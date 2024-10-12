@@ -1,0 +1,16 @@
+{
+    "name": "Schema.Unity.Runtime",
+    "rootNamespace": "Schema.Unity",
+    "references": [
+        "Schema.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
