@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Schema.Core
@@ -59,6 +60,56 @@ namespace Schema.Core
             }
             
             return SchemaResponse.Success("Successfully added attribute: " + newAttributeName);
+        }
+
+        public SchemaResponse ConvertAttributeType(string attributeName, DataType newType)
+        {
+            var attribute = Attributes.Find(a => a.AttributeName == attributeName);
+            var prevDataType = attribute.DataType;
+            
+            try
+            {
+                foreach (var entry in Entries)
+                {
+                    var entryData = entry.EntryData[attributeName];
+
+                    if (prevDataType.Equals(DataType.String))
+                    {
+                        string data = (string)entryData;
+                        if (string.IsNullOrEmpty(data))
+                        {
+                            entryData = newType.DefaultValue;
+                        }
+                        else if (newType.Equals(DataType.Integer))
+                        {
+                            entryData = Convert.ToInt32(data);
+                        }
+                        else if (newType.Equals(DataType.DateTime))
+                        {
+                            entryData = DateTime.Parse(data);
+                        }
+                    }
+                    else if (newType.Equals(DataType.String))
+                    {
+                        entryData = entryData.ToString();
+                    }
+                    else
+                    {
+                        return SchemaResponse.Error($"Cannot convert attribute {attributeName} to type {newType}");
+                    }
+                        
+                    entry.EntryData[attributeName] = entryData;
+                }
+            }
+            catch (FormatException e)
+            {
+                return SchemaResponse.Error("Failed to convert attribute " + attributeName + " to type " + newType + ": " + e.Message);
+            }
+            
+            attribute.DataType = newType;
+            attribute.DefaultValue = newType.DefaultValue;
+            
+            return SchemaResponse.Success($"Successfully converted attribute {attributeName} to type {newType}");
         }
     }
 }

@@ -1,10 +1,10 @@
 namespace Schema.Core
 {
-    public interface IStorageFormat
+    public interface IStorageFormat<T>
     {
         /// File extension for the format
         string Extension { get; }  
-        T Load<T>(string filePath);
-        void Save<T>(string filePath, T data);
+        T Load(string filePath);
+        void Save(string filePath, T data);
     }
 }

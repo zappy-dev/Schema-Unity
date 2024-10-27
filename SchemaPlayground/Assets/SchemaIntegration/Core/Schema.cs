@@ -47,8 +47,10 @@ namespace Schema.Core
             });
         }
 
-        public static SchemaResponse CreateNewSchema(string name)
+        public static SchemaResponse AddSchema(DataScheme scheme)
         {
+            string name = scheme.SchemeName;
+            
             // input validation
             if (DataSchemes.ContainsKey(name))
             {
@@ -60,11 +62,9 @@ namespace Schema.Core
                 return SchemaResponse.Error("Schema name is invalid: " + name);
             }
         
-            // business logic
-            DataScheme scheme = new DataScheme(name);
             DataSchemes.Add(name, scheme);
             
-            return SchemaResponse.Success(scheme);
+            return SchemaResponse.Success($"Schema added: {name}");
         }
     }
 
@@ -90,7 +90,7 @@ namespace Schema.Core
         public static SchemaResponse Error(string errorMessage) => 
             new SchemaResponse(status: RequestStatus.Error, payload: errorMessage);
 
-        public static SchemaResponse Success(object payload) =>
-            new SchemaResponse(status: RequestStatus.Success, payload: payload);
+        public static SchemaResponse Success(string message) =>
+            new SchemaResponse(status: RequestStatus.Success, payload: message);
     }
 }

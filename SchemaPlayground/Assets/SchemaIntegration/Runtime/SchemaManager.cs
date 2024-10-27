@@ -8,7 +8,7 @@ namespace Schema.Unity
     {
         private string _dataPath = Application.dataPath + "/Resources/Schemes/";
 
-        private readonly IStorageFormat devStorageFormat;
+        private readonly IStorageFormat<DataScheme> devStorageFormat;
 
         // Load a scheme from disk
         public DataScheme LoadScheme(string schemeName)
@@ -16,7 +16,7 @@ namespace Schema.Unity
             string filePath = _dataPath + schemeName + devStorageFormat.Extension;
             if (File.Exists(filePath))
             {
-                return devStorageFormat.Load<DataScheme>(filePath);
+                return devStorageFormat.Load(filePath);
             }
 
             Debug.LogError("Scheme file not found!");
