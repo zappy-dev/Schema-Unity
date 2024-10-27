@@ -1,11 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using Schema.Core;
+using Unity.Profiling;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Assertions;
+using UnityEngine.EventSystems;
 
 namespace Schema.Unity.Editor
 {
@@ -39,6 +42,8 @@ namespace Schema.Unity.Editor
             newAttributeName = string.Empty;
         }
 
+        private static ProfilerMarker explorerViewMarker = new ProfilerMarker("SchemaEditor:ExplorerView");
+        private static ProfilerMarker tableViewMarker = new ProfilerMarker("SchemaEditor:TableView");
         private void OnGUI()
         {
             GUILayout.Label("Scheme Editor", EditorStyles.boldLabel);
@@ -51,11 +56,16 @@ namespace Schema.Unity.Editor
             GUILayout.BeginHorizontal();
             // Scrollable area to list existing schemes
 
-            OnSchemaExplorerGUI();
+            using (var _ = explorerViewMarker.Auto())
+            {
+                OnSchemaExplorerGUI();
+            }
 
             DrawVerticalLine();
-
-            OnTableViewGUI();
+            using (var _ = tableViewMarker.Auto())
+            {
+                OnTableViewGUI();
+            }
             // Table View
             GUILayout.EndHorizontal();
         }
@@ -147,6 +157,12 @@ namespace Schema.Unity.Editor
                 EditorGUILayout.HelpBox($"Schema '{selectedSchemaName}' does not exist.", MessageType.Warning);
                 return;
             }
+            
+            int attributeCount = schema.Attributes.Count;
+            int entryCount = schema.Entries.Count;
+                
+            // mapping entries to control IDs for focus/navigation management
+            int[] controlIds = new int[attributeCount * entryCount];
 
             using (new GUILayout.VerticalScope())
             {
@@ -158,30 +174,34 @@ namespace Schema.Unity.Editor
                 }
                     
                 tableViewScrollPosition = GUILayout.BeginScrollView(tableViewScrollPosition, alwaysShowHorizontal: true, alwaysShowVertical: true);
-
+                
                 // render columns
                 using (new GUILayout.HorizontalScope())
                 {
-                    foreach (var attribute in schema.Attributes)
+                    for (var attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                     {
+                        var attribute = schema.Attributes[attributeIdx];
                         GUILayout.Label(attribute.AttributeName, EditorStyles.boldLabel, GUILayout.MaxWidth(90));
-                        if (EditorGUILayout.DropdownButton(new GUIContent(attribute.DataType.TypeName), FocusType.Keyboard, GUILayout.MaxWidth(60)))
+                        if (EditorGUILayout.DropdownButton(new GUIContent(attribute.DataType.TypeName),
+                                FocusType.Keyboard, GUILayout.MaxWidth(60)))
                         {
                             GenericMenu menu = new GenericMenu();
 
                             foreach (var builtInType in DataType.BuiltInTypes)
                             {
-                                menu.AddItem(new GUIContent(builtInType.TypeName), builtInType == attribute.DataType, () =>
-                                {
-                                    Debug.Log("Type selected?");
-                                    latestResponse = schema.ConvertAttributeType(attributeName: attribute.AttributeName, newType: builtInType);
-                                });
+                                menu.AddItem(new GUIContent(builtInType.TypeName), builtInType == attribute.DataType,
+                                    () =>
+                                    {
+                                        latestResponse =
+                                            schema.ConvertAttributeType(attributeName: attribute.AttributeName,
+                                                newType: builtInType);
+                                    });
                             }
-                            
+
                             menu.ShowAsContext();
                         }
                     }
-                        
+
                     newAttributeName = GUILayout.TextField(newAttributeName, GUILayout.ExpandWidth(false), GUILayout.MinWidth(100));
 
                     using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newAttributeName)))
@@ -195,17 +215,23 @@ namespace Schema.Unity.Editor
                 }
                 
                 // render data entries
-                foreach (var entry in schema.Entries)
+                for (int entryIdx = 0; entryIdx < entryCount; entryIdx++)
                 {
+                    var entry = schema.Entries[entryIdx];
                     using (new GUILayout.HorizontalScope())
                     {
-                        foreach (var attribute in schema.Attributes)
+                        for (int attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                         {
+                            var attribute = schema.Attributes[attributeIdx];
                             var attributeName = attribute.AttributeName;
                             var entryValue = entry.EntryData[attributeName];
                             using (var changed = new EditorGUI.ChangeCheckScope())
                             {
                                 entryValue = GUILayout.TextField(entryValue.ToString(), DEFAULT_ENTRY_WIDTH);
+                                int lastControlId = EditorGUIUtility.GetControlID(FocusType.Passive);
+                                // log control ids
+                                // Debug.Log($"({entryIdx},{attributeIdx}): {lastControlId}");
+                                controlIds[entryIdx * attributeCount + attributeIdx] = lastControlId;
 
                                 if (changed.changed)
                                 {
@@ -222,6 +248,71 @@ namespace Schema.Unity.Editor
                     Debug.Log($"Added entry to '{schema.SchemeName}'.`");
                 }
                 GUILayout.EndScrollView();
+            }
+            
+            // handle arrow key navigation of table
+            var ev = Event.current;
+            // Sometimes this receives multiple events but one doesn't contain a keycode?
+            if (ev.type == EventType.KeyUp && ev.keyCode != KeyCode.None)
+            {
+                if (ev.keyCode == KeyCode.Space)
+                {
+                    var sb = new StringBuilder();
+                    for (var index = 0; index < controlIds.Length; index++)
+                    {
+                        if (index != 0 && index % attributeCount == 0)
+                        {
+                            sb.AppendLine();
+                        }
+                        var controlId = controlIds[index];
+                        sb.Append($"{controlId} ");
+                    }
+                    
+                    Debug.Log(sb.ToString());
+                }
+               
+                // IDK why this is off-by-one
+                int focusedIndex = Array.IndexOf(controlIds, EditorGUIUtility.keyboardControl + 1);
+                
+                if (focusedIndex != -1)
+                {
+                    // shift control focus and stay clamped to valid controls
+                    int nextFocusedIndex = -1;
+                    switch (ev.keyCode)
+                    {
+                        case KeyCode.UpArrow:
+                            if (focusedIndex - attributeCount >= 0)
+                            {
+                                nextFocusedIndex = focusedIndex - attributeCount;
+                            }
+                            break;
+                        case KeyCode.DownArrow:
+                            if (focusedIndex + attributeCount < controlIds.Length)
+                            {
+                                nextFocusedIndex = focusedIndex + attributeCount;
+                            }
+                            break;
+                        case KeyCode.LeftArrow:
+                            if (focusedIndex % attributeCount > 0)
+                            {
+                                nextFocusedIndex = focusedIndex - 1;
+                            }
+                            break;
+                        case KeyCode.RightArrow:
+                            if (focusedIndex % attributeCount < attributeCount - 1)
+                            {
+                                nextFocusedIndex = focusedIndex + 1;
+                            }
+                            break;
+                    }
+
+                    if (nextFocusedIndex != -1)
+                    {
+                        // IDK why this is off-by-one
+                        GUIUtility.keyboardControl = controlIds[nextFocusedIndex] - 1;
+                        ev.Use(); // make sure to consume event if we used it
+                    }
+                }
             }
         }
 

@@ -6,7 +6,7 @@ namespace Schema.Core
     {
         public static readonly DataType String = new DataType("String", string.Empty);
         public static readonly DataType Integer = new DataType("Integer", 0);
-        public static readonly DataType DateTime = new DataType("Date Time", System.DateTime.Now);
+        public static readonly DataType DateTime = new DataType("Date Time", System.DateTime.Today);
 
         public static readonly DataType[] BuiltInTypes = {
             String,
