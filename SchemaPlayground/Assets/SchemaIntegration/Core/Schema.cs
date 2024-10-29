@@ -6,6 +6,8 @@ namespace Schema.Core
     {
         public static Dictionary<string, DataScheme> DataSchemes = new Dictionary<string, DataScheme>();
         
+        public static IEnumerable<string> AllSchemes => DataSchemes.Keys;
+        
         static Schema()
         {
             // TODO: dynamically load
@@ -47,22 +49,22 @@ namespace Schema.Core
             });
         }
 
-        public static SchemaResponse AddSchema(DataScheme scheme)
+        public static SchemaResponse AddSchema(DataScheme scheme, bool overwriteExisting)
         {
-            string name = scheme.SchemeName;
+            string name = scheme.SchemaName;
             
             // input validation
-            if (DataSchemes.ContainsKey(name))
-            {
-                return SchemaResponse.Error("Schema already exists: " + name);
-            }
-
             if (string.IsNullOrEmpty(name))
             {
                 return SchemaResponse.Error("Schema name is invalid: " + name);
             }
+            
+            if (DataSchemes.ContainsKey(name) && !overwriteExisting)
+            {
+                return SchemaResponse.Error("Schema already exists: " + name);
+            }
         
-            DataSchemes.Add(name, scheme);
+            DataSchemes[name] = scheme;
             
             return SchemaResponse.Success($"Schema added: {name}");
         }

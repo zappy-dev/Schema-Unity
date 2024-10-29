@@ -2,6 +2,7 @@ using System;
 
 namespace Schema.Core
 {
+    [Serializable]
     public sealed class DataType
     {
         public static readonly DataType String = new DataType("String", string.Empty);
@@ -18,7 +19,12 @@ namespace Schema.Core
         
         public object DefaultValue { get; private set;  }
 
-        private DataType(string typeName, object defaultValue)
+        private DataType()
+        {
+            
+        }
+
+        private DataType(string typeName, object defaultValue) : this()
         {
             TypeName = typeName;
             DefaultValue = defaultValue;

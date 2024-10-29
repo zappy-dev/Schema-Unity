@@ -1,4 +1,4 @@
-namespace Schema.Core
+namespace Schema.Core.Serialization
 {
     public interface IStorageFormat<T>
     {

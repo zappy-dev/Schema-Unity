@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 
 namespace Schema.Core
 {
+    [Serializable]
     public class DataEntry
     {
         public Dictionary<string, object> EntryData { get; set; }

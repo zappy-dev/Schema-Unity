@@ -1,8 +1,6 @@
 namespace Schema.Core
 {
-    /// <summary>
-    /// 
-    /// </summary>
+    [System.Serializable]
     public class AttributeDefinition
     {
         public string AttributeName { get; set; }

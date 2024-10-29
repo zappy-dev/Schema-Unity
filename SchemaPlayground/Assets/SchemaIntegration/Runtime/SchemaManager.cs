@@ -1,5 +1,6 @@
 using System.IO;
 using Schema.Core;
+using Schema.Core.Serialization;
 using UnityEngine;
 
 namespace Schema.Unity
@@ -26,7 +27,7 @@ namespace Schema.Unity
         // Save a scheme to disk
         public void SaveScheme(DataScheme scheme)
         {
-            string filePath = _dataPath + scheme.SchemeName + devStorageFormat.Extension;
+            string filePath = _dataPath + scheme.SchemaName + devStorageFormat.Extension;
             devStorageFormat.Save(filePath, scheme);
         }
     }

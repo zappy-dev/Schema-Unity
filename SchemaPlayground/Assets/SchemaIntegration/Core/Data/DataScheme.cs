@@ -4,24 +4,29 @@ using System.Collections.Generic;
 namespace Schema.Core
 {
     // Representing a data scheme in memory
+    [Serializable]
     public class DataScheme
     {
-        public string SchemeName { get; set; }
+        public string SchemaName { get; set; }
         public List<AttributeDefinition> Attributes { get; set; }
         public List<DataEntry> Entries { get; set; }
 
-        public DataScheme(string name)
+        public DataScheme()
         {
-            SchemeName = name;
             Attributes = new List<AttributeDefinition>();
             Entries = new List<DataEntry>();
+        }
+
+        public DataScheme(string name) : this()
+        {
+            SchemaName = name;
         }
 
         // Methods for adding/updating entries, etc.
 
         public override string ToString()
         {
-            return $"DataSchema: {SchemeName}";
+            return $"DataSchema: {SchemaName}";
         }
 
         public void CreateNewEntry()
@@ -110,6 +115,22 @@ namespace Schema.Core
             attribute.DefaultValue = newType.DefaultValue;
             
             return SchemaResponse.Success($"Successfully converted attribute {attributeName} to type {newType}");
+        }
+
+        public void IncreaseAttributeRank(AttributeDefinition attribute)
+        {
+            var attributeIdx = Attributes.IndexOf(attribute);
+            var newIdx = attributeIdx - 1; // shift lower to appear sooner
+            Attributes[attributeIdx] = Attributes[newIdx];
+            Attributes[newIdx] = attribute;
+        }
+
+        public void DecreaseAttributeRank(AttributeDefinition attribute)
+        {
+            var attributeIdx = Attributes.IndexOf(attribute);
+            var newIdx = attributeIdx + 1; // shift higher to appear later
+            Attributes[attributeIdx] = Attributes[newIdx];
+            Attributes[newIdx] = attribute;
         }
     }
 }
