@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Text;
 using Schema.Core;
+using Schema.Core.Serialization;
 using Unity.Profiling;
 using UnityEditor;
 using UnityEngine;
@@ -10,6 +12,36 @@ namespace Schema.Unity.Editor
 {
     public class SchemeEditorWindow : EditorWindow
     {
+        #region Static Fields and Constants
+
+        private const string EDITORPREFS_KEY_SELECTEDSCHEMA = "Schema:SelectedSchemaName";
+        
+        private static ProfilerMarker explorerViewMarker = new ProfilerMarker("SchemaEditor:ExplorerView");
+        private static ProfilerMarker tableViewMarker = new ProfilerMarker("SchemaEditor:TableView");
+
+        private const float SETTINGS_WIDTH = 50;
+
+        private static bool SettingsButton(string text = "", float width = SETTINGS_WIDTH) => EditorGUILayout.DropdownButton(
+            new GUIContent(text, EditorGUIUtility.IconContent(EditorIcon.GEAR_ICON_NAME).image),
+            FocusType.Keyboard, GUILayout.MaxWidth(width));
+        
+        
+        private bool DropdownButton(string text = "", float width = SETTINGS_WIDTH, GUIStyle style = null)
+        {
+            var buttonStyle = style ?? defaultDropdownButtonStyle;
+            return EditorGUILayout.DropdownButton(
+                new GUIContent(text),
+                FocusType.Keyboard, buttonStyle, GUILayout.Width(width));
+        }
+
+        private static string DEFAULT_CONTENT_PATH;
+        private static string DEFAULT_MANIFEST_LOAD_PATH;
+        private FileSystemWatcher manifestWatcher;
+        
+        #endregion
+        
+        #region Fields and Properties
+
         private SchemaResponse latestResponse;
         private Vector2 explorerScrollPosition;
         private Vector2 tableViewScrollPosition;
@@ -21,9 +53,22 @@ namespace Schema.Unity.Editor
         [NonSerialized]
         private string newAttributeName = string.Empty;
         
+        public string manifestFilePath = string.Empty;
+        
         [SerializeField]
         private int selectedSchemaIndex = -1;
+        
+        private GUIStyle leftAlignedButtonStyle;
+        private GUIStyle rightAlignedLabelStyle;
+        private GUIStyle defaultDropdownButtonStyle;
+        
+        private DateTime lastChanged = DateTime.MinValue;
+        private readonly TimeSpan debounceTime = TimeSpan.FromMilliseconds(500);
+        
+        #endregion
 
+        #region Unity Lifecycle Methods
+        
         [MenuItem("Tools/Scheme Editor")]
         public static void ShowWindow()
         {
@@ -36,13 +81,156 @@ namespace Schema.Unity.Editor
             selectedSchemaIndex = -1;
             selectedSchemaName = string.Empty;
             newAttributeName = string.Empty;
+
+            DEFAULT_CONTENT_PATH = Path.Combine(Path.GetFullPath(Application.dataPath + "/.."), "Content");
+            DEFAULT_MANIFEST_LOAD_PATH = GetContentPath("Manifest.json");
+
+            manifestFilePath = DEFAULT_MANIFEST_LOAD_PATH;
+            OnLoadManifest("On Editor Startup");
+
+            InitializeFileWatcher();
+
+            var storedSelectedSchema = EditorPrefs.GetString(EDITORPREFS_KEY_SELECTEDSCHEMA, null);
+            if (!string.IsNullOrEmpty(storedSelectedSchema))
+            {
+                OnSelectSchema(storedSelectedSchema, "Restoring from Editor Preferences");
+            }
+        }
+        
+
+        private string GetContentPath(string schemaFileName)
+        {
+            return Path.Combine(DEFAULT_CONTENT_PATH, schemaFileName);
+        }
+        
+        private void InitializeFileWatcher()
+        {
+            if (manifestWatcher == null)
+            {
+                manifestWatcher = new FileSystemWatcher 
+                {
+                    Path = Path.GetDirectoryName(manifestFilePath),
+                    Filter = Path.GetFileName(manifestFilePath),
+                    NotifyFilter = NotifyFilters.LastWrite
+                };
+                manifestWatcher.Changed += OnManifestChanged;
+                manifestWatcher.EnableRaisingEvents = true;
+            }
         }
 
-        private static ProfilerMarker explorerViewMarker = new ProfilerMarker("SchemaEditor:ExplorerView");
-        private static ProfilerMarker tableViewMarker = new ProfilerMarker("SchemaEditor:TableView");
+        private void OnManifestChanged(object sender, FileSystemEventArgs e)
+        {
+            DateTime now = DateTime.Now;
+
+            if (now - lastChanged < debounceTime) return;
+
+            lastChanged = now;
+
+            // Switch to main thread using UnityEditor.EditorApplication.delayCall
+            EditorApplication.delayCall += () =>
+            {
+                // You can now safely interact with Unity API on the main thread here
+                
+                OnLoadManifest($"On Manifest File Changed ");
+                Repaint();
+            };
+        }
+
+        private void OnDisable()
+        {
+            manifestWatcher?.Dispose();
+        }
+
+        #endregion
+        
+        #region UI Command Handling
+
+        private void AddSchema(DataScheme newSchema, string importFilePath = null)
+        {
+            bool overwriteExisting = false;
+            if (Core.Schema.DoesSchemaExist(newSchema.SchemaName))
+            {
+                overwriteExisting = EditorUtility.DisplayDialog("Add Schema", $"A Schema named {newSchema.SchemaName} already exists. " +
+                                                                              $"Do you want to overwrite this sceham>", "Yes", "No");
+            }
+            
+            latestResponse = Schema.Core.Schema.AddSchema(newSchema, overwriteExisting, importFilePath: importFilePath);
+            switch (latestResponse.Status)
+            {
+                case RequestStatus.Error:
+                    Debug.LogError(latestResponse.Payload);
+                    break;
+                case RequestStatus.Success:
+                    Debug.Log($"New scheme '{newSchema.SchemaName}' created.");
+                    OnSelectSchema(newSchema.SchemaName, "Added schema");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+
+        private void OnSelectSchema(string schemaName, string context)
+        {
+            Debug.Log($"Opening {schemaName} for editing, {context}...");
+            selectedSchemaName = schemaName;
+            var schemaNames = Schema.Core.Schema.AllSchemes.ToArray();
+            selectedSchemaIndex = Array.IndexOf(schemaNames, selectedSchemaName);
+            EditorPrefs.SetString(EDITORPREFS_KEY_SELECTEDSCHEMA, selectedSchemaName);
+            newAttributeName = string.Empty;
+        }
+
+        private void OnLoadManifest(string context)
+        {
+            using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
+            Debug.Log($"Loading manifest, {context}...");
+            latestResponse = Core.Schema.LoadFromManifest(manifestFilePath, progressReporter);
+            Debug.Log(latestResponse);
+        }
+
+        #endregion
+
+        #region Rendering Methods
+
+        private void InitializeStyles()
+        {
+            leftAlignedButtonStyle = new GUIStyle(GUI.skin.button);
+            leftAlignedButtonStyle.alignment = TextAnchor.MiddleLeft;
+            leftAlignedButtonStyle.padding = new RectOffset(10, 10, 5, 5);
+
+            rightAlignedLabelStyle = new GUIStyle(GUI.skin.label);
+            rightAlignedLabelStyle.alignment = TextAnchor.MiddleRight;
+            
+            defaultDropdownButtonStyle = new GUIStyle("MiniPullDown");
+            defaultDropdownButtonStyle.alignment = TextAnchor.MiddleCenter;
+        }
+        
         private void OnGUI()
         {
+            InitializeStyles();
+            debugIdx = 0;
             GUILayout.Label("Scheme Editor", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Label("Manifest Path");
+                
+                using (new EditorGUI.DisabledScope())
+                {
+                    GUILayout.TextField(manifestFilePath);
+                }
+
+                if (GUILayout.Button("Load"))
+                {
+                    OnLoadManifest("On User Load");
+                }
+
+                // save schemas to manifest
+                if (GUILayout.Button("Save"))
+                {
+                    Debug.Log($"Saving manifest to {manifestFilePath}");
+                    latestResponse = Core.Schema.SaveManifest(manifestFilePath);
+                }
+            }
 
             if (latestResponse.Payload != null)
             {
@@ -65,103 +253,71 @@ namespace Schema.Unity.Editor
             // Table View
             GUILayout.EndHorizontal();
         }
-
+        
         private void OnSchemaExplorerGUI()
         {
-            using (new GUILayout.VerticalScope(GUILayout.ExpandWidth(false)))
+            using (new EditorGUILayout.VerticalScope(GUILayout.Width(400)))
             {
-                GUILayout.Label($"Schema Explorer ({Schema.Core.Schema.DataSchemes.Count} count):", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
-                explorerScrollPosition = GUILayout.BeginScrollView(explorerScrollPosition, GUILayout.Width(200), GUILayout.ExpandWidth(false));
+                GUILayout.Label($"Schema Explorer ({Schema.Core.Schema.AllSchemes.Count()} count):", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
 
-                // list available schemas
-                var schemaNames = Schema.Core.Schema.AllSchemes.ToArray();
-
-                using (var schemaChange = new EditorGUI.ChangeCheckScope())
+                using (var explorerScrollView = new EditorGUILayout.ScrollViewScope(explorerScrollPosition))
                 {
-                    selectedSchemaIndex = GUILayout.SelectionGrid(selectedSchemaIndex, schemaNames, 1);
-                    
-                    if (schemaChange.changed)
-                    {
-                        var nextSelectedSchema = schemaNames[selectedSchemaIndex];
-                        OnSelectSchema(nextSelectedSchema);
-                    }
-                }
-            
-                // New Schema creation form
-                GUILayout.Space(10);
-                using (new EditorGUILayout.HorizontalScope(GUILayout.ExpandWidth(false)))
-                {
-                    // Input field to add a new scheme
-                    newSchemeName = EditorGUILayout.TextField( newSchemeName, GUILayout.ExpandWidth(false));
+                    explorerScrollPosition = explorerScrollView.scrollPosition;
+                    // list available schemas
+                    var schemaNames = Schema.Core.Schema.AllSchemes.ToArray();
 
-                    using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newSchemeName)))
+                    using (var schemaChange = new EditorGUI.ChangeCheckScope())
                     {
-                        if (AddButton("Add Schema"))
+                        selectedSchemaIndex = GUILayout.SelectionGrid(selectedSchemaIndex, schemaNames, 1, leftAlignedButtonStyle);
+                        
+                        if (schemaChange.changed)
                         {
-                            var newSchema = new DataScheme(newSchemeName);
-                            AddSchema(newSchema);
-                            newSchemeName = string.Empty; // clear out new schema field name since it's unlikely someone wants to make a new schema with the same name
+                            var nextSelectedSchema = schemaNames[selectedSchemaIndex];
+                            OnSelectSchema(nextSelectedSchema, "Selected Schema in Explorer");
                         }
                     }
-                }
                 
-                GUILayout.Space(10);
-                
-                // render import options
-                if (EditorGUILayout.DropdownButton(new GUIContent("Import"), 
-                        FocusType.Keyboard, GUILayout.ExpandWidth(false)))
-                {
-                    GenericMenu menu = new GenericMenu();
-
-                    foreach (var storageFormat in StorageUtil.AllFormats)
+                    // New Schema creation form
+                    EditorGUILayout.Space(10, false);
+                    using (new EditorGUILayout.HorizontalScope(GUILayout.ExpandWidth(false)))
                     {
-                        menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), false, () =>
+                        // Input field to add a new scheme
+                        newSchemeName = EditorGUILayout.TextField( newSchemeName, GUILayout.ExpandWidth(false));
+
+                        using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newSchemeName)))
                         {
-                            if (storageFormat.TryImport(out var importedSchema))
+                            if (AddButton("Add Schema"))
                             {
-                                AddSchema(importedSchema);
+                                var newSchema = new DataScheme(newSchemeName);
+                                AddSchema(newSchema, importFilePath: GetContentPath($"{newSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}"));
+                                newSchemeName = string.Empty; // clear out new schema field name since it's unlikely someone wants to make a new schema with the same name
                             }
-                        });
+                        }
                     }
-                        
-                    menu.ShowAsContext();
+                    
+                    EditorGUILayout.Space(10, false);
+                    
+                    // render import options
+                    if (EditorGUILayout.DropdownButton(new GUIContent("Import"), 
+                            FocusType.Keyboard, GUILayout.ExpandWidth(false)))
+                    {
+                        GenericMenu menu = new GenericMenu();
+
+                        foreach (var storageFormat in Storage.AllFormats)
+                        {
+                            menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), false, () =>
+                            {
+                                if (storageFormat.TryImport(out var importedSchema, out var importFilePath))
+                                {
+                                    AddSchema(importedSchema, importFilePath: importFilePath);
+                                }
+                            });
+                        }
+                            
+                        menu.ShowAsContext();
+                    }
                 }
-
-                GUILayout.EndScrollView();
             }
-        }
-
-        private void AddSchema(DataScheme newSchema)
-        {
-            bool overwriteExisting = false;
-            if (Core.Schema.DataSchemes.ContainsKey(newSchema.SchemaName))
-            {
-                overwriteExisting = EditorUtility.DisplayDialog("Add Schema", $"A Schema named {newSchema.SchemaName} already exists. " +
-                                                                              $"Do you want to overwrite this sceham>", "Yes", "No");
-            }
-            
-            latestResponse = Schema.Core.Schema.AddSchema(newSchema, overwriteExisting);
-            switch (latestResponse.Status)
-            {
-                case RequestStatus.Error:
-                    Debug.LogError(latestResponse.Payload);
-                    break;
-                case RequestStatus.Success:
-                    Debug.Log($"New scheme '{newSchema.SchemaName}' created.");
-                    OnSelectSchema(newSchema.SchemaName);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
-        }
-
-        private void OnSelectSchema(string schemaName)
-        {
-            Debug.Log($"Opening {schemaName} for editing...");
-            selectedSchemaName = schemaName;
-            var schemaNames = Schema.Core.Schema.AllSchemes.ToArray();
-            selectedSchemaIndex = Array.IndexOf(schemaNames, selectedSchemaName);
-            newAttributeName = string.Empty;
         }
 
         void OnTableViewGUI()
@@ -172,7 +328,7 @@ namespace Schema.Unity.Editor
                 return;
             }
 
-            if (!Schema.Core.Schema.DataSchemes.TryGetValue(selectedSchemaName, out var schema))
+            if (!Schema.Core.Schema.TryGetSchema(selectedSchemaName, out var schema))
             {
                 EditorGUILayout.HelpBox($"Schema '{selectedSchemaName}' does not exist.", MessageType.Warning);
                 return;
@@ -190,13 +346,24 @@ namespace Schema.Unity.Editor
 
                 using (new GUILayout.HorizontalScope())
                 {
+                    EditorGUILayout.LabelField("Storage Path", GUILayout.ExpandWidth(false));
+                    using (new EditorGUI.DisabledScope())
+                    {
+                        EditorGUILayout.TextField(Core.Schema.GetSchemaManifest(schema.SchemaName)
+                            .GetData(Core.Schema.MANIFEST_ATTRIBUTE_FILEPATH).ToString());
+                    }
+                    if (GUILayout.Button("Save", GUILayout.ExpandWidth(true)))
+                    {
+                        latestResponse = Core.Schema.SaveSchema(schema);
+                    }
+                    
                     // render export options
                     if (EditorGUILayout.DropdownButton(new GUIContent("Export"), 
                             FocusType.Keyboard, GUILayout.ExpandWidth(false)))
                     {
                         GenericMenu menu = new GenericMenu();
 
-                        foreach (var storageFormat in StorageUtil.AllFormats)
+                        foreach (var storageFormat in Storage.AllFormats)
                         {
                             menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), false, () =>
                             {
@@ -209,53 +376,48 @@ namespace Schema.Unity.Editor
                 }
                     
                 tableViewScrollPosition = GUILayout.BeginScrollView(tableViewScrollPosition, alwaysShowHorizontal: true, alwaysShowVertical: true);
-                
-                // render columns
+
+                // render table header
                 using (new GUILayout.HorizontalScope())
                 {
+                    // GUILayoutUtility.GetRect(SETTINGS_WIDTH, 10, GUILayout.ExpandWidth(false));
+                    EditorGUILayout.LabelField("#", rightAlignedLabelStyle, GUILayout.Width(SETTINGS_WIDTH), GUILayout.ExpandWidth(false));
+                    // row settings gear spacing
+                    
                     for (var attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                     {
                         var attribute = schema.Attributes[attributeIdx];
-                        GUILayout.Label(attribute.AttributeName, EditorStyles.boldLabel, GUILayout.MaxWidth(90));
+                        // GUILayout.Label(attribute.AttributeName, EditorStyles.boldLabel, GUILayout.MaxWidth(attribute.ColumnWidth - SETTINGS_WIDTH));
                         
-                        if (EditorGUILayout.DropdownButton(new GUIContent("", EditorGUIUtility.IconContent(EditorIcon.GEAR_ICON_NAME).image),
-                                FocusType.Keyboard, GUILayout.MaxWidth(60)))
+                        // column settings gear
+                        if (DropdownButton(attribute.AttributeName, attribute.ColumnWidth))
                         {
-                            GenericMenu menu = new GenericMenu();
+                            var columnOptionsMenu = new GenericMenu();
 
                             // attribute column ordering options
-                            var moveLeftOption = new GUIContent("Move Left");
-                            if (attributeIdx == 0)
+                            columnOptionsMenu.AddItem(new GUIContent("Move Left"), isDisabled: attributeIdx == 0, () =>
                             {
-                                menu.AddDisabledItem(moveLeftOption);
-                            }
-                            else
+                                schema.IncreaseAttributeRank(attribute);
+                            });
+                            columnOptionsMenu.AddItem(new GUIContent("Move Right"), isDisabled: attributeIdx == attributeCount - 1, () =>
                             {
-                                menu.AddItem(moveLeftOption, false, () =>
-                                {
-                                    schema.IncreaseAttributeRank(attribute);
-                                });
-                            }
-
-                            var moveRightOption = new GUIContent("Move Right");
-                            if (attributeIdx == attributeCount - 1)
-                            {
-                                menu.AddDisabledItem(moveRightOption);
-                            }
-                            else
-                            {
-                                menu.AddItem(moveRightOption, false, () =>
-                                {
-                                    schema.DecreaseAttributeRank(attribute);
-                                });
-                            }
+                                schema.DecreaseAttributeRank(attribute);
+                            });
                             
-                            menu.AddSeparator("");
+                            columnOptionsMenu.AddSeparator("");
+                            
+                            columnOptionsMenu.AddItem(new GUIContent("Column Settings"), false, () =>
+                            {
+                                AttributeSettingsPrompt.ShowWindow(schema, attribute);
+                            });
+                            
+                            columnOptionsMenu.AddSeparator("");
                             
                             // options to convert type
                             foreach (var builtInType in DataType.BuiltInTypes)
                             {
-                                menu.AddItem(new GUIContent($"Convert Type/{builtInType.TypeName}"), builtInType.TypeName == attribute.DataType.TypeName,
+                                bool isMatchingType = builtInType.TypeName.Equals(attribute.DataType.TypeName);
+                                columnOptionsMenu.AddItem(new GUIContent($"Convert Type/{builtInType.TypeName}"), isMatchingType,
                                     () =>
                                     {
                                         latestResponse =
@@ -263,8 +425,18 @@ namespace Schema.Unity.Editor
                                                 newType: builtInType);
                                     });
                             }
+                            
+                            columnOptionsMenu.AddSeparator("");
+                            
+                            columnOptionsMenu.AddItem(new GUIContent("Delete Attribute"), false, () =>
+                            {
+                                if (EditorUtility.DisplayDialog("Schema", $"Are you sure you want to delete this attribute: {attribute.AttributeName}?", "Yes, delete this attribute", "No, cancel"))
+                                {
+                                    latestResponse = schema.DeleteAttribute(attribute);
+                                }
+                            });
 
-                            menu.ShowAsContext();
+                            columnOptionsMenu.ShowAsContext();
                         }
                     }
 
@@ -281,20 +453,49 @@ namespace Schema.Unity.Editor
                     }
                 }
                 
-                // render data entries
+                // render table body, schema data entries
                 for (int entryIdx = 0; entryIdx < entryCount; entryIdx++)
                 {
                     var entry = schema.Entries[entryIdx];
                     using (new GUILayout.HorizontalScope())
                     {
+                        // row settings gear
+                        if (DropdownButton($"{entryIdx}", style: defaultDropdownButtonStyle))
+                        {
+                            var rowOptionsMenu = new GenericMenu();
+                            rowOptionsMenu.AddItem(new GUIContent("Move Up"), isDisabled: entryIdx == 0, () =>
+                            {
+                                schema.MoveUpEntry(entry);
+                            });
+                            rowOptionsMenu.AddItem(new GUIContent("Move Down"), isDisabled: entryIdx == entryCount - 1, () =>
+                            {
+                                schema.MoveUpEntry(entry);
+                            });
+                            rowOptionsMenu.AddSeparator("");
+                            rowOptionsMenu.AddItem(new GUIContent("Delete Entry"), false, () =>
+                            {
+                                if (EditorUtility.DisplayDialog("Schema", "Are you s you want to delete this entry?", "Yes, delete this entry", "No, cancel"))
+                                {
+                                    latestResponse = schema.DeleteEntry(entry);
+                                }
+                            });
+                            rowOptionsMenu.ShowAsContext();
+                        }
+
+                        // EditorGUILayout.LabelField($"{entryIdx}.", rightAlignedLabelStyle, GUILayout.Width(SETTINGS_WIDTH));
                         for (int attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                         {
                             var attribute = schema.Attributes[attributeIdx];
                             var attributeName = attribute.AttributeName;
-                            var entryValue = entry.EntryData[attributeName];
+                            bool dataExists = entry.EntryData.TryGetValue(attributeName, out var entryValue);
+                            if (!dataExists)
+                            {
+                                // for some reason this data wasn't set yet
+                                entry.EntryData[attributeName] = attribute.CloneDefaultValue();
+                            }
                             using (var changed = new EditorGUI.ChangeCheckScope())
                             {
-                                entryValue = GUILayout.TextField(entryValue.ToString(), DEFAULT_ENTRY_WIDTH);
+                                entryValue = GUILayout.TextField(entryValue.ToString(), GUILayout.Width(attribute.ColumnWidth));
                                 int lastControlId = EditorGUIUtility.GetControlID(FocusType.Passive);
                                 controlIds[entryIdx * attributeCount + attributeIdx] = lastControlId;
 
@@ -307,16 +508,17 @@ namespace Schema.Unity.Editor
                     }
                 }
 
+                GUILayout.EndScrollView();
+                
                 // add new entry form
-                using (new EditorGUI.DisabledScope(schema.Attributes.Count == 0))
+                if (schema.Attributes.Count > 0)
                 {
-                    if (AddButton("Add Entry"))
+                    if (AddButton("Add New Entry", true))
                     {
                         schema.CreateNewEntry();
                         Debug.Log($"Added entry to '{schema.SchemaName}'.`");
                     }
                 }
-                GUILayout.EndScrollView();
             }
             
             // handle arrow key navigation of table
@@ -384,8 +586,6 @@ namespace Schema.Unity.Editor
                 }
             }
         }
-
-        private static readonly GUILayoutOption DEFAULT_ENTRY_WIDTH = GUILayout.Width(150);
         
         public static void DrawUILine(Color color, int thickness = 2, int padding = 10)
         {
@@ -396,16 +596,24 @@ namespace Schema.Unity.Editor
             r.width +=6;
             EditorGUI.DrawRect(r, color);
         }
+
+        private int debugIdx;
+        void Mark()
+        {
+            EditorGUILayout.LabelField($"Mark{debugIdx++}", GUILayout.ExpandWidth(false), GUILayout.Width(50));
+        }
         
         private void DrawVerticalLine(float thickness = 2)
         {
-            Rect rect = EditorGUILayout.GetControlRect(GUILayout.Width(thickness), GUILayout.ExpandHeight(true));
+            Rect rect = EditorGUILayout.GetControlRect(GUILayout.Width(thickness), GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(false));
             EditorGUI.DrawRect(rect, Color.white);
         }
 
-        public static bool AddButton(string text) => Button(text, EditorIcon.PLUS_ICON_NAME);
+        public static bool AddButton(string text, bool expandWidth = false) => Button(text, EditorIcon.PLUS_ICON_NAME, expandWidth: expandWidth);
 
-        public static bool Button(string text, string iconName) =>
-            GUILayout.Button(new GUIContent(text, EditorGUIUtility.IconContent(iconName).image), GUILayout.ExpandWidth(false));
+        public static bool Button(string text, string iconName, bool expandWidth = false) =>
+            GUILayout.Button(new GUIContent(text, EditorGUIUtility.IconContent(iconName).image), GUILayout.ExpandWidth(expandWidth));
+        
+        #endregion
     }
 }

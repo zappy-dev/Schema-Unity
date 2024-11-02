@@ -3,7 +3,7 @@ using System;
 namespace Schema.Core
 {
     [Serializable]
-    public sealed class DataType
+    public sealed class DataType : Defaultable
     {
         public static readonly DataType String = new DataType("String", string.Empty);
         public static readonly DataType Integer = new DataType("Integer", 0);
@@ -15,11 +15,9 @@ namespace Schema.Core
             DateTime
         };
         
-        public string TypeName { get; private set;  }
-        
-        public object DefaultValue { get; private set;  }
+        public string TypeName { get; set;  }
 
-        private DataType()
+        public DataType()
         {
             
         }

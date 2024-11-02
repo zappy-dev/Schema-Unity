@@ -3,17 +3,19 @@ using Newtonsoft.Json;
 
 namespace Schema.Core.Serialization
 {
-    public class JsonStorageFormat<T> : IStorageFormat<T> where T : new()
+    public class JsonStorageFormat : IStorageFormat<DataScheme>
     {
         public string Extension => "json";
-        public T Load(string filePath)
+        public DataScheme Load(string filePath)
         {
             string jsonData = File.ReadAllText(filePath);
-            T obj = JsonConvert.DeserializeObject<T>(jsonData);
-            return obj;
+            
+            // TODO: Handle a non-schema formatted file, converting into schema format
+            DataScheme schema = JsonConvert.DeserializeObject<DataScheme>(jsonData);
+            return schema;
         }
 
-        public void Save(string filePath, T data)
+        public void Save(string filePath, DataScheme data)
         {
             string jsonData = JsonConvert.SerializeObject(data, Formatting.Indented);
             File.WriteAllText(filePath, jsonData);

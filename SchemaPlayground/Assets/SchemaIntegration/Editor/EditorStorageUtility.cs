@@ -6,18 +6,9 @@ using UnityEngine;
 
 namespace Schema.Unity.Editor
 {
-    public static class StorageUtil
+    public static class EditorStorageUtility
     {
         public static string DefaultContentDirectory = "Content";
-        
-        public static IStorageFormat<DataScheme> JSONStorageFormat = new JsonStorageFormat<DataScheme>();
-        public static IStorageFormat<DataScheme> CSVStorageFormat = new CSVStorageFormat();
-
-        public static IEnumerable<IStorageFormat<DataScheme>> AllFormats = new[]
-        {
-            JSONStorageFormat,
-            CSVStorageFormat,
-        };
         
         public static void Export(this IStorageFormat<DataScheme> format, DataScheme schema)
         {
@@ -36,19 +27,19 @@ namespace Schema.Unity.Editor
             Debug.Log($"Schema \"{schema.SchemaName}\" exported successfully to {filePath}");
         }
 
-        public static bool TryImport(this IStorageFormat<DataScheme> format, out DataScheme schema)
+        public static bool TryImport(this IStorageFormat<DataScheme> format, out DataScheme schema, out string importFilePath)
         {
-            string filePath = EditorUtility.OpenFilePanel($"Import from {format.Extension.ToUpper()}", DefaultContentDirectory, format.Extension);
+            importFilePath = EditorUtility.OpenFilePanel($"Import from {format.Extension.ToUpper()}", DefaultContentDirectory, format.Extension);
 
-            if (string.IsNullOrEmpty(filePath))
+            if (string.IsNullOrEmpty(importFilePath))
             {
                 Debug.LogWarning("Import canceled, no file path provided.");
                 schema = null;
                 return false;
             }
-            Debug.Log($"Importing scheme from file: {filePath}");
+            Debug.Log($"Importing scheme from file: {importFilePath}");
 
-            schema = format.Load(filePath);
+            schema = format.Load(importFilePath);
             return true;
         }
     }

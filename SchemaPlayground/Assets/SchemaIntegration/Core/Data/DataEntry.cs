@@ -23,5 +23,11 @@ namespace Schema.Core
         {
             return EntryData.ContainsKey(attributeName) ? EntryData[attributeName] : null;
         }
+
+        public object this[string key]
+        {
+            get => EntryData[key];
+            set => EntryData[key] = value;
+        }
     }
 }

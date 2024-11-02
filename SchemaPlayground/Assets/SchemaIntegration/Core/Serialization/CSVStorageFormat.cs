@@ -20,6 +20,7 @@ namespace Schema.Core.Serialization
                 AttributeName = h,
                 DataType = DataType.String, // TODO: determine datatype, maybe scan entries or hint in header name, e.g header (type)
                 DefaultValue = string.Empty,
+                ColumnWidth = AttributeDefinition.DefaultColumnWidth,
             }));
 
             for (var rowIdx = 1; rowIdx < rows.Length; rowIdx++)
