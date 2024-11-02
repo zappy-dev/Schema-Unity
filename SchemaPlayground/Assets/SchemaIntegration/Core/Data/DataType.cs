@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Schema.Core
 {
@@ -31,6 +32,31 @@ namespace Schema.Core
         public override string ToString()
         {
             return TypeName;
+        }
+
+        private bool Equals(DataType other)
+        {
+            return TypeName.Equals(other.TypeName);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return ReferenceEquals(this, obj) || obj is DataType other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return (TypeName != null ? TypeName.GetHashCode() : 0);
+        }
+
+        public static bool operator ==(DataType left, DataType right)
+        {
+            return Equals(left, right);
+        }
+
+        public static bool operator !=(DataType left, DataType right)
+        {
+            return !Equals(left, right);
         }
     }
 }

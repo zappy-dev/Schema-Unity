@@ -11,6 +11,7 @@ namespace Schema.Core
     {
         #region Static Fields and Constants
         
+        public static string ManifestPath { get; private set; } 
         private static readonly Dictionary<string, DataScheme> dataSchemes = new Dictionary<string, DataScheme>();
         
         public static IEnumerable<string> AllSchemes => Manifest.Entries.Select(e => e[MANIFEST_ATTRIBUTE_SCHEMANAME].ToString());
@@ -116,6 +117,13 @@ namespace Schema.Core
                 Manifest.Entries.Add(manifestRecord);
             }
             
+            var saveResponse = SaveSchema(scheme);
+
+            if (!saveResponse.IsSuccess)
+            {
+                return saveResponse;
+            }
+            
             return SchemaResponse.Success($"Schema added: {schemaName}");
         }
 
@@ -131,6 +139,8 @@ namespace Schema.Core
             {
                 return SchemaResponse.Error("Manifest file not found: " + manifestPath);
             }
+
+            ManifestPath = manifestPath;
             
             lock (opLoc)
             {
@@ -181,6 +191,12 @@ namespace Schema.Core
             var schemaManifest = GetSchemaManifest(scheme.SchemaName);
             string filePath = schemaManifest[MANIFEST_ATTRIBUTE_FILEPATH].ToString();
             Storage.DefaultSchemaStorageFormat.Save(filePath, scheme);
+
+            var saveManifestResponse = SaveManifest(ManifestPath);
+            if (!saveManifestResponse.IsSuccess)
+            {
+                return saveManifestResponse;
+            }
             
             return SchemaResponse.Success($"Successfully saved schema for {scheme.SchemaName} to file {filePath}");
         }
@@ -200,6 +216,7 @@ namespace Schema.Core
         public RequestStatus Status => status;
         private object payload;
         public object Payload => payload;
+        public bool IsSuccess => status == RequestStatus.Success;
 
         public SchemaResponse(RequestStatus status, object payload)
         {

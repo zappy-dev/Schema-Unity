@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -24,13 +25,16 @@ namespace Schema.Unity.Editor
         private static bool SettingsButton(string text = "", float width = SETTINGS_WIDTH) => EditorGUILayout.DropdownButton(
             new GUIContent(text, EditorGUIUtility.IconContent(EditorIcon.GEAR_ICON_NAME).image),
             FocusType.Keyboard, GUILayout.MaxWidth(width));
+
+
+        private bool DropdownButton(string text = "", float width = SETTINGS_WIDTH, GUIStyle style = null) =>
+            DropdownButton(new GUIContent(text), width, style);
         
-        
-        private bool DropdownButton(string text = "", float width = SETTINGS_WIDTH, GUIStyle style = null)
+        private bool DropdownButton(GUIContent content, float width = SETTINGS_WIDTH, GUIStyle style = null)
         {
             var buttonStyle = style ?? defaultDropdownButtonStyle;
             return EditorGUILayout.DropdownButton(
-                new GUIContent(text),
+                content,
                 FocusType.Keyboard, buttonStyle, GUILayout.Width(width));
         }
 
@@ -42,7 +46,13 @@ namespace Schema.Unity.Editor
         
         #region Fields and Properties
 
-        private SchemaResponse latestResponse;
+        private List<SchemaResponse> responseHistory = new List<SchemaResponse>();
+        private SchemaResponse LatestResponse
+        {
+            get => responseHistory.Last();
+            set => responseHistory.Add(value);
+        }
+
         private Vector2 explorerScrollPosition;
         private Vector2 tableViewScrollPosition;
 
@@ -154,11 +164,11 @@ namespace Schema.Unity.Editor
                                                                               $"Do you want to overwrite this sceham>", "Yes", "No");
             }
             
-            latestResponse = Schema.Core.Schema.AddSchema(newSchema, overwriteExisting, importFilePath: importFilePath);
-            switch (latestResponse.Status)
+            LatestResponse = Schema.Core.Schema.AddSchema(newSchema, overwriteExisting, importFilePath: importFilePath);
+            switch (LatestResponse.Status)
             {
                 case RequestStatus.Error:
-                    Debug.LogError(latestResponse.Payload);
+                    Debug.LogError(LatestResponse.Payload);
                     break;
                 case RequestStatus.Success:
                     Debug.Log($"New scheme '{newSchema.SchemaName}' created.");
@@ -183,8 +193,8 @@ namespace Schema.Unity.Editor
         {
             using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
             Debug.Log($"Loading manifest, {context}...");
-            latestResponse = Core.Schema.LoadFromManifest(manifestFilePath, progressReporter);
-            Debug.Log(latestResponse);
+            LatestResponse = Core.Schema.LoadFromManifest(manifestFilePath, progressReporter);
+            Debug.Log(LatestResponse);
         }
 
         #endregion
@@ -228,13 +238,13 @@ namespace Schema.Unity.Editor
                 if (GUILayout.Button("Save"))
                 {
                     Debug.Log($"Saving manifest to {manifestFilePath}");
-                    latestResponse = Core.Schema.SaveManifest(manifestFilePath);
+                    LatestResponse = Core.Schema.SaveManifest(manifestFilePath);
                 }
             }
 
-            if (latestResponse.Payload != null)
+            if (LatestResponse.Payload != null)
             {
-                EditorGUILayout.HelpBox(latestResponse.Payload.ToString(), latestResponse.MessageType());
+                EditorGUILayout.HelpBox(LatestResponse.Payload.ToString(), LatestResponse.MessageType());
             }
 
             GUILayout.BeginHorizontal();
@@ -354,7 +364,7 @@ namespace Schema.Unity.Editor
                     }
                     if (GUILayout.Button("Save", GUILayout.ExpandWidth(true)))
                     {
-                        latestResponse = Core.Schema.SaveSchema(schema);
+                        LatestResponse = Core.Schema.SaveSchema(schema);
                     }
                     
                     // render export options
@@ -390,7 +400,9 @@ namespace Schema.Unity.Editor
                         // GUILayout.Label(attribute.AttributeName, EditorStyles.boldLabel, GUILayout.MaxWidth(attribute.ColumnWidth - SETTINGS_WIDTH));
                         
                         // column settings gear
-                        if (DropdownButton(attribute.AttributeName, attribute.ColumnWidth))
+                        
+                        var attributeContent = new GUIContent(attribute.AttributeName, attribute.AttributeToolTip);
+                        if (DropdownButton(attributeContent, attribute.ColumnWidth))
                         {
                             var columnOptionsMenu = new GenericMenu();
 
@@ -420,7 +432,7 @@ namespace Schema.Unity.Editor
                                 columnOptionsMenu.AddItem(new GUIContent($"Convert Type/{builtInType.TypeName}"), isMatchingType,
                                     () =>
                                     {
-                                        latestResponse =
+                                        LatestResponse =
                                             schema.ConvertAttributeType(attributeName: attribute.AttributeName,
                                                 newType: builtInType);
                                     });
@@ -432,7 +444,7 @@ namespace Schema.Unity.Editor
                             {
                                 if (EditorUtility.DisplayDialog("Schema", $"Are you sure you want to delete this attribute: {attribute.AttributeName}?", "Yes, delete this attribute", "No, cancel"))
                                 {
-                                    latestResponse = schema.DeleteAttribute(attribute);
+                                    LatestResponse = schema.DeleteAttribute(attribute);
                                 }
                             });
 
@@ -447,7 +459,11 @@ namespace Schema.Unity.Editor
                         if (AddButton("Add Attribute"))
                         {
                             Debug.Log($"Added new attribute to '{schema.SchemaName}'.`");
-                            latestResponse = schema.AddAttribute(newAttributeName, DataType.String, string.Empty);
+                            LatestResponse = schema.AddAttribute(newAttributeName, DataType.String, string.Empty);
+                            if (LatestResponse.IsSuccess) 
+                            {
+                                LatestResponse = Core.Schema.SaveSchema(schema);
+                            }
                             newAttributeName = string.Empty; // clear out attribute name field since it's unlikely someone wants to make another attribute with the same name
                         }
                     }
@@ -476,13 +492,12 @@ namespace Schema.Unity.Editor
                             {
                                 if (EditorUtility.DisplayDialog("Schema", "Are you s you want to delete this entry?", "Yes, delete this entry", "No, cancel"))
                                 {
-                                    latestResponse = schema.DeleteEntry(entry);
+                                    LatestResponse = schema.DeleteEntry(entry);
                                 }
                             });
                             rowOptionsMenu.ShowAsContext();
                         }
 
-                        // EditorGUILayout.LabelField($"{entryIdx}.", rightAlignedLabelStyle, GUILayout.Width(SETTINGS_WIDTH));
                         for (int attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                         {
                             var attribute = schema.Attributes[attributeIdx];
@@ -495,7 +510,14 @@ namespace Schema.Unity.Editor
                             }
                             using (var changed = new EditorGUI.ChangeCheckScope())
                             {
-                                entryValue = GUILayout.TextField(entryValue.ToString(), GUILayout.Width(attribute.ColumnWidth));
+                                if (attribute.DataType == DataType.Integer)
+                                {
+                                    entryValue = EditorGUILayout.IntField(Convert.ToInt32(entryValue),
+                                        GUILayout.Width(attribute.ColumnWidth));
+                                }
+                                else {
+                                    entryValue = EditorGUILayout.TextField(entryValue.ToString(), GUILayout.Width(attribute.ColumnWidth));
+                                }
                                 int lastControlId = EditorGUIUtility.GetControlID(FocusType.Passive);
                                 controlIds[entryIdx * attributeCount + attributeIdx] = lastControlId;
 
