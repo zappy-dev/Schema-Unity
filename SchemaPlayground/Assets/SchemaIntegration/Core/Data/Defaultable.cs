@@ -8,6 +8,11 @@ namespace Schema.Core
 
         public object CloneDefaultValue()
         {
+            if (DefaultValue == null)
+            {
+                return null;
+            }
+            
             var type = DefaultValue.GetType();
             
             // is struct / value copy type

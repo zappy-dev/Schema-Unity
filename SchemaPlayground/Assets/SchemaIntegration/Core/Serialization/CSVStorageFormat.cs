@@ -33,7 +33,7 @@ namespace Schema.Core.Serialization
                 {
                     var attributeName = header[colIdx];
                     
-                    entry.EntryData[attributeName] = entries[colIdx];
+                    entry.SetData(attributeName, entries[colIdx]);
                 }
                 
                 importedSchema.Entries.Add(entry);
@@ -67,7 +67,7 @@ namespace Schema.Core.Serialization
             {
                 for (int i = 0; i < attributeCount; i++)
                 {
-                    csvContent.Append(entry.EntryData[schema.Attributes[i].AttributeName]);
+                    csvContent.Append(entry.GetData(schema.Attributes[i].AttributeName));
                     
                     // fence posting
                     if (i != attributeCount - 1)

@@ -8,6 +8,7 @@ using Schema.Core.Serialization;
 using Unity.Profiling;
 using UnityEditor;
 using UnityEngine;
+using Random = System.Random;
 
 namespace Schema.Unity.Editor
 {
@@ -64,6 +65,7 @@ namespace Schema.Unity.Editor
         private string newAttributeName = string.Empty;
         
         public string manifestFilePath = string.Empty;
+        public string tooltipOfTheDay = string.Empty;
         
         [SerializeField]
         private int selectedSchemaIndex = -1;
@@ -71,6 +73,60 @@ namespace Schema.Unity.Editor
         private GUIStyle leftAlignedButtonStyle;
         private GUIStyle rightAlignedLabelStyle;
         private GUIStyle defaultDropdownButtonStyle;
+        
+        [NonSerialized]
+        private CellStyle cellEvenStyle;
+
+        private static float evenOddsBase = 0.4f;
+        private static float evenOddsOffset = 0.3f;
+        private static readonly Color cellEventBackgroundColor = new Color(evenOddsBase, evenOddsBase, evenOddsBase);
+
+        [NonSerialized]
+        private CellStyle cellOddStyle;
+
+        private static readonly Color cellOddBackgroundColor = new Color(evenOddsBase + evenOddsOffset, evenOddsBase + evenOddsOffset, evenOddsBase + evenOddsOffset);
+
+        public class CellStyle
+        {
+            public GUIStyle FieldStyle { get; }
+            public GUIStyle DropdownStyle { get; }
+            public GUIStyle ButtonStyle { get; }
+            private Color backgroundColor;
+            public Color BackgroundColor
+            {
+                get => backgroundColor;
+            }
+
+            public CellStyle()
+            {
+                FieldStyle = new GUIStyle(EditorStyles.textField);
+                DropdownStyle = new GUIStyle("MiniPullDown");
+                ButtonStyle = new GUIStyle(GUI.skin.button)
+                {
+                    alignment = TextAnchor.MiddleLeft
+                };
+            }
+
+            public void SetBackgroundColor(Color backgroundColor)
+            {
+                Texture2D backgroundTexture = new Texture2D(1, 1);
+                backgroundTexture.SetPixels(new[]
+                {
+                    backgroundColor
+                });
+                backgroundTexture.Apply();
+                
+                // FieldStyle.normal.background = backgroundTexture;
+                
+                // DropdownStyle.normal.background = backgroundTexture;
+                
+                // DropdownStyle.active.background = backgroundTexture;
+                // DropdownStyle.hover.background = backgroundTexture;
+                
+                // ButtonStyle.normal.background = backgroundTexture;
+                this.backgroundColor = backgroundColor;
+            }
+        }
         
         private DateTime lastChanged = DateTime.MinValue;
         private readonly TimeSpan debounceTime = TimeSpan.FromMilliseconds(500);
@@ -97,8 +153,12 @@ namespace Schema.Unity.Editor
 
             manifestFilePath = DEFAULT_MANIFEST_LOAD_PATH;
             OnLoadManifest("On Editor Startup");
+            
+            // manifest should be loaded at this point
+            tooltipOfTheDay = $"Tip Of The Day: {GetTooltipMessage()}";
 
             InitializeFileWatcher();
+            
 
             var storedSelectedSchema = EditorPrefs.GetString(EDITORPREFS_KEY_SELECTEDSCHEMA, null);
             if (!string.IsNullOrEmpty(storedSelectedSchema))
@@ -200,6 +260,18 @@ namespace Schema.Unity.Editor
         #endregion
 
         #region Rendering Methods
+        
+        private CellStyle GetRowCellStyle(int rowIdx)
+        {
+            switch (rowIdx % 2)
+            {
+                case 0:
+                    return cellEvenStyle;
+                case 1:
+                default:
+                    return cellOddStyle;
+            }
+        }
 
         private void InitializeStyles()
         {
@@ -212,6 +284,32 @@ namespace Schema.Unity.Editor
             
             defaultDropdownButtonStyle = new GUIStyle("MiniPullDown");
             defaultDropdownButtonStyle.alignment = TextAnchor.MiddleCenter;
+
+            cellEvenStyle = new CellStyle();
+            cellOddStyle = new CellStyle();
+            
+            cellEvenStyle.SetBackgroundColor(cellEventBackgroundColor);
+            cellOddStyle.SetBackgroundColor(cellOddBackgroundColor);
+        }
+
+        private string GetTooltipMessage()
+        {
+            if (!Core.Schema.TryGetSchema("Tooltips", out var tooltips)) 
+                return "Could not find Tooltips schema";
+            
+            int entriesCount = tooltips.Entries.Count;
+            if (entriesCount == 0)
+            {
+                return "No tooltips found.";
+            }
+
+            Random random = new Random();
+            var randomIdx = random.Next(entriesCount);
+            if (!tooltips.Entries[randomIdx].TryGetDataAsString("Message", out var message))
+                return $"No message found for tooltip entry {randomIdx}";
+            
+            return message;
+
         }
         
         private void OnGUI()
@@ -219,6 +317,8 @@ namespace Schema.Unity.Editor
             InitializeStyles();
             debugIdx = 0;
             GUILayout.Label("Scheme Editor", EditorStyles.boldLabel);
+
+            EditorGUILayout.HelpBox(tooltipOfTheDay, MessageType.Info);
 
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -348,7 +448,7 @@ namespace Schema.Unity.Editor
             int entryCount = schema.Entries.Count;
                 
             // mapping entries to control IDs for focus/navigation management
-            int[] controlIds = new int[attributeCount * entryCount];
+            int[] tableCellControlIds = new int[attributeCount * entryCount];
 
             using (new GUILayout.VerticalScope())
             {
@@ -400,55 +500,20 @@ namespace Schema.Unity.Editor
                         // GUILayout.Label(attribute.AttributeName, EditorStyles.boldLabel, GUILayout.MaxWidth(attribute.ColumnWidth - SETTINGS_WIDTH));
                         
                         // column settings gear
+                        string attributeLabel = attribute.AttributeName;
+                        if (attribute.IsIdentifier)
+                        {
+                            attributeLabel = $"{attribute.AttributeName} - ID";
+                        }
+                        else if (attribute.DataType is ReferenceDataType)
+                        {
+                            attributeLabel = $"{attribute.AttributeName} - Ref";
+                        }
                         
-                        var attributeContent = new GUIContent(attribute.AttributeName, attribute.AttributeToolTip);
+                        var attributeContent = new GUIContent(attributeLabel, attribute.AttributeToolTip);
                         if (DropdownButton(attributeContent, attribute.ColumnWidth))
                         {
-                            var columnOptionsMenu = new GenericMenu();
-
-                            // attribute column ordering options
-                            columnOptionsMenu.AddItem(new GUIContent("Move Left"), isDisabled: attributeIdx == 0, () =>
-                            {
-                                schema.IncreaseAttributeRank(attribute);
-                            });
-                            columnOptionsMenu.AddItem(new GUIContent("Move Right"), isDisabled: attributeIdx == attributeCount - 1, () =>
-                            {
-                                schema.DecreaseAttributeRank(attribute);
-                            });
-                            
-                            columnOptionsMenu.AddSeparator("");
-                            
-                            columnOptionsMenu.AddItem(new GUIContent("Column Settings"), false, () =>
-                            {
-                                AttributeSettingsPrompt.ShowWindow(schema, attribute);
-                            });
-                            
-                            columnOptionsMenu.AddSeparator("");
-                            
-                            // options to convert type
-                            foreach (var builtInType in DataType.BuiltInTypes)
-                            {
-                                bool isMatchingType = builtInType.TypeName.Equals(attribute.DataType.TypeName);
-                                columnOptionsMenu.AddItem(new GUIContent($"Convert Type/{builtInType.TypeName}"), isMatchingType,
-                                    () =>
-                                    {
-                                        LatestResponse =
-                                            schema.ConvertAttributeType(attributeName: attribute.AttributeName,
-                                                newType: builtInType);
-                                    });
-                            }
-                            
-                            columnOptionsMenu.AddSeparator("");
-                            
-                            columnOptionsMenu.AddItem(new GUIContent("Delete Attribute"), false, () =>
-                            {
-                                if (EditorUtility.DisplayDialog("Schema", $"Are you sure you want to delete this attribute: {attribute.AttributeName}?", "Yes, delete this attribute", "No, cancel"))
-                                {
-                                    LatestResponse = schema.DeleteAttribute(attribute);
-                                }
-                            });
-
-                            columnOptionsMenu.ShowAsContext();
+                            ShowAttributeColumnOptions(attributeIdx, schema, attribute, attributeCount);
                         }
                     }
 
@@ -459,10 +524,17 @@ namespace Schema.Unity.Editor
                         if (AddButton("Add Attribute"))
                         {
                             Debug.Log($"Added new attribute to '{schema.SchemaName}'.`");
-                            LatestResponse = schema.AddAttribute(newAttributeName, DataType.String, string.Empty);
+                            LatestResponse = schema.AddAttribute(new AttributeDefinition
+                            {
+                                AttributeName = newAttributeName,
+                                DataType = DataType.String,
+                                DefaultValue = string.Empty,
+                                IsIdentifier = false,
+                                ColumnWidth = AttributeDefinition.DefaultColumnWidth,
+                            });
                             if (LatestResponse.IsSuccess) 
                             {
-                                LatestResponse = Core.Schema.SaveSchema(schema);
+                                LatestResponse = Core.Schema.SaveSchema(schema, saveManifest: false);
                             }
                             newAttributeName = string.Empty; // clear out attribute name field since it's unlikely someone wants to make another attribute with the same name
                         }
@@ -475,55 +547,118 @@ namespace Schema.Unity.Editor
                     var entry = schema.Entries[entryIdx];
                     using (new GUILayout.HorizontalScope())
                     {
-                        // row settings gear
-                        if (DropdownButton($"{entryIdx}", style: defaultDropdownButtonStyle))
+                        var cellStyle = GetRowCellStyle(entryIdx);
+                        
+                        // render entry values
+                        using (new BackgroundColorScope(cellStyle.BackgroundColor))
                         {
-                            var rowOptionsMenu = new GenericMenu();
-                            rowOptionsMenu.AddItem(new GUIContent("Move Up"), isDisabled: entryIdx == 0, () =>
+                            // row settings gear
+                            // make row count human 1-based
+                            if (DropdownButton($"{entryIdx + 1}", style: cellStyle.DropdownStyle))
                             {
-                                schema.MoveUpEntry(entry);
-                            });
-                            rowOptionsMenu.AddItem(new GUIContent("Move Down"), isDisabled: entryIdx == entryCount - 1, () =>
-                            {
-                                schema.MoveUpEntry(entry);
-                            });
-                            rowOptionsMenu.AddSeparator("");
-                            rowOptionsMenu.AddItem(new GUIContent("Delete Entry"), false, () =>
-                            {
-                                if (EditorUtility.DisplayDialog("Schema", "Are you s you want to delete this entry?", "Yes, delete this entry", "No, cancel"))
-                                {
-                                    LatestResponse = schema.DeleteEntry(entry);
-                                }
-                            });
-                            rowOptionsMenu.ShowAsContext();
-                        }
-
-                        for (int attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
-                        {
-                            var attribute = schema.Attributes[attributeIdx];
-                            var attributeName = attribute.AttributeName;
-                            bool dataExists = entry.EntryData.TryGetValue(attributeName, out var entryValue);
-                            if (!dataExists)
-                            {
-                                // for some reason this data wasn't set yet
-                                entry.EntryData[attributeName] = attribute.CloneDefaultValue();
+                                ShowEntryRowOptions(entryIdx, entryCount, schema, entry);
                             }
-                            using (var changed = new EditorGUI.ChangeCheckScope())
+                            
+                            for (int attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                             {
-                                if (attribute.DataType == DataType.Integer)
+                                var attribute = schema.Attributes[attributeIdx];
+                                var attributeName = attribute.AttributeName;
+                                var entryValue = entry.GetData(attributeName);
+                                bool dataExists = entryValue != null;
+                                if (!dataExists)
                                 {
-                                    entryValue = EditorGUILayout.IntField(Convert.ToInt32(entryValue),
-                                        GUILayout.Width(attribute.ColumnWidth));
+                                    // for some reason this data wasn't set yet
+                                    var newData = attribute.CloneDefaultValue();
+                                    entry.SetData(attributeName, newData);
+                                    entryValue = newData;
                                 }
-                                else {
-                                    entryValue = EditorGUILayout.TextField(entryValue.ToString(), GUILayout.Width(attribute.ColumnWidth));
-                                }
-                                int lastControlId = EditorGUIUtility.GetControlID(FocusType.Passive);
-                                controlIds[entryIdx * attributeCount + attributeIdx] = lastControlId;
 
-                                if (changed.changed)
+                                var attributeFieldWidth = GUILayout.Width(attribute.ColumnWidth);
+                                using (var changed = new EditorGUI.ChangeCheckScope())
                                 {
-                                    entry.EntryData[attributeName] = entryValue;
+                                    if (attribute.DataType == DataType.Integer)
+                                    {
+                                        entryValue = EditorGUILayout.IntField(Convert.ToInt32(entryValue), cellStyle.FieldStyle,
+                                            attributeFieldWidth);
+                                    }
+                                    else if (attribute.DataType == DataType.String_FilePath)
+                                    {
+                                        string filePath = entryValue.ToString();
+                                        var fileContent = new GUIContent(Path.GetFileName(filePath), tooltip: filePath);
+                                        if (GUILayout.Button(fileContent, cellStyle.ButtonStyle, attributeFieldWidth))
+                                        {
+                                            var selectedFilePath = EditorUtility.OpenFilePanel($"{schema.SchemaName} - {attributeName}", "", "");
+                                            if (!string.IsNullOrEmpty(selectedFilePath))
+                                            {
+                                                entryValue = selectedFilePath;
+                                            }
+                                        }
+                                    }
+                                    else if (attribute.DataType is ReferenceDataType refDataType)
+                                    {
+                                        var gotoButtonWidth = 20;
+                                        var refDropdownWidth = attribute.ColumnWidth - gotoButtonWidth;
+                                        var currentValue = entryValue == null ? "..." : entryValue.ToString();
+                                        if (DropdownButton(currentValue, refDropdownWidth, cellStyle.DropdownStyle))
+                                        {
+                                            var referenceEntryOptions = new GenericMenu();
+
+                                            if (Core.Schema.TryGetSchema(refDataType.ReferenceSchemaName,
+                                                    out var refSchema))
+                                            {
+                                                foreach (var identifierValue in refSchema.GetIdentifierValues())
+                                                {
+                                                    referenceEntryOptions.AddItem(new GUIContent(identifierValue.ToString()),
+                                                        on: identifierValue.Equals(currentValue), () =>
+                                                        {
+                                                            entry.SetData(attributeName, identifierValue);
+                                                        });
+                                                }
+                                            }
+                                            referenceEntryOptions.ShowAsContext();
+                                        }
+                                        
+                                        if (GUILayout.Button("O", GUILayout.Width(gotoButtonWidth)))
+                                        {
+                                            FocusOnEntry(refDataType.ReferenceSchemaName, refDataType.ReferenceAttributeName, currentValue);
+                                            GUI.FocusControl(null);
+                                        }
+                                    }
+                                    else {
+                                        entryValue = EditorGUILayout.TextField(entryValue == null ? string.Empty : entryValue.ToString(), cellStyle.FieldStyle, attributeFieldWidth);
+                                    }
+                                    int lastControlId = EditorGUIUtility.GetControlID(FocusType.Passive);
+                                    tableCellControlIds[entryIdx * attributeCount + attributeIdx] = lastControlId;
+
+                                    if (changed.changed)
+                                    {
+                                        bool shouldUpdateEntry = false;
+                                        if (attribute.IsIdentifier)
+                                        {
+                                            if (schema.GetIdentifierValues()
+                                                .Any(otherAttributeName =>
+                                                    otherAttributeName.Equals(entryValue)))
+                                            {
+                                                EditorUtility.DisplayDialog("Schema", $"Attribute '{attribute.AttributeName}' with value '{entryValue}' already exists.", "OK");
+                                            }
+                                            else
+                                            {
+                                                shouldUpdateEntry = true;
+                                                Debug.Log($"Setting unique attribute '{attribute.AttributeName}' to '{schema.SchemaName}', value '{entryValue}'.");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            shouldUpdateEntry = true;
+                                            Debug.Log($"Setting attribute '{attribute.AttributeName}' to '{schema.SchemaName}'.");
+                                        }
+
+                                        if (shouldUpdateEntry)
+                                        {
+                                            entry.SetData(attributeName, entryValue);
+                                            LatestResponse = Core.Schema.SaveSchema(schema, saveManifest: false);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -538,7 +673,7 @@ namespace Schema.Unity.Editor
                     if (AddButton("Add New Entry", true))
                     {
                         schema.CreateNewEntry();
-                        Debug.Log($"Added entry to '{schema.SchemaName}'.`");
+                        Debug.Log($"Added entry to '{schema.SchemaName}'.");
                     }
                 }
             }
@@ -548,24 +683,8 @@ namespace Schema.Unity.Editor
             // Sometimes this receives multiple events but one doesn't contain a keycode?
             if (ev.type == EventType.KeyUp && ev.keyCode != KeyCode.None)
             {
-                if (ev.keyCode == KeyCode.Space)
-                {
-                    var sb = new StringBuilder();
-                    for (var index = 0; index < controlIds.Length; index++)
-                    {
-                        if (index != 0 && index % attributeCount == 0)
-                        {
-                            sb.AppendLine();
-                        }
-                        var controlId = controlIds[index];
-                        sb.Append($"{controlId} ");
-                    }
-                    
-                    Debug.Log(sb.ToString());
-                }
-               
                 // IDK why this is off-by-one
-                int focusedIndex = Array.IndexOf(controlIds, EditorGUIUtility.keyboardControl + 1);
+                int focusedIndex = Array.IndexOf(tableCellControlIds, EditorGUIUtility.keyboardControl + 1);
                 
                 if (focusedIndex != -1)
                 {
@@ -580,7 +699,7 @@ namespace Schema.Unity.Editor
                             }
                             break;
                         case KeyCode.DownArrow:
-                            if (focusedIndex + attributeCount < controlIds.Length)
+                            if (focusedIndex + attributeCount < tableCellControlIds.Length)
                             {
                                 nextFocusedIndex = focusedIndex + attributeCount;
                             }
@@ -590,6 +709,15 @@ namespace Schema.Unity.Editor
                             {
                                 nextFocusedIndex = focusedIndex - 1;
                             }
+                            break;
+                        case KeyCode.Return:
+                        case KeyCode.KeypadEnter:
+                            // try to go right if possible
+                            if (focusedIndex + 1 < tableCellControlIds.Length)
+                            {
+                                nextFocusedIndex = focusedIndex + 1;
+                            }
+
                             break;
                         case KeyCode.RightArrow:
                             if (focusedIndex % attributeCount < attributeCount - 1)
@@ -602,13 +730,134 @@ namespace Schema.Unity.Editor
                     if (nextFocusedIndex != -1)
                     {
                         // IDK why this is off-by-one
-                        GUIUtility.keyboardControl = controlIds[nextFocusedIndex] - 1;
+                        GUIUtility.keyboardControl = tableCellControlIds[nextFocusedIndex] - 1;
                         ev.Use(); // make sure to consume event if we used it
                     }
                 }
             }
         }
-        
+
+        private void FocusOnEntry(string referenceSchemaName, string referenceAttributeName, string currentValue)
+        {
+            OnSelectSchema(referenceSchemaName, "Focus On Entry");
+        }
+
+        private void ShowEntryRowOptions(int entryIdx, int entryCount, DataScheme schema, DataEntry entry)
+        {
+            var rowOptionsMenu = new GenericMenu();
+            bool isFirstEntry = entryIdx == 0;
+            bool isLastEntry = entryIdx == entryCount - 1;
+            rowOptionsMenu.AddItem(new GUIContent("Move To Top"), isDisabled: isFirstEntry, () =>
+            {
+                schema.MoveEntry(entry, 0);
+                Core.Schema.SaveSchema(schema, saveManifest: false);
+            });
+            rowOptionsMenu.AddItem(new GUIContent("Move Up"), isDisabled: isFirstEntry, () =>
+            {
+                schema.MoveUpEntry(entry);
+                Core.Schema.SaveSchema(schema, saveManifest: false);
+            });
+            rowOptionsMenu.AddItem(new GUIContent("Move Down"), isDisabled: isLastEntry, () =>
+            {
+                schema.MoveDownEntry(entry);
+                Core.Schema.SaveSchema(schema, saveManifest: false);
+            });
+            rowOptionsMenu.AddItem(new GUIContent("Move To Bottom"), isDisabled: isLastEntry, () =>
+            {
+                schema.MoveEntry(entry, entryCount - 1);
+                Core.Schema.SaveSchema(schema, saveManifest: false);
+            });
+            rowOptionsMenu.AddSeparator("");
+            rowOptionsMenu.AddItem(new GUIContent("Delete Entry"), false, () =>
+            {
+                if (EditorUtility.DisplayDialog("Schema", "Are you s you want to delete this entry?", "Yes, delete this entry", "No, cancel"))
+                {
+                    LatestResponse = schema.DeleteEntry(entry);
+                    Core.Schema.SaveSchema(schema, saveManifest: false);
+                }
+            });
+            rowOptionsMenu.ShowAsContext();
+        }
+
+        private void ShowAttributeColumnOptions(int attributeIdx, DataScheme schema, AttributeDefinition attribute,
+            int attributeCount)
+        {
+            var columnOptionsMenu = new GenericMenu();
+
+            // attribute column ordering options
+            columnOptionsMenu.AddItem(new GUIContent("Move Left"), isDisabled: attributeIdx == 0, () =>
+            {
+                schema.IncreaseAttributeRank(attribute);
+                Core.Schema.SaveSchema(schema, saveManifest: false);
+            });
+            columnOptionsMenu.AddItem(new GUIContent("Move Right"), isDisabled: attributeIdx == attributeCount - 1, () =>
+            {
+                schema.DecreaseAttributeRank(attribute);
+                Core.Schema.SaveSchema(schema, saveManifest: false);
+            });
+                            
+            columnOptionsMenu.AddSeparator("");
+                            
+            columnOptionsMenu.AddItem(new GUIContent("Column Settings..."), false, () =>
+            {
+                AttributeSettingsPrompt.ShowWindow(schema, attribute);
+            });
+                            
+            columnOptionsMenu.AddSeparator("");
+                            
+            // options to convert type
+            foreach (var builtInType in DataType.BuiltInTypes)
+            {
+                bool isMatchingType = builtInType.Equals(attribute.DataType);
+                columnOptionsMenu.AddItem(new GUIContent($"Convert Type/{builtInType.TypeName}"), 
+                    isMatchingType,
+                    () =>
+                    {
+                        LatestResponse =
+                            schema.ConvertAttributeType(attributeName: attribute.AttributeName,
+                                newType: builtInType);
+                        if (LatestResponse.IsSuccess) 
+                        {
+                            LatestResponse = Core.Schema.SaveSchema(schema, saveManifest: false);
+                        }
+                    });
+            }
+                            
+            columnOptionsMenu.AddSeparator("Convert Type");
+            foreach (var schemaName in Core.Schema.AllSchemes.OrderBy(s => s))
+            {
+                if (Core.Schema.TryGetSchema(schemaName, out var dataSchema) && dataSchema.TryGetIdentifierAttribute(out var identifierAttribute))
+                {
+                    var referenceDataType = new ReferenceDataType(schemaName, identifierAttribute.AttributeName);
+                    bool isMatchingType = referenceDataType.Equals(attribute.DataType);
+                    columnOptionsMenu.AddItem(new GUIContent($"Convert Type/{referenceDataType.TypeName}"),
+                        on: isMatchingType, 
+                        () =>
+                        {
+                            LatestResponse =
+                                schema.ConvertAttributeType(attributeName: attribute.AttributeName,
+                                    newType: referenceDataType);
+                            if (LatestResponse.IsSuccess) 
+                            {
+                                LatestResponse = Core.Schema.SaveSchema(schema, saveManifest: false);
+                            }
+                        });
+                }
+            }
+                            
+            columnOptionsMenu.AddSeparator("");
+                            
+            columnOptionsMenu.AddItem(new GUIContent("Delete Attribute"), false, () =>
+            {
+                if (EditorUtility.DisplayDialog("Schema", $"Are you sure you want to delete this attribute: {attribute.AttributeName}?", "Yes, delete this attribute", "No, cancel"))
+                {
+                    LatestResponse = schema.DeleteAttribute(attribute);
+                }
+            });
+
+            columnOptionsMenu.ShowAsContext();
+        }
+
         public static void DrawUILine(Color color, int thickness = 2, int padding = 10)
         {
             Rect r = EditorGUILayout.GetControlRect(GUILayout.Height(padding+thickness));

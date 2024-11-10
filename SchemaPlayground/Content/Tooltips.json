@@ -1,0 +1,23 @@
+{
+  "SchemaName": "Tooltips",
+  "Attributes": [
+    {
+      "AttributeName": "Message",
+      "AttributeToolTip": "",
+      "DataType": {
+        "TypeName": "String",
+        "DefaultValue": ""
+      },
+      "ColumnWidth": 600,
+      "IsIdentifier": false,
+      "DefaultValue": ""
+    }
+  ],
+  "Entries": [
+    {
+      "EntryData": {
+        "Message": "In the Table View for a Schema, you can use arrow keys to navigate between table cells."
+      }
+    }
+  ]
+}

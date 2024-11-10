@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Schema.Core
 {
@@ -30,7 +31,7 @@ namespace Schema.Core
 
         public override string ToString()
         {
-            return $"DataSchema: {SchemaName}";
+            return $"DataSchema {SchemaName}";
         }
 
         public void CreateNewEntry()
@@ -38,14 +39,20 @@ namespace Schema.Core
             var entry = new DataEntry();
             foreach (var attribute in Attributes)
             {
-                entry.EntryData[attribute.AttributeName] = attribute.CloneDefaultValue();
+                entry.SetData(attribute.AttributeName, attribute.CloneDefaultValue());
             }
             
             Entries.Add(entry);
         }
 
-        public SchemaResponse AddAttribute(string newAttributeName, DataType dataType, ICloneable defaultValue)
+        public SchemaResponse AddAttribute(AttributeDefinition newAttribute)
         {
+            if (newAttribute == null)
+            {
+                return SchemaResponse.Error("Attribute cannot be null");
+            }
+
+            string newAttributeName = newAttribute.AttributeName;
             if (string.IsNullOrEmpty(newAttributeName))
             {
                 return SchemaResponse.Error("Attribute name cannot be null or empty.");
@@ -56,17 +63,11 @@ namespace Schema.Core
                 return SchemaResponse.Error("Duplicate attribute name: " + newAttributeName);
             }
             
-            Attributes.Add(new AttributeDefinition
-            {
-                AttributeName = newAttributeName,
-                DataType = dataType,
-                DefaultValue = defaultValue,
-                ColumnWidth = AttributeDefinition.DefaultColumnWidth,
-            });
+            Attributes.Add(newAttribute);
 
             foreach (var entry in Entries)
             {
-                entry.EntryData[newAttributeName] = defaultValue;
+                entry.SetData(newAttributeName, newAttribute.CloneDefaultValue());
             }
             
             return SchemaResponse.Success("Successfully added attribute: " + newAttributeName);
@@ -81,34 +82,13 @@ namespace Schema.Core
             {
                 foreach (var entry in Entries)
                 {
-                    var entryData = entry.EntryData[attributeName];
-
-                    if (prevDataType.Equals(DataType.String))
-                    {
-                        string data = (string)entryData;
-                        if (string.IsNullOrEmpty(data))
-                        {
-                            entryData = newType.CloneDefaultValue();
-                        }
-                        else if (newType.Equals(DataType.Integer))
-                        {
-                            entryData = Convert.ToInt32(data);
-                        }
-                        else if (newType.Equals(DataType.DateTime))
-                        {
-                            entryData = DateTime.Parse(data);
-                        }
-                    }
-                    else if (newType.Equals(DataType.String))
-                    {
-                        entryData = entryData.ToString();
-                    }
-                    else
+                    var entryData = entry.GetData(attributeName);
+                    if (!DataType.TryToConvertData(entryData, prevDataType, newType, out entryData))
                     {
                         return SchemaResponse.Error($"Cannot convert attribute {attributeName} to type {newType}");
                     }
                         
-                    entry.EntryData[attributeName] = entryData;
+                    entry.SetData(attributeName, entryData);
                 }
             }
             catch (FormatException e)
@@ -143,16 +123,38 @@ namespace Schema.Core
         {
             var entryIdx = Entries.IndexOf(entry);
             var newIdx = entryIdx - 1;
-            Entries[entryIdx] = Entries[newIdx];
-            Entries[newIdx] = entry;
+            SwapEntries(entryIdx, newIdx);
+        }
+
+        public void SwapEntries(int srcIndex, int dstIndex)
+        {
+            if (srcIndex < 0 || srcIndex >= Entries.Count)
+            {
+                Logger.LogError($"Attempted to move entry from invalid index {srcIndex}.");
+                return;
+            }
+            
+            if (dstIndex < 0 || dstIndex >= Entries.Count)
+            {
+                Logger.LogError($"Attempted to move entry {srcIndex} to invalid destination {dstIndex} is out of range.");
+                return;
+            }
+            
+            (Entries[srcIndex], Entries[dstIndex]) = (Entries[dstIndex], Entries[srcIndex]);
         }
 
         public void MoveDownEntry(DataEntry entry)
         {
             var entryIdx = Entries.IndexOf(entry);
             var newIdx = entryIdx + 1;
-            Entries[entryIdx] = Entries[newIdx];
-            Entries[newIdx] = entry;
+            SwapEntries(entryIdx, newIdx);
+        }
+
+        public void MoveEntry(DataEntry entry, int targetIndex)
+        {
+            var entryIdx = Entries.IndexOf(entry);
+            Entries.RemoveAt(entryIdx);
+            Entries.Insert(targetIndex, entry);
         }
 
         public SchemaResponse DeleteEntry(DataEntry entry)
@@ -183,9 +185,37 @@ namespace Schema.Core
             Attributes.Find(a => a.AttributeName == prevAttributeName).AttributeName = newAttributeName;
             foreach (var entry in Entries)
             {
-                entry.EntryData[newAttributeName] = entry.EntryData[prevAttributeName];
-                entry.EntryData.Remove(prevAttributeName);
+                entry.MigrateData(prevAttributeName, newAttributeName);
             }
+        }
+
+        public bool TryGetIdentifierAttribute(out AttributeDefinition identifierAttribute)
+        {
+            identifierAttribute = Attributes.FirstOrDefault(a => a.IsIdentifier);
+            return identifierAttribute != null;;
+        }
+
+        public IEnumerable<object> GetIdentifierValues()
+        {
+            if (!TryGetIdentifierAttribute(out var identifierAttribute)) return Enumerable.Empty<object>();
+
+            return GetAttributeValues(identifierAttribute);
+        }
+
+        public IEnumerable<object> GetAttributeValues(AttributeDefinition attribute)
+        {
+            if (attribute is null)
+            {
+                throw new ArgumentNullException(nameof(attribute));
+            }
+
+            if (!Attributes.Contains(attribute))
+            {
+                throw new InvalidOperationException(
+                    $"Attempted to get attribute values for attribute not contained by Schema");
+            }
+            
+            return Entries.Select(e => e.GetData(attribute.AttributeName));
         }
     }
 }

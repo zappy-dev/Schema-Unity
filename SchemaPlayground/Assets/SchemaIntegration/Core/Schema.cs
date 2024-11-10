@@ -44,18 +44,20 @@ namespace Schema.Core
                 {
                     new AttributeDefinition
                     {
-                        
-                        AttributeName = MANIFEST_ATTRIBUTE_FILEPATH,
+                        AttributeName = MANIFEST_ATTRIBUTE_SCHEMANAME,
                         DataType = DataType.String,
                         DefaultValue = DataType.String.DefaultValue,
+                        IsIdentifier = true,
                         ColumnWidth = AttributeDefinition.DefaultColumnWidth
                     },
                     new AttributeDefinition
                     {
-                        AttributeName = MANIFEST_ATTRIBUTE_SCHEMANAME,
+                        
+                        AttributeName = MANIFEST_ATTRIBUTE_FILEPATH,
                         DataType = DataType.String,
                         DefaultValue = DataType.String.DefaultValue,
-                        ColumnWidth = AttributeDefinition.DefaultColumnWidth
+                        IsIdentifier = false,
+                        ColumnWidth = AttributeDefinition.DefaultColumnWidth,
                     },
                 },
             };
@@ -69,9 +71,9 @@ namespace Schema.Core
         }
 
         // TODO support async
-        public static bool TryGetSchema(string selectedSchemaName, out DataScheme scheme)
+        public static bool TryGetSchema(string schemaName, out DataScheme scheme)
         {
-            return dataSchemes.TryGetValue(selectedSchemaName, out scheme);
+            return dataSchemes.TryGetValue(schemaName, out scheme);
         }
         
         /// <summary>
@@ -100,24 +102,23 @@ namespace Schema.Core
             if (GetSchemaManifest(schemaName) == null)
             {
                 // add manifest record for new schema
-                var manifestRecord = new DataEntry
-                {
-                    EntryData = new Dictionary<string, object>
+                var manifestRecord = new DataEntry(
+                    new Dictionary<string, object>
                     {
                         { MANIFEST_ATTRIBUTE_SCHEMANAME, schemaName },
                     }
-                };
+                );
             
                 if (!string.IsNullOrEmpty(importFilePath))
                 {
                     // TODO: Record import path or give option to clone / copy file to new content path?
-                    manifestRecord.EntryData.Add(MANIFEST_ATTRIBUTE_FILEPATH, importFilePath);
+                    manifestRecord.SetData(MANIFEST_ATTRIBUTE_FILEPATH, importFilePath);
                 }
                 
                 Manifest.Entries.Add(manifestRecord);
             }
             
-            var saveResponse = SaveSchema(scheme);
+            var saveResponse = SaveSchema(scheme, saveManifest: true);
 
             if (!saveResponse.IsSuccess)
             {
@@ -149,24 +150,28 @@ namespace Schema.Core
             
                 progress?.Report(0f);
                 Manifest = Storage.DefaultManifestStorageFormat.Load(manifestPath);
-                var stopwatch = Stopwatch.StartNew();
+                var loadStopwatch = Stopwatch.StartNew();
 
                 int currentSchema = 0;
                 int schemaCount = Manifest.Entries.Count;
                 foreach (var manifestEntry in Manifest.Entries)
                 {
-                    string schemaFilePath = manifestEntry.EntryData[MANIFEST_ATTRIBUTE_FILEPATH].ToString();
-
                     currentSchema++;
                     progress?.Report(currentSchema * 1.0f / schemaCount);
+                    if (!manifestEntry.TryGetDataAsString(MANIFEST_ATTRIBUTE_FILEPATH, out var schemaFilePath))
+                    {
+                        // TODO: Report partial load failure
+                        
+                        continue;
+                    }
                 
                     // TODO support async loading
                     var loadedSchema = Storage.DefaultSchemaStorageFormat.Load(schemaFilePath);
                     AddSchema(loadedSchema, true);
                 }
-                stopwatch.Stop();
+                loadStopwatch.Stop();
             
-                return SchemaResponse.Success($"Loaded {schemaCount} schemas from manifest in {stopwatch.ElapsedMilliseconds:N0} ms");
+                return SchemaResponse.Success($"Loaded {schemaCount} schemas from manifest in {loadStopwatch.ElapsedMilliseconds:N0} ms");
             }
         }
 
@@ -186,19 +191,28 @@ namespace Schema.Core
             return SchemaResponse.Success("Saved manifest to manifest.");
         }
 
-        public static SchemaResponse SaveSchema(DataScheme scheme)
+        public static SchemaResponse SaveSchema(DataScheme scheme, bool saveManifest = true)
         {
+            var saveStopwatch = Stopwatch.StartNew();
             var schemaManifest = GetSchemaManifest(scheme.SchemaName);
             string filePath = schemaManifest[MANIFEST_ATTRIBUTE_FILEPATH].ToString();
             Storage.DefaultSchemaStorageFormat.Save(filePath, scheme);
 
-            var saveManifestResponse = SaveManifest(ManifestPath);
-            if (!saveManifestResponse.IsSuccess)
+            if (saveManifest)
             {
-                return saveManifestResponse;
+                var saveManifestResponse = SaveManifest(ManifestPath);
+                saveStopwatch.Stop();
+                if (!saveManifestResponse.IsSuccess)
+                {
+                    return saveManifestResponse;
+                }
+            }
+            else
+            {
+                saveStopwatch.Stop();
             }
             
-            return SchemaResponse.Success($"Successfully saved schema for {scheme.SchemaName} to file {filePath}");
+            return SchemaResponse.Success($"Saved {scheme} to file {filePath} in {saveStopwatch.ElapsedMilliseconds:N0} ms");
         }
         
         #endregion
@@ -208,31 +222,5 @@ namespace Schema.Core
     {
         Error,
         Success
-    }
-
-    public struct SchemaResponse
-    {
-        private RequestStatus status;
-        public RequestStatus Status => status;
-        private object payload;
-        public object Payload => payload;
-        public bool IsSuccess => status == RequestStatus.Success;
-
-        public SchemaResponse(RequestStatus status, object payload)
-        {
-            this.status = status;
-            this.payload = payload;
-        }
-    
-        public static SchemaResponse Error(string errorMessage) => 
-            new SchemaResponse(status: RequestStatus.Error, payload: errorMessage);
-
-        public static SchemaResponse Success(string message) =>
-            new SchemaResponse(status: RequestStatus.Success, payload: message);
-
-        public override string ToString()
-        {
-            return $"SchemaResponse[status={status}, payload={payload}]";
-        }
     }
 }
