@@ -35,11 +35,12 @@ jobs:
           --logger "trx;LogFileName=TestResults.trx"
 
     - name: Publish code coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         files: 'TestResults/**/coverage.cobertura.xml'
         fail_ci_if_error: true
         verbose: true
+        token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Upload coverage report
       uses: actions/upload-artifact@v3
