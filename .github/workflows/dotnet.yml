@@ -20,19 +20,16 @@ jobs:
         dotnet-version: '7.0.x' # or the version your project uses
 
     - name: Restore dependencies
-      working-directory: Schema
-      run: dotnet restore Schema.sln
+      run: dotnet restore Schema/Schema.sln
 
     - name: Build
-      working-directory: Schema
-      run: dotnet build Schema.sln --no-restore --configuration Release
+      run: dotnet build Schema/Schema.sln --no-restore --configuration Release
 
     - name: Test with code coverage
-      working-directory: Schema
       run: |
-        dotnet test Schema.sln --no-build --configuration Release \
+        dotnet test Schema/Schema.sln --no-build --configuration Release \
           --collect:"XPlat Code Coverage" \
-          --results-directory ../TestResults \
+          --results-directory TestResults \
           --logger "trx;LogFileName=TestResults.trx"
 
     - name: Report test results
