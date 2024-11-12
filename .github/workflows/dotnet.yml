@@ -19,6 +19,9 @@ jobs:
       with:
         dotnet-version: '7.0.x' # or the version your project uses
 
+    - name: List all files and directories
+      run: ls -R
+
     - name: Restore dependencies
       run: dotnet restore Schema/Schema.sln
 
