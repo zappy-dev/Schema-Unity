@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Schema.Core", "Schema.Core\Schema.Core.csproj", "{A0F48436-6C5E-4E09-8D3D-3B307AFE30EA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Schema.Core.Tests", "Schema.Core.Tests\Schema.Core.Tests.csproj", "{95388FCB-7A41-4414-8BEC-EA762C8E6EF9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A0F48436-6C5E-4E09-8D3D-3B307AFE30EA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A0F48436-6C5E-4E09-8D3D-3B307AFE30EA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A0F48436-6C5E-4E09-8D3D-3B307AFE30EA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A0F48436-6C5E-4E09-8D3D-3B307AFE30EA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{95388FCB-7A41-4414-8BEC-EA762C8E6EF9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{95388FCB-7A41-4414-8BEC-EA762C8E6EF9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{95388FCB-7A41-4414-8BEC-EA762C8E6EF9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{95388FCB-7A41-4414-8BEC-EA762C8E6EF9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
