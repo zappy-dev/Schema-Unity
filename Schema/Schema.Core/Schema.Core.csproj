@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <Content Include="..\..\SchemaPlayground\Packages\dev.czarzappy.schema.unity\Core\README.md">
+        <Link>Core\README.md</Link>
+      </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Include="..\..\SchemaPlayground\Packages\dev.czarzappy.schema.unity\Core\**\*.cs">
+        <Link>%(RecursiveDir)%(FileName)%(Extension)</Link>
+      </Compile>
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    </ItemGroup>
+
+</Project>
