@@ -41,6 +41,14 @@
       },
       "url": "https://packages.unity.com"
     },
+    "dev.czarzappy.schema.unity": {
+      "version": "file:dev.czarzappy.schema.unity",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.2.1"
+      }
+    },
     "com.unity.modules.ai": {
       "version": "1.0.0",
       "depth": 0,
