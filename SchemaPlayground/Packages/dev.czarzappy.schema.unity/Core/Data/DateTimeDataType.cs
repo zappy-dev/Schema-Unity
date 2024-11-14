@@ -11,7 +11,7 @@ namespace Schema.Core.Data
             return value is DateTime;
         }
 
-        public DateTimeDataType() : base(System.DateTime.Now)
+        public DateTimeDataType() : base(System.DateTime.UtcNow)
         {
             
         }
