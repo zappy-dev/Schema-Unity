@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Schema.Core.Data;
 using Schema.Core.IO;
 
 namespace Schema.Core.Serialization

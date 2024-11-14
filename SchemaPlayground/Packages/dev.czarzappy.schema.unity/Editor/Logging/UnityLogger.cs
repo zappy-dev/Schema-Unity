@@ -1,3 +1,4 @@
+#define SCHEMA_DEV
 using System;
 using UnityEngine;
 using ILogger = Schema.Core.ILogger;
@@ -7,7 +8,12 @@ namespace Schema.Unity.Editor
 {
     public class UnityLogger : ILogger
     {
-        public Logger.LogLevel LogLevel { get; set; } = Logger.LogLevel.INFO;
+        public Logger.LogLevel LogLevel { get; set; } =
+#if SCHEMA_DEV
+            Logger.LogLevel.VERBOSE;
+#else
+            Logger.LogLevel.INFO;
+#endif
         public void Log(Logger.LogLevel logLevel, string message)
         {
             if (logLevel < LogLevel)

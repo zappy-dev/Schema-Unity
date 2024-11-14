@@ -1,5 +1,5 @@
 using System.Linq;
-using Schema.Core;
+using Schema.Core.Data;
 using UnityEditor;
 using UnityEngine;
 

@@ -1,11 +1,10 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Newtonsoft.Json;
 
-namespace Schema.Core
+namespace Schema.Core.Data
 {
     // Representing a data scheme in memory
     [Serializable]
@@ -101,19 +100,27 @@ namespace Schema.Core
         public SchemaResult ConvertAttributeType(string attributeName, DataType newType)
         {
             var attribute = attributes.Find(a => a.AttributeName == attributeName);
-            var prevDataType = attribute.DataType;
-            
+
             try
             {
                 foreach (var entry in entries)
                 {
-                    var entryData = entry.GetData(attributeName);
-                    if (!DataType.TryToConvertData(entryData, prevDataType, newType, out entryData))
+                    object convertedData;
+                    if (!entry.HasData(attribute))
                     {
-                        return SchemaResult.Fail($"Cannot convert attribute {attributeName} to type {newType}", this);
+                        convertedData = newType.CloneDefaultValue();
+                    }
+                    else
+                    {
+                        var entryData = entry.GetData(attribute);
+
+                        if (!DataType.TryToConvertData(entryData, attribute.DataType, newType, out convertedData))
+                        {
+                            return SchemaResult.Fail($"Cannot convert attribute {attributeName} to type {newType}", this);
+                        }
                     }
                         
-                    entry.SetData(attributeName, entryData);
+                    entry.SetData(attributeName, convertedData);
                 }
             }
             catch (FormatException e)
@@ -125,13 +132,20 @@ namespace Schema.Core
             // TODO: Does the abstract that an attribute can defined a separate default value than a type help right now?
             attribute.DefaultValue = newType.CloneDefaultValue();
             
-            return SchemaResult.Success($"Successfully converted attribute {attributeName} to type {newType}", this);
+            return SchemaResult.Success($"Converted attribute {attributeName} to type {newType}", this);
         }
 
         public SchemaResult DeleteAttribute(AttributeDefinition attribute)
         {
-            attributes.Remove(attribute);
-            return SchemaResult.Success("Successfully deleted attribute: " + attribute.AttributeName, this);
+            bool result = attributes.Remove(attribute);
+            if (result == false)
+            {
+                return SchemaResult.Fail($"Attribute {attribute.AttributeName} cannot be deleted", this);
+            }
+            else
+            {
+                return SchemaResult.Success($"Deleted {attribute}", this);
+            }
         }
 
         /// <summary>
@@ -216,6 +230,9 @@ namespace Schema.Core
             {
                 return SchemaResult.Fail("Entry cannot be null", this);
             }
+            
+            // TODO: Validate that a data entry has all of the expected attributes and add default attribute values if not present
+            // Also fail if unexpected attribute values are encountered? 
             
             entries.Add(newEntry);
             return SchemaResult.Success($"Added {newEntry}", this);
@@ -345,7 +362,7 @@ namespace Schema.Core
                     $"Attempted to get attribute values for attribute not contained by Schema");
             }
             
-            return entries.Select(e => e.GetData(attribute.AttributeName));
+            return entries.Select(e => e.GetData(attribute));
         }
         
         #endregion
@@ -353,6 +370,30 @@ namespace Schema.Core
         public AttributeDefinition GetAttribute(int attributeIndex)
         {
             return attributes[attributeIndex];
+        }
+
+        public bool TryGetAttribute(string attributeName, out AttributeDefinition attribute)
+        {
+            attribute = attributes.FirstOrDefault(a => a.AttributeName.Equals(attributeName));
+            return attribute != null;
+        }
+
+        public IEnumerable<DataEntry> GetEntries(AttributeSortOrder sortOrder = default)
+        {
+            if (!sortOrder.HasValue)
+            {
+                return entries;
+            }
+
+            var attributeName = sortOrder.AttributeName;
+            if (!TryGetAttribute(attributeName, out var attribute))
+            {
+                throw new ArgumentException($"Attempted to get entries for attribute not contained by Schema");
+            }
+
+            return sortOrder.Order == SortOrder.Ascending ? 
+                entries.OrderBy(e => e.GetData(attribute)) : 
+                entries.OrderByDescending(e => e.GetData(attribute));
         }
     }
 }

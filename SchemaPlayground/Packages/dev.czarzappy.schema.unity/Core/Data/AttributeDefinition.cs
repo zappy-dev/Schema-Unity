@@ -1,6 +1,6 @@
 using System;
 
-namespace Schema.Core
+namespace Schema.Core.Data
 {
     [Serializable]
     public class AttributeDefinition : Defaultable, ICloneable
@@ -15,7 +15,7 @@ namespace Schema.Core
 
         public override string ToString()
         {
-            return $"Attribute {AttributeName}";
+            return $"Attribute: '{AttributeName}' ({DataType})";
         }
 
         public AttributeDefinition(string attributeName, DataType dataType, 

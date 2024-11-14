@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using Schema.Core.Data;
 using Schema.Core.Serialization;
 using static Schema.Core.SchemaResult;
 
@@ -16,7 +17,7 @@ namespace Schema.Core
         {
             get
             {
-                if (!isInitialized)
+                if (!IsInitialized)
                 {
                     return null;
                 }
@@ -34,7 +35,7 @@ namespace Schema.Core
         {
             get
             {
-                if (!isInitialized)
+                if (!IsInitialized)
                 {
                     return Enumerable.Empty<string>();
                 }
@@ -64,7 +65,7 @@ namespace Schema.Core
         {
             get
             {
-                if (!isInitialized)
+                if (!IsInitialized)
                 {
                     return null;
                 }
@@ -77,7 +78,7 @@ namespace Schema.Core
         {
             get
             {
-                if (!isInitialized)
+                if (!IsInitialized)
                 {
                     return null;
                 }
@@ -93,8 +94,8 @@ namespace Schema.Core
 
             }
         }
-        private static bool isInitialized = false;
-        public static bool IsInitialized => isInitialized;
+
+        public static bool IsInitialized { get; private set; }
 
         #endregion
         
@@ -106,11 +107,11 @@ namespace Schema.Core
 
         public static void Reset()
         {
-            isInitialized = false;
+            IsInitialized = false;
             dataSchemes.Clear();
             
             InitializeTemplateManifestScheme();
-            isInitialized = true;
+            IsInitialized = true;
         }
 
         private static void InitializeTemplateManifestScheme()
@@ -388,7 +389,7 @@ namespace Schema.Core
             Logger.Log($"Saving {scheme} to file...", "Storage");
             if (scheme == null)
             {
-                return Fail("Data scheme is invalid: " + scheme);
+                return Fail("Attempted to save an invalid Data scheme");
             }
             
             var saveStopwatch = Stopwatch.StartNew();
@@ -427,7 +428,7 @@ namespace Schema.Core
 
         public static bool TryGetManifestEntryForScheme(DataScheme scheme, out DataEntry schemeManifestEntry)
         {
-            if (!isInitialized)
+            if (!IsInitialized)
             {
                 schemeManifestEntry = null;
                 return false;
@@ -442,10 +443,9 @@ namespace Schema.Core
             return TryGetManifestEntryForScheme(scheme.SchemeName, out schemeManifestEntry);
         }
         
-        public static bool TryGetManifestEntryForScheme(string schemeName, out DataEntry schemeManifestEntry)
+        internal static bool TryGetManifestEntryForScheme(string schemeName, out DataEntry schemeManifestEntry)
         {
-            Logger.LogVerbose($"Getting manifest entry for scheme name: {schemeName}...");
-            if (!isInitialized)
+            if (!IsInitialized)
             {
                 schemeManifestEntry = null;
                 return false;

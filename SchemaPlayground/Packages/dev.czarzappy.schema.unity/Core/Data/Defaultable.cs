@@ -1,6 +1,6 @@
 using System;
 
-namespace Schema.Core
+namespace Schema.Core.Data
 {
     public abstract class Defaultable
     {

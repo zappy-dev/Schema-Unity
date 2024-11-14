@@ -1,5 +1,7 @@
 // using System.IO;
 
+using System;
+using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -7,7 +9,7 @@ using Schema.Core.IO;
 
 namespace Schema.Core.Serialization
 {
-    public class JsonStorageFormat : IStorageFormat<DataScheme>
+    public class JsonStorageFormat<T> : IStorageFormat<T>
     {
         private JsonSerializerSettings settings;
         public string Extension => "json";
@@ -24,34 +26,39 @@ namespace Schema.Core.Serialization
                 {
                     NamingStrategy = new DefaultNamingStrategy()
                 },
+                Converters = new List<JsonConverter>
+                {
+                    new DataTypeConverter(),
+                    new DataEntryConverter(),
+                },
                 Formatting = Formatting.Indented,
             };
         }
         
-        public bool TryDeserializeFromFile(string filePath, out DataScheme scheme)
+        public bool TryDeserializeFromFile(string filePath, out T scheme)
         {
             string jsonData = fileSystem.ReadAllText(filePath);
 
             return TryDeserialize(jsonData, out scheme);
         }
 
-        public bool TryDeserialize(string content, out DataScheme dataScheme)
+        public bool TryDeserialize(string content, out T data)
         {
             // TODO: Handle a non-scheme formatted file, converting into scheme format
             try
             {
-                dataScheme = JsonConvert.DeserializeObject<DataScheme>(content, settings);
+                data = JsonConvert.DeserializeObject<T>(content, settings);
                 return true;
             }
-            catch (JsonReaderException ex)
+            catch (Exception ex)
             {
                 Logger.LogError($"Error parsing JSON: {ex.Message}");
-                dataScheme = null;
+                data = default;
                 return false;
             }
         }
 
-        public void SerializeToFile(string filePath, DataScheme data)
+        public void SerializeToFile(string filePath, T data)
         {
             string jsonData = Serialize(data);
             // Extract the directory path from the file path
@@ -66,7 +73,7 @@ namespace Schema.Core.Serialization
             fileSystem.WriteAllText(filePath, jsonData);
         }
 
-        public string Serialize(DataScheme data)
+        public string Serialize(T data)
         {
             return JsonConvert.SerializeObject(data, Formatting.Indented, settings);
         }

@@ -1,4 +1,5 @@
 using Schema.Core;
+using Schema.Core.Data;
 using Schema.Core.Serialization;
 using UnityEditor;
 using UnityEngine;

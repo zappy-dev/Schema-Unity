@@ -2,58 +2,50 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using Schema.Core;
+using Schema.Core.Data;
 using Schema.Core.Serialization;
 using Unity.Profiling;
 using UnityEditor;
 using UnityEngine;
 using static Schema.Core.SchemaResult;
+using static Schema.Unity.Editor.SchemaLayout;
 using Logger = Schema.Core.Logger;
 using Random = System.Random;
 
 namespace Schema.Unity.Editor
 {
-    public class SchemeEditorWindow : EditorWindow
+    [Serializable]
+    public class SchemaEditorWindow : EditorWindow
     {
         #region Static Fields and Constants
 
         private const string EDITORPREFS_KEY_SELECTEDSCHEME = "Schema:SelectedSchemeName";
         
-        private static ProfilerMarker explorerViewMarker = new ProfilerMarker("SchemaEditor:ExplorerView");
-        private static ProfilerMarker tableViewMarker = new ProfilerMarker("SchemaEditor:TableView");
+        private static ProfilerMarker _explorerViewMarker = new ProfilerMarker("SchemaEditor:ExplorerView");
+        private static ProfilerMarker _tableViewMarker = new ProfilerMarker("SchemaEditor:TableView");
 
-        private const float SETTINGS_WIDTH = 50;
-
-        private static bool SettingsButton(string text = "", float width = SETTINGS_WIDTH) => EditorGUILayout.DropdownButton(
-            new GUIContent(text, EditorGUIUtility.IconContent(EditorIcon.GEAR_ICON_NAME).image),
-            FocusType.Keyboard, GUILayout.MaxWidth(width));
-
-
-        private bool DropdownButton(string text = "", float width = SETTINGS_WIDTH, GUIStyle style = null) =>
-            DropdownButton(new GUIContent(text), width, style);
-        
-        private bool DropdownButton(GUIContent content, float width = SETTINGS_WIDTH, GUIStyle style = null)
-        {
-            var buttonStyle = style ?? defaultDropdownButtonStyle;
-            return EditorGUILayout.DropdownButton(
-                content,
-                FocusType.Keyboard, buttonStyle, GUILayout.Width(width));
-        }
-
-        private static string DEFAULT_CONTENT_PATH;
-        private static string DEFAULT_MANIFEST_LOAD_PATH;
-        private FileSystemWatcher manifestWatcher;
+        private static string _defaultContentPath;
+        private static string _defaultManifestLoadPath;
         
         #endregion
         
         #region Fields and Properties
-
+        
+        private bool isInitialized;
+        private bool showDebugView;
+        
+        public SchemaResult LatestManifestLoadResponse { get; set; }
         private List<SchemaResult> responseHistory = new List<SchemaResult>();
+        private DateTime latestResponseTime;
         private SchemaResult LatestResponse
         {
             get => responseHistory.LastOrDefault();
-            set => responseHistory.Add(value);
+            set
+            {
+                latestResponseTime = DateTime.Now;
+                responseHistory.Add(value);
+            }
         }
 
         private Vector2 explorerScrollPosition;
@@ -65,73 +57,21 @@ namespace Schema.Unity.Editor
         private string selectedSchemeName = string.Empty;
         [NonSerialized]
         private string newAttributeName = string.Empty;
-        
-        public string manifestFilePath = string.Empty;
-        public string tooltipOfTheDay = string.Empty;
+
+        private string manifestFilePath = string.Empty;
+        private string tooltipOfTheDay = string.Empty;
         
         [SerializeField]
         private int selectedSchemaIndex = -1;
         
-        private GUIStyle leftAlignedButtonStyle;
-        private GUIStyle rightAlignedLabelStyle;
-        private GUIStyle defaultDropdownButtonStyle;
-        
-        [NonSerialized]
-        private CellStyle cellEvenStyle;
-
-        private static float evenOddsBase = 0.4f;
-        private static float evenOddsOffset = 0.3f;
-        private static readonly Color cellEventBackgroundColor = new Color(evenOddsBase, evenOddsBase, evenOddsBase);
-
-        [NonSerialized]
-        private CellStyle cellOddStyle;
-
-        private static readonly Color cellOddBackgroundColor = new Color(evenOddsBase + evenOddsOffset, evenOddsBase + evenOddsOffset, evenOddsBase + evenOddsOffset);
-
-        public class CellStyle
-        {
-            public GUIStyle FieldStyle { get; }
-            public GUIStyle DropdownStyle { get; }
-            public GUIStyle ButtonStyle { get; }
-            private Color backgroundColor;
-            public Color BackgroundColor
-            {
-                get => backgroundColor;
-            }
-
-            public CellStyle()
-            {
-                FieldStyle = new GUIStyle(EditorStyles.textField);
-                DropdownStyle = new GUIStyle("MiniPullDown");
-                ButtonStyle = new GUIStyle(GUI.skin.button)
-                {
-                    alignment = TextAnchor.MiddleCenter
-                };
-            }
-
-            public void SetBackgroundColor(Color backgroundColor)
-            {
-                Texture2D backgroundTexture = new Texture2D(1, 1);
-                backgroundTexture.SetPixels(new[]
-                {
-                    backgroundColor
-                });
-                backgroundTexture.Apply();
-                
-                // FieldStyle.normal.background = backgroundTexture;
-                
-                // DropdownStyle.normal.background = backgroundTexture;
-                
-                // DropdownStyle.active.background = backgroundTexture;
-                // DropdownStyle.hover.background = backgroundTexture;
-                
-                // ButtonStyle.normal.background = backgroundTexture;
-                this.backgroundColor = backgroundColor;
-            }
-        }
-        
-        private DateTime lastChanged = DateTime.MinValue;
+        private FileSystemWatcher manifestWatcher;
+        private DateTime lastManifestReloadTime = DateTime.MinValue;
         private readonly TimeSpan debounceTime = TimeSpan.FromMilliseconds(500);
+        
+        private int debugIdx;
+
+        private readonly Dictionary<string, AttributeSortOrder> primarySchemeSort = 
+            new Dictionary<string, AttributeSortOrder>();
         
         #endregion
 
@@ -140,20 +80,31 @@ namespace Schema.Unity.Editor
         [MenuItem("Tools/Scheme Editor")]
         public static void ShowWindow()
         {
-            GetWindow<SchemeEditorWindow>("Scheme Editor");
+            GetWindow<SchemaEditorWindow>("Scheme Editor");
         }
 
         private void OnEnable()
         {
-            Debug.Log("Scheme Editor enabled");
+            Logger.LogVerbose("Scheme Editor enabled", this);
+            isInitialized = false;
+            EditorApplication.update += InitializeSafely;
+        }
+
+        private void InitializeSafely()
+        {
+            if (isInitialized) return;
+            Logger.LogVerbose("InitializeSafely", this);
+            
+            // return;
             selectedSchemaIndex = -1;
             selectedSchemeName = string.Empty;
             newAttributeName = string.Empty;
 
-            DEFAULT_CONTENT_PATH = Path.Combine(Path.GetFullPath(Application.dataPath + "/.."), "Content");
-            DEFAULT_MANIFEST_LOAD_PATH = GetContentPath("Manifest.json");
+            _defaultContentPath = Path.Combine(Path.GetFullPath(Application.dataPath + "/.."), "Content");
+            _defaultManifestLoadPath = GetContentPath("Manifest.json");
 
-            manifestFilePath = DEFAULT_MANIFEST_LOAD_PATH;
+            manifestFilePath = _defaultManifestLoadPath;
+            // return;
             LatestResponse = OnLoadManifest("On Editor Startup");
             if (LatestResponse.IsSuccess)
             {
@@ -164,18 +115,26 @@ namespace Schema.Unity.Editor
             }
 
             var storedSelectedSchema = EditorPrefs.GetString(EDITORPREFS_KEY_SELECTEDSCHEME, null);
+            // return;
             if (!string.IsNullOrEmpty(storedSelectedSchema))
             {
+                Logger.LogVerbose($"Selected schema found: {storedSelectedSchema}", this);
                 OnSelectScheme(storedSelectedSchema, "Restoring from Editor Preferences");
             }
+
+            EditorApplication.update -= InitializeSafely;
+            isInitialized = true;
         }
-        
+
 
         private string GetContentPath(string schemeFileName)
         {
-            return Path.Combine(DEFAULT_CONTENT_PATH, schemeFileName);
+            return Path.Combine(_defaultContentPath, schemeFileName);
         }
+
+        #region Manifest File Changing Handling
         
+        // TODO: Migrate to separate file
         private void InitializeFileWatcher()
         {
             if (manifestWatcher == null)
@@ -186,18 +145,18 @@ namespace Schema.Unity.Editor
                     Filter = Path.GetFileName(manifestFilePath),
                     NotifyFilter = NotifyFilters.LastWrite
                 };
-                manifestWatcher.Changed += OnManifestChanged;
+                manifestWatcher.Changed += OnManifestFileChanged;
                 manifestWatcher.EnableRaisingEvents = true;
             }
         }
 
-        private void OnManifestChanged(object sender, FileSystemEventArgs e)
+        private void OnManifestFileChanged(object sender, FileSystemEventArgs e)
         {
             DateTime now = DateTime.Now;
 
-            if (now - lastChanged < debounceTime) return;
+            if (now - lastManifestReloadTime < debounceTime) return;
 
-            lastChanged = now;
+            lastManifestReloadTime = now;
 
             // Switch to main thread using UnityEditor.EditorApplication.delayCall
             EditorApplication.delayCall += () =>
@@ -208,9 +167,12 @@ namespace Schema.Unity.Editor
                 Repaint();
             };
         }
+        #endregion
 
         private void OnDisable()
         {
+            // Clean up event handlers to prevent memory leaks
+            EditorApplication.delayCall -= InitializeSafely;
             manifestWatcher?.Dispose();
         }
 
@@ -244,7 +206,6 @@ namespace Schema.Unity.Editor
 
         private void OnSelectScheme(string schemeName, string context)
         {
-            Logger.Log($"Opening Schema '{schemeName}' for editing, {context}...");
             var schemeNames = Schema.Core.Schema.AllSchemes.ToArray();
             var prevSelectedIndex = Array.IndexOf(schemeNames, schemeName);
             if (prevSelectedIndex == -1)
@@ -252,56 +213,47 @@ namespace Schema.Unity.Editor
                 return;
             }
             
+            Logger.Log($"Opening Schema '{schemeName}' for editing, {context}...");
             selectedSchemeName = schemeName;
             selectedSchemaIndex = prevSelectedIndex;
-            EditorPrefs.SetString(EDITORPREFS_KEY_SELECTEDSCHEME, selectedSchemeName);
+            EditorPrefs.SetString(EDITORPREFS_KEY_SELECTEDSCHEME, schemeName);
             newAttributeName = string.Empty;
         }
 
         private SchemaResult OnLoadManifest(string context)
         {
-            using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
-            LatestResponse = Core.Schema.LoadFromManifest(manifestFilePath, progress: progressReporter);
+            Logger.LogVerbose($"Loading Manifest", context);
+            // TODO: Figure out why progress reporting is making the Unity Editor unhappy
+            // using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
+            LatestResponse = Core.Schema.LoadFromManifest(manifestFilePath);
             LatestManifestLoadResponse = LatestResponse;
             return LatestResponse;
         }
+        
+        private void SetColumnSort(DataScheme scheme, AttributeDefinition attribute, SortOrder sortOrder)
+        {
+            Logger.Log($"Set column sort '{sortOrder}' for schema '{scheme.SchemeName}'.", this);
+            primarySchemeSort[scheme.SchemeName] = new AttributeSortOrder(attribute.AttributeName, sortOrder);
+        }
 
-        public SchemaResult LatestManifestLoadResponse { get; set; }
+        private AttributeSortOrder GetSortOrderForScheme(DataScheme scheme)
+        {
+            if (primarySchemeSort.TryGetValue(scheme.SchemeName, out var sortOrder))
+            {
+                return sortOrder;
+            }
+
+            return AttributeSortOrder.None;
+        }
+
+        private void FocusOnEntry(string referenceSchemeName, string referenceAttributeName, string currentValue)
+        {
+            OnSelectScheme(referenceSchemeName, "Focus On Entry");
+        }
 
         #endregion
 
         #region Rendering Methods
-        
-        private CellStyle GetRowCellStyle(int rowIdx)
-        {
-            switch (rowIdx % 2)
-            {
-                case 0:
-                    return cellEvenStyle;
-                case 1:
-                default:
-                    return cellOddStyle;
-            }
-        }
-
-        private void InitializeStyles()
-        {
-            leftAlignedButtonStyle = new GUIStyle(GUI.skin.button);
-            leftAlignedButtonStyle.alignment = TextAnchor.MiddleLeft;
-            leftAlignedButtonStyle.padding = new RectOffset(10, 10, 5, 5);
-
-            rightAlignedLabelStyle = new GUIStyle(GUI.skin.label);
-            rightAlignedLabelStyle.alignment = TextAnchor.MiddleRight;
-            
-            defaultDropdownButtonStyle = new GUIStyle("MiniPullDown");
-            defaultDropdownButtonStyle.alignment = TextAnchor.MiddleCenter;
-
-            cellEvenStyle = new CellStyle();
-            cellOddStyle = new CellStyle();
-            
-            cellEvenStyle.SetBackgroundColor(cellEventBackgroundColor);
-            cellOddStyle.SetBackgroundColor(cellOddBackgroundColor);
-        }
 
         private string GetTooltipMessage()
         {
@@ -320,17 +272,20 @@ namespace Schema.Unity.Editor
                 return $"No message found for tooltip entry {randomIdx}";
             
             return message;
-
         }
-
-        private bool showDebugView = true;
         
         private void OnGUI()
         {
+            if (!isInitialized)
+            {
+                GUILayout.Label("Initializing...");
+                return;
+            }
+            
             showDebugView = EditorGUILayout.Foldout(showDebugView, "Debug View");
             if (showDebugView)
             {
-                ShowDebugView();
+                RenderDebugView();
             }
             
             InitializeStyles();
@@ -343,7 +298,7 @@ namespace Schema.Unity.Editor
                 EditorGUILayout.HelpBox("Hello! Would you like to Create an Empty Project or Load an Existing Project Manifest", MessageType.Info);
                 if (GUILayout.Button("Start Empty Project"))
                 {
-                    LatestResponse = Core.Schema.SaveManifest(DEFAULT_MANIFEST_LOAD_PATH);
+                    LatestResponse = Core.Schema.SaveManifest(_defaultManifestLoadPath);
                     LatestManifestLoadResponse = LatestResponse;
                 }
                 return;
@@ -359,21 +314,21 @@ namespace Schema.Unity.Editor
             GUILayout.BeginHorizontal();
             // Scrollable area to list existing schemes
 
-            using (var _ = explorerViewMarker.Auto())
+            using (var _ = _explorerViewMarker.Auto())
             {
-                OnSchemaExplorerGUI();
+                RenderSchemaExplorer();
             }
 
             DrawVerticalLine();
-            using (var _ = tableViewMarker.Auto())
+            using (var _ = _tableViewMarker.Auto())
             {
-                OnTableViewGUI();
+                RenderTableView();
             }
             // Table View
             GUILayout.EndHorizontal();
         }
 
-        private void ShowDebugView()
+        private void RenderDebugView()
         {
             using (new EditorGUI.DisabledScope())
             {
@@ -446,11 +401,11 @@ namespace Schema.Unity.Editor
 
             if (LatestResponse.Payload != null)
             {
-                EditorGUILayout.HelpBox(LatestResponse.Payload.ToString(), LatestResponse.MessageType());
+                EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestResponse.Payload}", LatestResponse.MessageType());
             }
         }
 
-        private void OnSchemaExplorerGUI()
+        private void RenderSchemaExplorer()
         {
             using (new EditorGUILayout.VerticalScope(GUILayout.Width(400)))
             {
@@ -464,7 +419,7 @@ namespace Schema.Unity.Editor
 
                     using (var schemeChange = new EditorGUI.ChangeCheckScope())
                     {
-                        selectedSchemaIndex = GUILayout.SelectionGrid(selectedSchemaIndex, schemeNames, 1, leftAlignedButtonStyle);
+                        selectedSchemaIndex = GUILayout.SelectionGrid(selectedSchemaIndex, schemeNames, 1, LeftAlignedButtonStyle);
                         
                         if (schemeChange.changed)
                         {
@@ -516,11 +471,11 @@ namespace Schema.Unity.Editor
             }
         }
 
-        void OnTableViewGUI()
+        private void RenderTableView()
         {
             if (string.IsNullOrEmpty(selectedSchemeName))
             {
-                EditorGUILayout.HelpBox("Select a Schema from the Schema Explorer to view in the table", MessageType.Info);
+                EditorGUILayout.HelpBox("Choose a Schema from the Schema Explorer to view in the table", MessageType.Info);
                 return;
             }
 
@@ -578,64 +533,15 @@ namespace Schema.Unity.Editor
                     
                 tableViewScrollPosition = GUILayout.BeginScrollView(tableViewScrollPosition, alwaysShowHorizontal: true, alwaysShowVertical: true);
                 
-                // render table header
-                using (new GUILayout.HorizontalScope())
-                {
-                    // GUILayoutUtility.GetRect(SETTINGS_WIDTH, 10, GUILayout.ExpandWidth(false));
-                    EditorGUILayout.LabelField("#", rightAlignedLabelStyle, GUILayout.Width(SETTINGS_WIDTH), GUILayout.ExpandWidth(false));
-                    // row settings gear spacing
-                    
-                    for (var attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
-                    {
-                        var attribute = scheme.GetAttribute(attributeIdx);
-                        // GUILayout.Label(attribute.AttributeName, EditorStyles.boldLabel, GUILayout.MaxWidth(attribute.ColumnWidth - SETTINGS_WIDTH));
-                        
-                        // column settings gear
-                        string attributeLabel = attribute.AttributeName;
-                        if (attribute.IsIdentifier)
-                        {
-                            attributeLabel = $"{attribute.AttributeName} - ID";
-                        }
-                        else if (attribute.DataType is ReferenceDataType)
-                        {
-                            attributeLabel = $"{attribute.AttributeName} - Ref";
-                        }
-                        
-                        var attributeContent = new GUIContent(attributeLabel, attribute.AttributeToolTip);
-                        if (DropdownButton(attributeContent, attribute.ColumnWidth))
-                        {
-                            ShowAttributeColumnOptions(attributeIdx, scheme, attribute, attributeCount);
-                        }
-                    }
-
-                    // add new attribute form
-                    newAttributeName = GUILayout.TextField(newAttributeName, GUILayout.ExpandWidth(false), GUILayout.MinWidth(100));
-                    using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newAttributeName)))
-                    {
-                        if (AddButton("Add Attribute"))
-                        {
-                            Debug.Log($"Added new attribute to '{scheme.SchemeName}'.`");
-                            LatestResponse = scheme.AddAttribute(new AttributeDefinition
-                            {
-                                AttributeName = newAttributeName,
-                                DataType = DataType.String,
-                                DefaultValue = string.Empty,
-                                IsIdentifier = false,
-                                ColumnWidth = AttributeDefinition.DefaultColumnWidth,
-                            });
-                            if (LatestResponse.IsSuccess) 
-                            {
-                                LatestResponse = Core.Schema.SaveDataScheme(scheme, saveManifest: false);
-                            }
-                            newAttributeName = string.Empty; // clear out attribute name field since it's unlikely someone wants to make another attribute with the same name
-                        }
-                    }
-                }
+                RenderTableHeader(attributeCount, scheme);
+                
+                var sortOrder = GetSortOrderForScheme(scheme);
+                var entries = scheme.GetEntries(sortOrder);
                 
                 // render table body, scheme data entries
-                for (int entryIdx = 0; entryIdx < entryCount; entryIdx++)
+                int entryIdx = 0;
+                foreach (var entry in entries)
                 {
-                    var entry = scheme.GetEntry(entryIdx);
                     using (new GUILayout.HorizontalScope())
                     {
                         var cellStyle = GetRowCellStyle(entryIdx);
@@ -647,21 +553,45 @@ namespace Schema.Unity.Editor
                             // make row count human 1-based
                             if (DropdownButton($"{entryIdx + 1}", style: cellStyle.DropdownStyle))
                             {
-                                ShowEntryRowOptions(entryIdx, entryCount, scheme, entry);
+                                RenderEntryRowOptions(entryIdx, entryCount, scheme, entry);
                             }
                             
                             for (int attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                             {
                                 var attribute = scheme.GetAttribute(attributeIdx);
                                 var attributeName = attribute.AttributeName;
-                                var entryValue = entry.GetData(attributeName);
-                                bool dataExists = entryValue != null;
-                                if (!dataExists)
+                                // handle setting
+                                object entryValue;
+                                bool didSetLoad = false;
+                                if (!entry.HasData(attribute))
                                 {
+                                    Logger.LogWarning($"Setting {attribute} data for {entry}");
                                     // for some reason this data wasn't set yet
-                                    var newData = attribute.CloneDefaultValue();
-                                    entry.SetData(attributeName, newData);
-                                    entryValue = newData;
+                                    entryValue = attribute.CloneDefaultValue();
+                                    didSetLoad = true;
+                                }
+                                else
+                                {
+                                    entryValue = entry.GetData(attribute);
+                                    if (!attribute.DataType.IsValid(entryValue))
+                                    {
+                                        if (DataType.TryToConvertData(entryValue, DataType.Default, attribute.DataType,
+                                                out var convertedValue))
+                                        {
+                                            entryValue = convertedValue;
+                                            didSetLoad = true;
+                                        }
+                                        else
+                                        {
+                                            entryValue = attribute.CloneDefaultValue();
+                                            didSetLoad = true;
+                                        }
+                                    }
+                                }
+
+                                if (didSetLoad)
+                                {
+                                    entry.SetData(attributeName, entryValue);
                                 }
 
                                 var attributeFieldWidth = GUILayout.Width(attribute.ColumnWidth);
@@ -723,7 +653,7 @@ namespace Schema.Unity.Editor
                                     else {
                                         entryValue = EditorGUILayout.TextField(entryValue == null ? string.Empty : entryValue.ToString(), cellStyle.FieldStyle, attributeFieldWidth);
                                     }
-                                    int lastControlId = EditorGUIUtility.GetControlID(FocusType.Passive);
+                                    int lastControlId = GUIUtility.GetControlID(FocusType.Passive);
                                     tableCellControlIds[entryIdx * attributeCount + attributeIdx] = lastControlId;
 
                                     if (changed.changed)
@@ -759,6 +689,8 @@ namespace Schema.Unity.Editor
                             }
                         }
                     }
+                    
+                    entryIdx++;
                 }
 
                 GUILayout.EndScrollView();
@@ -780,7 +712,7 @@ namespace Schema.Unity.Editor
             if (ev.type == EventType.KeyUp && ev.keyCode != KeyCode.None)
             {
                 // IDK why this is off-by-one
-                int focusedIndex = Array.IndexOf(tableCellControlIds, EditorGUIUtility.keyboardControl + 1);
+                int focusedIndex = Array.IndexOf(tableCellControlIds, GUIUtility.keyboardControl + 1);
                 
                 if (focusedIndex != -1)
                 {
@@ -833,32 +765,103 @@ namespace Schema.Unity.Editor
             }
         }
 
-        private void FocusOnEntry(string referenceSchemeName, string referenceAttributeName, string currentValue)
+        private void RenderTableHeader(int attributeCount, DataScheme scheme)
         {
-            OnSelectScheme(referenceSchemeName, "Focus On Entry");
+            using (new GUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("#", RightAlignedLabelStyle, 
+                    GUILayout.Width(SETTINGS_WIDTH),
+                    GUILayout.ExpandWidth(false));
+                
+                // render column attribute headings
+                for (var attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
+                {
+                    var attribute = scheme.GetAttribute(attributeIdx);
+                        
+                    // column settings gear
+                    string attributeLabel = attribute.AttributeName;
+                    if (attribute.IsIdentifier)
+                    {
+                        attributeLabel = $"{attribute.AttributeName} - ID";
+                    }
+                    else if (attribute.DataType is ReferenceDataType)
+                    {
+                        attributeLabel = $"{attribute.AttributeName} - Ref";
+                    }
+
+                    var sortOrder = GetSortOrderForScheme(scheme);
+                    Texture attributeIcon = null;
+                    if (sortOrder.AttributeName == attribute.AttributeName)
+                    {
+                        switch (sortOrder.Order)
+                        {
+                            case SortOrder.Ascending:
+                                attributeIcon = EditorIcon.UpArrow;
+                                break;
+                            case SortOrder.Descending:
+                                attributeIcon = EditorIcon.DownArrow;
+                                break;
+                        }
+                    }
+                    
+                    var attributeContent = new GUIContent(attributeLabel,
+                        attributeIcon,
+                        attribute.AttributeToolTip);
+                    if (DropdownButton(attributeContent, attribute.ColumnWidth))
+                    {
+                        RenderAttributeColumnOptions(attributeIdx, scheme, attribute, attributeCount);
+                    }
+                }
+
+                // add new attribute form
+                newAttributeName = GUILayout.TextField(newAttributeName, GUILayout.ExpandWidth(false), GUILayout.MinWidth(100));
+                using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newAttributeName)))
+                {
+                    if (AddButton("Add Attribute"))
+                    {
+                        Debug.Log($"Added new attribute to '{scheme.SchemeName}'.`");
+                        LatestResponse = scheme.AddAttribute(new AttributeDefinition
+                        {
+                            AttributeName = newAttributeName,
+                            DataType = DataType.String,
+                            DefaultValue = string.Empty,
+                            IsIdentifier = false,
+                            ColumnWidth = AttributeDefinition.DefaultColumnWidth,
+                        });
+                        if (LatestResponse.IsSuccess) 
+                        {
+                            LatestResponse = Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                        }
+                        newAttributeName = string.Empty; // clear out attribute name field since it's unlikely someone wants to make another attribute with the same name
+                    }
+                }
+            }
         }
 
-        private void ShowEntryRowOptions(int entryIdx, int entryCount, DataScheme scheme, DataEntry entry)
+        private void RenderEntryRowOptions(int entryIdx, int entryCount, DataScheme scheme, DataEntry entry)
         {
             var rowOptionsMenu = new GenericMenu();
-            bool isFirstEntry = entryIdx == 0;
-            bool isLastEntry = entryIdx == entryCount - 1;
-            rowOptionsMenu.AddItem(new GUIContent("Move To Top"), isDisabled: isFirstEntry, () =>
+
+            var sortOrder = GetSortOrderForScheme(scheme);
+            bool canMoveUp = sortOrder.HasValue && entryIdx != 0;
+            bool canMoveDown = sortOrder.HasValue && entryIdx != entryCount - 1;
+            
+            rowOptionsMenu.AddItem(new GUIContent("Move To Top"), isDisabled: canMoveUp, () =>
             {
                 scheme.MoveEntry(entry, 0);
                 Core.Schema.SaveDataScheme(scheme, saveManifest: false);
             });
-            rowOptionsMenu.AddItem(new GUIContent("Move Up"), isDisabled: isFirstEntry, () =>
+            rowOptionsMenu.AddItem(new GUIContent("Move Up"), isDisabled: canMoveUp, () =>
             {
                 scheme.MoveUpEntry(entry);
                 Core.Schema.SaveDataScheme(scheme, saveManifest: false);
             });
-            rowOptionsMenu.AddItem(new GUIContent("Move Down"), isDisabled: isLastEntry, () =>
+            rowOptionsMenu.AddItem(new GUIContent("Move Down"), isDisabled: canMoveDown, () =>
             {
                 scheme.MoveDownEntry(entry);
                 Core.Schema.SaveDataScheme(scheme, saveManifest: false);
             });
-            rowOptionsMenu.AddItem(new GUIContent("Move To Bottom"), isDisabled: isLastEntry, () =>
+            rowOptionsMenu.AddItem(new GUIContent("Move To Bottom"), isDisabled: canMoveDown, () =>
             {
                 scheme.MoveEntry(entry, entryCount - 1);
                 Core.Schema.SaveDataScheme(scheme, saveManifest: false);
@@ -875,7 +878,7 @@ namespace Schema.Unity.Editor
             rowOptionsMenu.ShowAsContext();
         }
 
-        private void ShowAttributeColumnOptions(int attributeIdx, DataScheme scheme, AttributeDefinition attribute,
+        private void RenderAttributeColumnOptions(int attributeIdx, DataScheme scheme, AttributeDefinition attribute,
             int attributeCount)
         {
             var columnOptionsMenu = new GenericMenu();
@@ -890,6 +893,31 @@ namespace Schema.Unity.Editor
             {
                 scheme.DecreaseAttributeRank(attribute);
                 Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+            });
+                            
+            // Sorting options
+            columnOptionsMenu.AddSeparator("");
+            
+            var sortOrder = GetSortOrderForScheme(scheme);
+            columnOptionsMenu.AddItem(new GUIContent("Sort Ascending"), 
+                on: sortOrder.Equals(new AttributeSortOrder(attribute.AttributeName, SortOrder.Ascending)), 
+                () =>
+            {
+                SetColumnSort(scheme, attribute, SortOrder.Ascending);
+            });
+            
+            columnOptionsMenu.AddItem(new GUIContent("Sort Descending"), 
+                on: sortOrder.Equals(new AttributeSortOrder(attribute.AttributeName, SortOrder.Descending)),
+                () =>
+            {
+                SetColumnSort(scheme, attribute, SortOrder.Descending);
+            });
+            
+            columnOptionsMenu.AddItem(new GUIContent("Clear Sort"), 
+                isDisabled: !sortOrder.HasValue,
+                () =>
+            {
+                SetColumnSort(scheme, attribute, SortOrder.None);
             });
                             
             columnOptionsMenu.AddSeparator("");
@@ -948,6 +976,10 @@ namespace Schema.Unity.Editor
                 if (EditorUtility.DisplayDialog("Schema", $"Are you sure you want to delete this attribute: {attribute.AttributeName}?", "Yes, delete this attribute", "No, cancel"))
                 {
                     LatestResponse = scheme.DeleteAttribute(attribute);
+                    if (LatestResponse.IsSuccess)
+                    {
+                        LatestResponse = Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                    }
                 }
             });
 
@@ -958,14 +990,11 @@ namespace Schema.Unity.Editor
         {
             Rect r = EditorGUILayout.GetControlRect(GUILayout.Height(padding+thickness));
             r.height = thickness;
-            r.y+=padding/2;
+            r.y+=padding/2.0f;
             r.x-=2;
             r.width +=6;
             EditorGUI.DrawRect(r, color);
         }
-
-        private int debugIdx;
-        private const bool allowUserToLoadAManifest = false;
 
         void Mark()
         {

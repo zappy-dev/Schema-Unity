@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Schema.Core.Data;
 using Schema.Core.IO;
 
 namespace Schema.Core.Serialization
@@ -25,7 +26,7 @@ namespace Schema.Core.Serialization
         public static void SetFileSystem(IFileSystem fileSystem)
         {
             FileSystem = fileSystem;
-            JSONStorageFormat = new JsonStorageFormat(fileSystem);
+            JSONStorageFormat = new JsonStorageFormat<DataScheme>(fileSystem);
             CSVStorageFormat = new CSVStorageFormat(fileSystem);
         }
 

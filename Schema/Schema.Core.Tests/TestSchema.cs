@@ -1,6 +1,7 @@
 
 using System.Collections;
 using Moq;
+using Schema.Core.Data;
 using Schema.Core.IO;
 using Schema.Core.Serialization;
 using Schema.Core.Tests.Ext;
@@ -124,10 +125,11 @@ public class TestSchema
 
         // Act
         var loadResponse = Schema.LoadFromManifest(manifestFilePath);
+        Assert.IsTrue(loadResponse.IsSuccess);
+        
         bool canGetTestSchemeManifestEntry = Schema.TryGetManifestEntryForScheme(testDataScheme, out var testDataEntry);
         
         // Assert
-        Assert.IsTrue(loadResponse.IsSuccess);
         Assert.IsTrue(canGetTestSchemeManifestEntry);
         Assert.IsTrue(Schema.DoesSchemeExist(manifestScheme.SchemeName));
         Assert.IsTrue(Schema.DoesSchemeExist(testDataSchemeName));

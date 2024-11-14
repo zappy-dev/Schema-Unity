@@ -1,4 +1,5 @@
 using System.Collections;
+using Schema.Core.Data;
 using Schema.Core.Tests.Ext;
 
 namespace Schema.Core.Tests.Data;
@@ -23,10 +24,11 @@ public class TestDataScheme
         var dataScheme = new DataScheme("Foo");
         string attributeName = "Field1";
         dataScheme.AddAttribute(new AttributeDefinition(attributeName, DataType.String));
-        dataScheme.AddEntry(new DataEntry(new Dictionary<string, object>()
+        dataScheme.AddEntry(new DataEntry
         {
             { attributeName, "1" }
-        }));
+        });
+        dataScheme.AddEntry(new DataEntry());
         
         // Act
         var conversionResponse = dataScheme.ConvertAttributeType(attributeName, DataType.Integer);
@@ -34,6 +36,7 @@ public class TestDataScheme
         // Assert
         Assert.IsTrue(conversionResponse.IsSuccess);
         Assert.That(dataScheme.GetEntry(0).GetData(attributeName), Is.EqualTo(1));
+        Assert.That(dataScheme.GetEntry(1).GetData(attributeName), Is.EqualTo(DataType.Integer.DefaultValue));
     }
     
     [Test]
@@ -222,5 +225,40 @@ public class TestDataScheme
         Assert.IsTrue(increaseResponse.IsSuccess);
         Assert.That(dataScheme.GetAttribute(0), Is.EqualTo(secondAttribute));
         Assert.That(dataScheme.GetAttribute(1), Is.EqualTo(firstAttribute));
+    }
+
+    [Test]
+    public void Test_GetEntries()
+    {
+        var dataScheme = new DataScheme("Foo");
+        var sortAttribute = "FirstAttribute";
+        dataScheme.AddAttribute(new AttributeDefinition(sortAttribute, DataType.String));
+        dataScheme.AddAttribute(new AttributeDefinition("SecondAttribute", DataType.String));
+
+        dataScheme.AddEntry(new DataEntry
+        {
+            { sortAttribute, "a" },
+        });
+        dataScheme.AddEntry(new DataEntry
+        {
+            { sortAttribute, "c" },
+        });
+        dataScheme.AddEntry(new DataEntry
+        {
+            { sortAttribute, "b" },
+        });
+        
+        Assert.That(dataScheme.GetEntries(), 
+            Is.EqualTo(dataScheme.GetEntries(AttributeSortOrder.None)));
+        Assert.That(dataScheme.GetEntries(), 
+            Is.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.None))));
+        Assert.That(dataScheme.GetEntries(), 
+            Is.Not.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Ascending))));
+        Assert.That(dataScheme.GetEntries(), 
+            Is.Not.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Descending))));
+        Assert.That(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Descending)), 
+            Is.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Ascending)).Reverse()));
+        Assert.That(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Ascending)), 
+            Is.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Descending)).Reverse()));
     }
 }

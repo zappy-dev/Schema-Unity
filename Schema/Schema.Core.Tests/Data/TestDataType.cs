@@ -1,5 +1,6 @@
 using System.Collections;
 using Moq;
+using Schema.Core.Data;
 using Schema.Core.IO;
 using Schema.Core.Serialization;
 
@@ -70,11 +71,11 @@ public class TestDataType
     {
         get
         {
-            yield return new TestCaseData(DataType.String, new DataType("String", string.Empty), true);
-            yield return new TestCaseData(DataType.String, new DataType("String", null), true);
-            yield return new TestCaseData(DataType.DateTime, new DataType("DateTime", null), true);
-            yield return new TestCaseData(DataType.Integer, new DataType("Integer", null), true);
-            yield return new TestCaseData(DataType.FilePath, new DataType("FilePath", null), true);
+            yield return new TestCaseData(DataType.String, new TextDataType(string.Empty), true);
+            yield return new TestCaseData(DataType.String, new TextDataType(null), true);
+            yield return new TestCaseData(DataType.DateTime, new DateTimeDataType(), true);
+            yield return new TestCaseData(DataType.Integer, new IntegerDataType(), true);
+            yield return new TestCaseData(DataType.FilePath, new FilePathDataType(), true);
             yield return new TestCaseData(DataType.String, DataType.Integer, false);
             yield return new TestCaseData(DataType.String, new ReferenceDataType("Schema1", "Attribute1"), false);
             yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema1", "Attribute1"), true);
