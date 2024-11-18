@@ -8,6 +8,7 @@ using Schema.Core.Serialization;
 using Unity.Profiling;
 using UnityEditor;
 using UnityEngine;
+using static Schema.Core.Schema;
 using static Schema.Core.SchemaResult;
 using static Schema.Unity.Editor.SchemaLayout;
 using Logger = Schema.Core.Logger;
@@ -106,7 +107,7 @@ namespace Schema.Unity.Editor
             manifestFilePath = _defaultManifestLoadPath;
             // return;
             LatestResponse = OnLoadManifest("On Editor Startup");
-            if (LatestResponse.IsSuccess)
+            if (LatestResponse.Passed)
             {
                 // manifest should be loaded at this point
                 tooltipOfTheDay = $"Tip Of The Day: {GetTooltipMessage()}";
@@ -183,19 +184,19 @@ namespace Schema.Unity.Editor
         private void AddSchema(DataScheme newSchema, string importFilePath = null)
         {
             bool overwriteExisting = false;
-            if (Core.Schema.DoesSchemeExist(newSchema.SchemeName))
+            if (DoesSchemeExist(newSchema.SchemeName))
             {
                 overwriteExisting = EditorUtility.DisplayDialog("Add Schema", $"A Schema named {newSchema.SchemeName} already exists. " +
                                                                               $"Do you want to overwrite this sceham>", "Yes", "No");
             }
             
-            LatestResponse = Schema.Core.Schema.LoadDataScheme(newSchema, overwriteExisting, importFilePath: importFilePath);
+            LatestResponse = LoadDataScheme(newSchema, overwriteExisting, importFilePath: importFilePath);
             switch (LatestResponse.Status)
             {
                 case RequestStatus.Failed:
-                    Debug.LogError(LatestResponse.Payload);
+                    Debug.LogError(LatestResponse.Message);
                     break;
-                case RequestStatus.Success:
+                case RequestStatus.Passed:
                     Debug.Log($"New scheme '{newSchema.SchemeName}' created.");
                     OnSelectScheme(newSchema.SchemeName, "Added scheme");
                     break;
@@ -206,7 +207,7 @@ namespace Schema.Unity.Editor
 
         private void OnSelectScheme(string schemeName, string context)
         {
-            var schemeNames = Schema.Core.Schema.AllSchemes.ToArray();
+            var schemeNames = AllSchemes.ToArray();
             var prevSelectedIndex = Array.IndexOf(schemeNames, schemeName);
             if (prevSelectedIndex == -1)
             {
@@ -225,7 +226,7 @@ namespace Schema.Unity.Editor
             Logger.LogVerbose($"Loading Manifest", context);
             // TODO: Figure out why progress reporting is making the Unity Editor unhappy
             // using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
-            LatestResponse = Core.Schema.LoadFromManifest(manifestFilePath);
+            LatestResponse = LoadFromManifest(manifestFilePath);
             LatestManifestLoadResponse = LatestResponse;
             return LatestResponse;
         }
@@ -257,7 +258,7 @@ namespace Schema.Unity.Editor
 
         private string GetTooltipMessage()
         {
-            if (!Core.Schema.TryGetScheme("Tooltips", out var tooltips)) 
+            if (!GetScheme("Tooltips").Try(out var tooltips)) 
                 return "Could not find Tooltips scheme";
             
             int entriesCount = tooltips.EntryCount;
@@ -293,12 +294,12 @@ namespace Schema.Unity.Editor
             GUILayout.Label("Scheme Editor", EditorStyles.largeLabel, 
                 GUILayout.ExpandWidth(true));
 
-            if (!LatestManifestLoadResponse.IsSuccess)
+            if (!LatestManifestLoadResponse.Passed)
             {
                 EditorGUILayout.HelpBox("Hello! Would you like to Create an Empty Project or Load an Existing Project Manifest", MessageType.Info);
                 if (GUILayout.Button("Start Empty Project"))
                 {
-                    LatestResponse = Core.Schema.SaveManifest(_defaultManifestLoadPath);
+                    LatestResponse = SaveManifest(_defaultManifestLoadPath);
                     LatestManifestLoadResponse = LatestResponse;
                 }
                 return;
@@ -306,9 +307,9 @@ namespace Schema.Unity.Editor
 
             EditorGUILayout.HelpBox(tooltipOfTheDay, MessageType.Info);
 
-            if (!LatestResponse.IsSuccess && LatestResponse.Payload != null)
+            if (!LatestResponse.Passed && LatestResponse.Message != null)
             {
-                EditorGUILayout.HelpBox(LatestResponse.Payload.ToString(), LatestResponse.MessageType());
+                EditorGUILayout.HelpBox(LatestResponse.Message, LatestResponse.MessageType());
             }
 
             GUILayout.BeginHorizontal();
@@ -332,7 +333,7 @@ namespace Schema.Unity.Editor
         {
             using (new EditorGUI.DisabledScope())
             {
-                EditorGUILayout.Toggle("Is Schema Initialized?", Core.Schema.IsInitialized);
+                EditorGUILayout.Toggle("Is Schema Initialized?", IsInitialized);
             }
             
             using (new EditorGUILayout.HorizontalScope())
@@ -353,20 +354,20 @@ namespace Schema.Unity.Editor
                 if (GUILayout.Button("Save"))
                 {
                     Debug.Log($"Saving manifest to {manifestFilePath}");
-                    LatestResponse = Core.Schema.SaveManifest(manifestFilePath);
+                    LatestResponse = SaveManifest(manifestFilePath);
                 }
             }
 
             if (GUILayout.Button("Fix Duplicate Entries"))
             {
-                foreach (var schemeName in Core.Schema.AllSchemes)
+                foreach (var schemeName in AllSchemes)
                 {
-                    if (!Core.Schema.TryGetScheme(schemeName, out var scheme))
+                    if (!GetScheme(schemeName).Try(out var scheme))
                     {
                         continue; // can't de-dupe these schemes easily
                     }
 
-                    if (!scheme.TryGetIdentifierAttribute(out var identifierAttribute))
+                    if (!scheme.GetIdentifierAttribute().Try(out var identifierAttribute))
                     {
                         identifierAttribute = scheme.GetAttribute(0); // just use first attribute
                     }
@@ -394,14 +395,14 @@ namespace Schema.Unity.Editor
                     if (numDeleted > 0)
                     {
                         Logger.LogWarning($"Scheme '{schemeName}' has deleted {numDeleted} entries.");
-                        Core.Schema.SaveDataScheme(scheme, false);
+                        SaveDataScheme(scheme, false);
                     }
                 }
             }
 
-            if (LatestResponse.Payload != null)
+            if (LatestResponse.Message != null)
             {
-                EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestResponse.Payload}", LatestResponse.MessageType());
+                EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestResponse.Message}", LatestResponse.MessageType());
             }
         }
 
@@ -409,13 +410,13 @@ namespace Schema.Unity.Editor
         {
             using (new EditorGUILayout.VerticalScope(GUILayout.Width(400)))
             {
-                GUILayout.Label($"Schema Explorer ({Schema.Core.Schema.AllSchemes.Count()} count):", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
+                GUILayout.Label($"Schema Explorer ({AllSchemes.Count()} count):", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
 
                 using (var explorerScrollView = new EditorGUILayout.ScrollViewScope(explorerScrollPosition))
                 {
                     explorerScrollPosition = explorerScrollView.scrollPosition;
                     // list available schemes
-                    var schemeNames = Schema.Core.Schema.AllSchemes.ToArray();
+                    var schemeNames = AllSchemes.ToArray();
 
                     using (var schemeChange = new EditorGUI.ChangeCheckScope())
                     {
@@ -479,7 +480,7 @@ namespace Schema.Unity.Editor
                 return;
             }
 
-            if (!Schema.Core.Schema.TryGetScheme(selectedSchemeName, out var scheme))
+            if (!GetScheme(selectedSchemeName).Try(out var scheme))
             {
                 EditorGUILayout.HelpBox($"Schema '{selectedSchemeName}' does not exist.", MessageType.Warning);
                 return;
@@ -501,8 +502,8 @@ namespace Schema.Unity.Editor
                     using (new EditorGUI.DisabledScope())
                     {
                         string storagePath = "No storage path found for this Schema.";
-                        if (Core.Schema.TryGetManifestEntryForScheme(scheme, out var schemeManifest) && 
-                            schemeManifest.TryGetDataAsString(Core.Schema.MANIFEST_ATTRIBUTE_FILEPATH, out storagePath))
+                        if (GetManifestEntryForScheme(scheme).Try(out var schemeManifest) && 
+                            schemeManifest.TryGetDataAsString(MANIFEST_ATTRIBUTE_FILEPATH, out storagePath))
                         {
                         }
                         
@@ -510,7 +511,7 @@ namespace Schema.Unity.Editor
                     }
                     if (GUILayout.Button("Save", GUILayout.ExpandWidth(true)))
                     {
-                        LatestResponse = Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                        LatestResponse = SaveDataScheme(scheme, saveManifest: false);
                     }
                     
                     // render export options
@@ -563,7 +564,7 @@ namespace Schema.Unity.Editor
                                 // handle setting
                                 object entryValue;
                                 bool didSetLoad = false;
-                                if (!entry.HasData(attribute))
+                                if (!entry.GetData(attribute).Try(out entryValue))
                                 {
                                     Logger.LogWarning($"Setting {attribute} data for {entry}");
                                     // for some reason this data wasn't set yet
@@ -572,11 +573,10 @@ namespace Schema.Unity.Editor
                                 }
                                 else
                                 {
-                                    entryValue = entry.GetData(attribute);
-                                    if (!attribute.DataType.IsValid(entryValue))
+                                    if (attribute.DataType.CheckIfValidData(entryValue).Failed)
                                     {
-                                        if (DataType.TryToConvertData(entryValue, DataType.Default, attribute.DataType,
-                                                out var convertedValue))
+                                        if (DataType.ConvertData(entryValue, DataType.Default, attribute.DataType)
+                                            .Try(out var convertedValue))
                                         {
                                             entryValue = convertedValue;
                                             didSetLoad = true;
@@ -629,8 +629,8 @@ namespace Schema.Unity.Editor
                                         {
                                             var referenceEntryOptions = new GenericMenu();
 
-                                            if (Core.Schema.TryGetScheme(refDataType.ReferenceSchemeName,
-                                                    out var refSchema))
+                                            if (GetScheme(refDataType.ReferenceSchemeName)
+                                                .Try(out var refSchema))
                                             {
                                                 foreach (var identifierValue in refSchema.GetIdentifierValues())
                                                 {
@@ -682,7 +682,7 @@ namespace Schema.Unity.Editor
                                         if (shouldUpdateEntry)
                                         {
                                             entry.SetData(attributeName, entryValue);
-                                            LatestResponse = Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                                            LatestResponse = SaveDataScheme(scheme, saveManifest: false);
                                         }
                                     }
                                 }
@@ -823,14 +823,14 @@ namespace Schema.Unity.Editor
                         LatestResponse = scheme.AddAttribute(new AttributeDefinition
                         {
                             AttributeName = newAttributeName,
-                            DataType = DataType.String,
+                            DataType = DataType.Text,
                             DefaultValue = string.Empty,
                             IsIdentifier = false,
                             ColumnWidth = AttributeDefinition.DefaultColumnWidth,
                         });
-                        if (LatestResponse.IsSuccess) 
+                        if (LatestResponse.Passed) 
                         {
-                            LatestResponse = Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                            LatestResponse = SaveDataScheme(scheme, saveManifest: false);
                         }
                         newAttributeName = string.Empty; // clear out attribute name field since it's unlikely someone wants to make another attribute with the same name
                     }
@@ -849,22 +849,22 @@ namespace Schema.Unity.Editor
             rowOptionsMenu.AddItem(new GUIContent("Move To Top"), isDisabled: canMoveUp, () =>
             {
                 scheme.MoveEntry(entry, 0);
-                Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                SaveDataScheme(scheme, saveManifest: false);
             });
             rowOptionsMenu.AddItem(new GUIContent("Move Up"), isDisabled: canMoveUp, () =>
             {
                 scheme.MoveUpEntry(entry);
-                Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                SaveDataScheme(scheme, saveManifest: false);
             });
             rowOptionsMenu.AddItem(new GUIContent("Move Down"), isDisabled: canMoveDown, () =>
             {
                 scheme.MoveDownEntry(entry);
-                Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                SaveDataScheme(scheme, saveManifest: false);
             });
             rowOptionsMenu.AddItem(new GUIContent("Move To Bottom"), isDisabled: canMoveDown, () =>
             {
                 scheme.MoveEntry(entry, entryCount - 1);
-                Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                SaveDataScheme(scheme, saveManifest: false);
             });
             rowOptionsMenu.AddSeparator("");
             rowOptionsMenu.AddItem(new GUIContent("Delete Entry"), false, () =>
@@ -872,7 +872,7 @@ namespace Schema.Unity.Editor
                 if (EditorUtility.DisplayDialog("Schema", "Are you s you want to delete this entry?", "Yes, delete this entry", "No, cancel"))
                 {
                     LatestResponse = scheme.DeleteEntry(entry);
-                    Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                    SaveDataScheme(scheme, saveManifest: false);
                 }
             });
             rowOptionsMenu.ShowAsContext();
@@ -887,12 +887,12 @@ namespace Schema.Unity.Editor
             columnOptionsMenu.AddItem(new GUIContent("Move Left"), isDisabled: attributeIdx == 0, () =>
             {
                 scheme.IncreaseAttributeRank(attribute);
-                Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                SaveDataScheme(scheme, saveManifest: false);
             });
             columnOptionsMenu.AddItem(new GUIContent("Move Right"), isDisabled: attributeIdx == attributeCount - 1, () =>
             {
                 scheme.DecreaseAttributeRank(attribute);
-                Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                SaveDataScheme(scheme, saveManifest: false);
             });
                             
             // Sorting options
@@ -940,17 +940,18 @@ namespace Schema.Unity.Editor
                         LatestResponse =
                             scheme.ConvertAttributeType(attributeName: attribute.AttributeName,
                                 newType: builtInType);
-                        if (LatestResponse.IsSuccess) 
+                        if (LatestResponse.Passed) 
                         {
-                            LatestResponse = Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                            LatestResponse = SaveDataScheme(scheme, saveManifest: false);
                         }
                     });
             }
                             
             columnOptionsMenu.AddSeparator("Convert Type");
-            foreach (var schemeName in Core.Schema.AllSchemes.OrderBy(s => s))
+            foreach (var schemeName in AllSchemes.OrderBy(s => s))
             {
-                if (Core.Schema.TryGetScheme(schemeName, out var dataSchema) && dataSchema.TryGetIdentifierAttribute(out var identifierAttribute))
+                if (GetScheme(schemeName).Try(out var dataSchema) 
+                    && dataSchema.GetIdentifierAttribute().Try(out var identifierAttribute))
                 {
                     var referenceDataType = new ReferenceDataType(schemeName, identifierAttribute.AttributeName);
                     bool isMatchingType = referenceDataType.Equals(attribute.DataType);
@@ -961,9 +962,9 @@ namespace Schema.Unity.Editor
                             LatestResponse =
                                 scheme.ConvertAttributeType(attributeName: attribute.AttributeName,
                                     newType: referenceDataType);
-                            if (LatestResponse.IsSuccess) 
+                            if (LatestResponse.Passed) 
                             {
-                                LatestResponse = Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                                LatestResponse = SaveDataScheme(scheme, saveManifest: false);
                             }
                         });
                 }
@@ -976,9 +977,9 @@ namespace Schema.Unity.Editor
                 if (EditorUtility.DisplayDialog("Schema", $"Are you sure you want to delete this attribute: {attribute.AttributeName}?", "Yes, delete this attribute", "No, cancel"))
                 {
                     LatestResponse = scheme.DeleteAttribute(attribute);
-                    if (LatestResponse.IsSuccess)
+                    if (LatestResponse.Passed)
                     {
-                        LatestResponse = Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+                        LatestResponse = SaveDataScheme(scheme, saveManifest: false);
                     }
                 }
             });

@@ -9,7 +9,8 @@ namespace Schema.Unity.Editor
         [InitializeOnLoadMethod]
         static void OnInitializeOnLoad()
         {
-            Logger.SetLogger(new UnityLogger());
+            var unityLogger = new UnityLogger();
+            Logger.SetLogger(unityLogger);
         }
     }
 }

@@ -14,7 +14,7 @@ namespace Schema.Core.Data
             Order = order;
         }
 
-        public bool HasValue => !string.IsNullOrEmpty(AttributeName) && Order != SortOrder.None;
+        public bool HasValue => !string.IsNullOrWhiteSpace(AttributeName) && Order != SortOrder.None;
 
         public bool Equals(AttributeSortOrder other)
         {
@@ -42,6 +42,11 @@ namespace Schema.Core.Data
         public static bool operator !=(AttributeSortOrder left, AttributeSortOrder right)
         {
             return !left.Equals(right);
+        }
+
+        public override string ToString()
+        {
+            return $"AttributeSortOrder: Sort By '{AttributeName}' in '{Order}' order";
         }
     }
 }

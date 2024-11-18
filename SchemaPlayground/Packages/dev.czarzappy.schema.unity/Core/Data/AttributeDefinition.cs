@@ -1,4 +1,5 @@
 using System;
+using Newtonsoft.Json;
 
 namespace Schema.Core.Data
 {
@@ -6,6 +7,7 @@ namespace Schema.Core.Data
     public class AttributeDefinition : Defaultable, ICloneable
     {
         public const int DefaultColumnWidth = 150;
+        
         public string AttributeName { get; set; }
         public string AttributeToolTip { get; set; }
         public DataType DataType { get; set; }
@@ -54,6 +56,62 @@ namespace Schema.Core.Data
             DataType = other.DataType;
             ColumnWidth = other.ColumnWidth;
             IsIdentifier = other.IsIdentifier;
+        }
+
+        public SchemaResult<ReferenceDataType> CreateReferenceType()
+        {
+            if (!IsIdentifier)
+            {
+                return Fail<ReferenceDataType>("Attribute is not a identifier");
+            }
+            
+            if (!Schema.TryGetSchemeForAttribute(this, out var ownerScheme))
+            {
+                return Fail<ReferenceDataType>($"{this} does not existing in any known scheme.");
+            }
+
+            var refDataType = new ReferenceDataType(ownerScheme.SchemeName, AttributeName);
+            return Pass(refDataType);
+        }
+
+        protected bool Equals(AttributeDefinition other)
+        {
+            return AttributeName == other.AttributeName && Equals(DataType, other.DataType) && IsIdentifier == other.IsIdentifier;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is null) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != GetType()) return false;
+            return Equals((AttributeDefinition)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                var hashCode = (AttributeName != null ? AttributeName.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ (DataType != null ? DataType.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ IsIdentifier.GetHashCode();
+                return hashCode;
+            }
+        }
+
+        public static bool operator ==(AttributeDefinition left, AttributeDefinition right)
+        {
+            return Equals(left, right);
+        }
+
+        public static bool operator !=(AttributeDefinition left, AttributeDefinition right)
+        {
+            return !Equals(left, right);
+        }
+        
+        internal void UpdateAttributeName(string newAttributeName)
+        {
+            
+            AttributeName = newAttributeName;
         }
     }
 }

@@ -6,6 +6,7 @@ using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using Schema.Core.IO;
+using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.Serialization
 {
@@ -58,7 +59,7 @@ namespace Schema.Core.Serialization
             }
         }
 
-        public void SerializeToFile(string filePath, T data)
+        public SchemaResult SerializeToFile(string filePath, T data)
         {
             string jsonData = Serialize(data);
             // Extract the directory path from the file path
@@ -71,6 +72,7 @@ namespace Schema.Core.Serialization
             }
             
             fileSystem.WriteAllText(filePath, jsonData);
+            return Pass($"Wrote {data} to file {filePath}", this);
         }
 
         public string Serialize(T data)

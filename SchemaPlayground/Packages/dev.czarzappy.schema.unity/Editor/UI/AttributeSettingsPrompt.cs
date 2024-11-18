@@ -47,7 +47,7 @@ namespace Schema.Unity.Editor
                     if (setIsIdentifier)
                     {
                         // validate that this attribute can be converted to an identifier
-                        if (scheme.TryGetIdentifierAttribute(out var identifierAttribute))
+                        if (scheme.GetIdentifierAttribute().Try(out var identifierAttribute))
                         {
                             EditorUtility.DisplayDialog("Schema", $"Schema {scheme} already contains an identifier attribute: {identifierAttribute}", "OK");
                         }

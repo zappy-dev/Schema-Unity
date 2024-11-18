@@ -2,7 +2,7 @@ using System;
 
 namespace Schema.Core.Data
 {
-    public abstract class Defaultable
+    public abstract class Defaultable : ResultGenerator
     {
         public object DefaultValue { get; set;  }
 

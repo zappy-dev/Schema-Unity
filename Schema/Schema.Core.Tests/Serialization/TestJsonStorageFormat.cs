@@ -53,8 +53,16 @@ public class TestJsonStorageFormat
                 true);
             yield return new TestCaseData("{\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
                 true,
-                new FilePathDataType(),
-                true);
+                new FilePathDataType(false),
+                false);
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": true,\"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+                true,
+                new FilePathDataType(true),
+                false);
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+                true,
+                new FilePathDataType(false),
+                false);
             yield return new TestCaseData("{\n  \"TypeName\": \"Integer\",\n  \"DefaultValue\": 0\n}",
                 true,
                 new IntegerDataType(),

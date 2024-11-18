@@ -4,16 +4,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
+using Schema.Core.Ext;
+using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.Data
 {
     [Serializable]
     public class DataEntry : IEnumerable<KeyValuePair<string, object>>
     {
-        [JsonProperty("EntryData")]
-        private Dictionary<string, object> entryData { get; set; }
+        [JsonProperty("EntryData")] 
+        private Dictionary<string, object> entryData { get; set; } = new Dictionary<string, object>();
 
-        public DataEntry() : this(new Dictionary<string, object>())
+        public DataEntry()
         {
         }
         
@@ -26,17 +28,6 @@ namespace Schema.Core.Data
         public object GetData(string attributeName)
         {
             return !entryData.TryGetValue(attributeName, out var value) ? null : value;
-        }
-        
-        public object GetData(AttributeDefinition attribute, DataType castDataType = null)
-        { 
-            TryGetData(attribute, out object data, castDataType);
-            return data;
-        }
-        
-        public object GetDataOrDefault(AttributeDefinition attribute, DataType castDataType = null)
-        {
-            return TryGetData(attribute, out object data, castDataType) ? data : attribute.CloneDefaultValue();
         }
         
         public bool HasData(AttributeDefinition attribute)
@@ -54,37 +45,13 @@ namespace Schema.Core.Data
             return data != null;
         }
 
-        public bool TryGetData(AttributeDefinition attribute, 
-            out object castValue, 
-            DataType castDataType = null, 
-            bool checkIfValid = false)
+        public SchemaResult<object> GetData(AttributeDefinition attribute)
         {
-            if (entryData.TryGetValue(attribute.AttributeName, out var value))
-            {
-                if (checkIfValid && !attribute.DataType.IsValid(value))
-                {
-                    castValue = null;
-                    return false;
-                }
-                
-                // check if there's any casts we need to do
-                if (castDataType != null)
-                {
-                    return DataType.TryToConvertData(value, attribute.DataType, castDataType, out castValue);
-                }
+            if (!entryData.TryGetValue(attribute.AttributeName, out var value))
+                return SchemaResult<object>.Fail($"No data found for {attribute}", this);
 
-                castValue = value;
-                return true;
-            }
+            return SchemaResult<object>.Pass(value, successMessage: $"Found value for {attribute}", this);
 
-            if (castDataType != null)
-            {
-                castValue = castDataType.CloneDefaultValue();
-                return true;
-            }
-
-            castValue = null;
-            return false;
         }
 
         public string GetDataAsString(string attributeName)
@@ -112,10 +79,15 @@ namespace Schema.Core.Data
             return false;
         }
         
-        public void SetData(string attributeName, object value)
+        public SchemaResult SetData(string attributeName, object value)
         {
-            Logger.LogVerbose($"Setting {attributeName} to {value}", this);
+            if (string.IsNullOrWhiteSpace(attributeName))
+            {
+                return Fail($"The attribute name is empty.");
+            }
+            
             entryData[attributeName] = value;
+            return Pass($"Setting '{attributeName}' to '{value}'");
         }
 
         public void MigrateData(string prevAttributeName, string newAttributeName)
@@ -126,7 +98,7 @@ namespace Schema.Core.Data
 
         public override string ToString()
         {
-            return Print(-1);
+            return Print();
         }
 
         public string Print(int numAttributesToPrint = -1)
@@ -162,7 +134,10 @@ namespace Schema.Core.Data
 
         public void Add(string attributeName, object attributeValue)
         {
-            SetData(attributeName, attributeValue);
+            if (SetData(attributeName, attributeValue).Failed)
+            {
+                throw new ArgumentException($"Failed to set '{attributeName}' to '{attributeValue}'");
+            }
         }
         
         IEnumerator IEnumerable.GetEnumerator()

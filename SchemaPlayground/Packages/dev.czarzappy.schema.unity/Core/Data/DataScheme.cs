@@ -1,14 +1,17 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Newtonsoft.Json;
+using Schema.Core.Ext;
+using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.Data
 {
     // Representing a data scheme in memory
     [Serializable]
-    public class DataScheme
+    public class DataScheme : ResultGenerator
     {
         #region Fields
         
@@ -39,7 +42,7 @@ namespace Schema.Core.Data
         
         [JsonIgnore]
         public bool HasIdentifierAttribute
-            => TryGetAttribute(a => a.IsIdentifier, out _);
+            => GetAttribute(a => a.IsIdentifier).Passed;
 
         #endregion
 
@@ -76,8 +79,9 @@ namespace Schema.Core.Data
                 return SchemaResult.Fail("Attribute cannot be null", this);
             }
 
+            // Attribute naming validation
             string newAttributeName = newAttribute.AttributeName;
-            if (string.IsNullOrEmpty(newAttributeName))
+            if (string.IsNullOrWhiteSpace(newAttributeName))
             {
                 return SchemaResult.Fail("Attribute name cannot be null or empty.", this);
             }
@@ -85,6 +89,11 @@ namespace Schema.Core.Data
             if (attributes.Exists(a => a.AttributeName == newAttributeName))
             {
                 return SchemaResult.Fail("Duplicate attribute name: " + newAttributeName, this);
+            }
+
+            if (newAttribute.DataType == null)
+            {
+                return SchemaResult.Fail("Attribute data type cannot be null.", this);
             }
             
             attributes.Add(newAttribute);
@@ -94,58 +103,46 @@ namespace Schema.Core.Data
                 entry.SetData(newAttributeName, newAttribute.CloneDefaultValue());
             }
             
-            return SchemaResult.Success($"Added attribute {newAttributeName} to all entries", this);
+            return SchemaResult.Pass($"Added attribute {newAttributeName} to all entries", this);
         }
 
         public SchemaResult ConvertAttributeType(string attributeName, DataType newType)
         {
             var attribute = attributes.Find(a => a.AttributeName == attributeName);
 
-            try
+            foreach (var entry in entries)
             {
-                foreach (var entry in entries)
+                object convertedData;
+                if (!entry.HasData(attribute))
                 {
-                    object convertedData;
-                    if (!entry.HasData(attribute))
-                    {
-                        convertedData = newType.CloneDefaultValue();
-                    }
-                    else
-                    {
-                        var entryData = entry.GetData(attribute);
-
-                        if (!DataType.TryToConvertData(entryData, attribute.DataType, newType, out convertedData))
-                        {
-                            return SchemaResult.Fail($"Cannot convert attribute {attributeName} to type {newType}", this);
-                        }
-                    }
-                        
-                    entry.SetData(attributeName, convertedData);
+                    convertedData = newType.CloneDefaultValue();
                 }
-            }
-            catch (FormatException e)
-            {
-                return SchemaResult.Fail("Failed to convert attribute " + attributeName + " to type " + newType + ": " + e.Message, this);
+                else
+                {
+                    var entryData = entry.GetData(attribute).Result;
+
+                    if (!DataType.ConvertData(entryData, attribute.DataType, newType).Try(out convertedData))
+                    {
+                        return SchemaResult.Fail($"Cannot convert attribute {attributeName} to type {newType}", this);
+                    }
+                }
+                        
+                entry.SetData(attributeName, convertedData);
             }
             
             attribute.DataType = newType;
             // TODO: Does the abstract that an attribute can defined a separate default value than a type help right now?
             attribute.DefaultValue = newType.CloneDefaultValue();
             
-            return SchemaResult.Success($"Converted attribute {attributeName} to type {newType}", this);
+            return SchemaResult.Pass($"Converted attribute {attributeName} to type {newType}", this);
         }
 
         public SchemaResult DeleteAttribute(AttributeDefinition attribute)
         {
             bool result = attributes.Remove(attribute);
-            if (result == false)
-            {
-                return SchemaResult.Fail($"Attribute {attribute.AttributeName} cannot be deleted", this);
-            }
-            else
-            {
-                return SchemaResult.Success($"Deleted {attribute}", this);
-            }
+
+            return CheckIf(result, errorMessage: $"Attribute {attribute} cannot be deleted",
+                successMessage: $"Deleted {attribute}");
         }
 
         /// <summary>
@@ -156,7 +153,7 @@ namespace Schema.Core.Data
         /// <exception cref="InvalidOperationException"></exception>
         public SchemaResult UpdateAttributeName(string prevAttributeName, string newAttributeName)
         {
-            if (string.IsNullOrEmpty(prevAttributeName) || string.IsNullOrEmpty(newAttributeName))
+            if (string.IsNullOrWhiteSpace(prevAttributeName) || string.IsNullOrWhiteSpace(newAttributeName))
             {
                 return SchemaResult.Fail("Attribute name cannot be null or empty.", this);
             }
@@ -171,23 +168,78 @@ namespace Schema.Core.Data
                 return SchemaResult.Fail("Attribute name already exists.", this);
             }
             
-            attributes.Find(a => a.AttributeName == prevAttributeName).AttributeName = newAttributeName;
+            // for reference type fields, we gotta update anything that references this field.
+            if (!GetAttribute(prevAttributeName).Try(out var prevAttribute))
+            {
+                return SchemaResult.Fail($"Attribute {prevAttributeName} cannot be found", this);
+            }
+            
+            // update attribute and migrate entries
+            prevAttribute.UpdateAttributeName(newAttributeName);
             foreach (var entry in entries)
             {
                 entry.MigrateData(prevAttributeName, newAttributeName);
             }
+
+            // update all referencing attributes
+            foreach (var otherScheme in Schema.GetSchemes())
+            {
+                // skip checking my own schema.
+                // TODO: Handle cyclical references from an attribute in a scheme to itself?
+                if (otherScheme.SchemeName == SchemeName)
+                {
+                    continue;
+                }
+
+                // find attributes referencing the previous attribute name
+                var referencingAttributes = otherScheme.GetAttributes(attr =>
+                    {
+                        if (attr.DataType is ReferenceDataType refDataType)
+                        {
+                            return refDataType.ReferenceSchemeName == SchemeName &&
+                                   refDataType.ReferenceAttributeName == prevAttributeName;
+                        }
+
+                        return false;
+                    }).Select(attr => attr.DataType as ReferenceDataType)
+                    .Where(refDataType => refDataType != null);
+
+                // update attributes to reference new attribute name
+                foreach (var refDataType in referencingAttributes)
+                {
+                    refDataType.ReferenceAttributeName = newAttributeName;
+                }
+            }
             
-            return SchemaResult.Success("Updated attribute: " + prevAttributeName + " to " + newAttributeName, this);
+            return SchemaResult.Pass("Updated attribute: " + prevAttributeName + " to " + newAttributeName, this);
         }
 
-        public bool TryGetAttribute(Func<AttributeDefinition, bool> predicate, out AttributeDefinition attribute)
+        public SchemaResult<AttributeDefinition> GetAttribute(Func<AttributeDefinition, bool> predicate)
         {
-            attribute = attributes.FirstOrDefault(predicate);
-            return attribute != null;;
+            var attribute = attributes.FirstOrDefault(predicate);
+            
+            return CheckIf(attribute != null, attribute, errorMessage: "Attribute not found", successMessage: "Attribute found");
         }
 
-        public bool TryGetIdentifierAttribute(out AttributeDefinition identifierAttribute)
-            => TryGetAttribute(a => a.IsIdentifier, out identifierAttribute);
+        public IEnumerable<AttributeDefinition> GetAttributes(Func<AttributeDefinition, bool> predicate)
+        {
+            var matchingAttributes = attributes.Where(predicate);
+            
+            return matchingAttributes;
+        }
+
+        public IEnumerable<AttributeDefinition> GetAttributes()
+        {
+            return attributes;
+        }
+
+        public SchemaResult<AttributeDefinition> GetAttribute(string attributeName)
+        {
+            return GetAttribute(a => a.AttributeName == attributeName);
+        }
+
+        public SchemaResult<AttributeDefinition> GetIdentifierAttribute()
+            => GetAttribute(a => a.IsIdentifier);
 
         #region Attribute Ordering Operations
         
@@ -233,15 +285,45 @@ namespace Schema.Core.Data
             
             // TODO: Validate that a data entry has all of the expected attributes and add default attribute values if not present
             // Also fail if unexpected attribute values are encountered? 
+
+            foreach (var kvp in newEntry)
+            {
+                string attributeName = kvp.Key;
+                // Don't need to validate invalid attribute names, since adding new entry data already does that.
+
+                if (!GetAttributeByName(attributeName).Try(out var attribute))
+                {
+                    return SchemaResult.Fail($"No matching attribute found for '{kvp.Key}'", this);
+                }
+
+                var entryValue = kvp.Value;
+                var isValidRes = entryValue.IsValidForDataType(attribute.DataType);
+                if (isValidRes.Failed)
+                {
+                    return isValidRes;
+                }
+            }
+
+            foreach (var attribute in AllAttributes)
+            {
+                if (newEntry.HasData(attribute))
+                {
+                    continue;
+                }
+
+                newEntry.SetData(attribute.AttributeName, attribute.CloneDefaultValue());
+            }
             
             entries.Add(newEntry);
-            return SchemaResult.Success($"Added {newEntry}", this);
+            return SchemaResult.Pass($"Added {newEntry}", this);
         }
 
         public SchemaResult DeleteEntry(DataEntry entry)
         {
-            entries.Remove(entry);
-            return SchemaResult.Success("Successfully deleted entry", this);
+            bool result = entries.Remove(entry);
+            return SchemaResult.CheckIf(result, 
+                errorMessage: "Could not delete entry",
+                successMessage: "Removed entry");
         }
 
         public DataEntry GetEntry(Func<DataEntry, bool> entryFilter)
@@ -296,7 +378,7 @@ namespace Schema.Core.Data
             entries.RemoveAt(entryIdx);
             entries.Insert(targetIndex, entry);
             
-            return SchemaResult.Success($"Moved {entry} from {entryIdx} to {targetIndex}", this);
+            return SchemaResult.Pass($"Moved {entry} from {entryIdx} to {targetIndex}", this);
         }
 
         public SchemaResult SwapEntries(int srcIndex, int dstIndex)
@@ -317,7 +399,7 @@ namespace Schema.Core.Data
             }
             
             (data[srcIndex], data[dstIndex]) = (data[dstIndex], data[srcIndex]);
-            return SchemaResult.Success("Successfully swapped entry", this);
+            return SchemaResult.Pass("Successfully swapped entry", this);
         }
 
         #endregion
@@ -328,20 +410,23 @@ namespace Schema.Core.Data
         
         public IEnumerable<object> GetIdentifierValues()
         {
-            if (!TryGetIdentifierAttribute(out var identifierAttribute)) return Enumerable.Empty<object>();
-
-            return GetValuesForAttribute(identifierAttribute).Distinct();;
-        }
-
-        public IEnumerable<object> GetValuesForAttribute(string attributeName)
-        {
-            if (string.IsNullOrEmpty(attributeName))
+            var identifierAttrRes = GetIdentifierAttribute();
+            if (identifierAttrRes.Failed)
             {
                 return Enumerable.Empty<object>();
             }
 
+            return GetValuesForAttribute(identifierAttrRes.Result).Distinct();;
+        }
+
+        public IEnumerable<object> GetValuesForAttribute(string attributeName)
+        {
+            if (string.IsNullOrWhiteSpace(attributeName))
+            {
+                return Enumerable.Empty<object>();
+            }
             
-            if (!TryGetAttribute(a => a.AttributeName.Equals(attributeName), out var attribute))
+            if (!GetAttribute(a => a.AttributeName.Equals(attributeName)).Try(out var attribute))
             {
                 return Enumerable.Empty<object>();
             }
@@ -362,7 +447,9 @@ namespace Schema.Core.Data
                     $"Attempted to get attribute values for attribute not contained by Schema");
             }
             
-            return entries.Select(e => e.GetData(attribute));
+            return entries.Select(e => e.GetData(attribute))
+                .Where(r => r.Passed)
+                .Select(r => r.Result);
         }
         
         #endregion
@@ -372,10 +459,13 @@ namespace Schema.Core.Data
             return attributes[attributeIndex];
         }
 
-        public bool TryGetAttribute(string attributeName, out AttributeDefinition attribute)
+        public SchemaResult<AttributeDefinition> GetAttributeByName(string attributeName)
         {
-            attribute = attributes.FirstOrDefault(a => a.AttributeName.Equals(attributeName));
-            return attribute != null;
+            var attribute = attributes.FirstOrDefault(a => a.AttributeName.Equals(attributeName));
+            
+            return CheckIf(attribute != null, attribute, 
+                errorMessage: "Attribute does not exist",
+                successMessage: $"Attribute with name '{attributeName}' exist");
         }
 
         public IEnumerable<DataEntry> GetEntries(AttributeSortOrder sortOrder = default)
@@ -386,14 +476,24 @@ namespace Schema.Core.Data
             }
 
             var attributeName = sortOrder.AttributeName;
-            if (!TryGetAttribute(attributeName, out var attribute))
+            if (!GetAttributeByName(attributeName).Try(out var attribute))
             {
-                throw new ArgumentException($"Attempted to get entries for attribute not contained by Schema");
+                throw new ArgumentException($"Attempted to get entries using invalid sort attribute: {attributeName}");
             }
 
             return sortOrder.Order == SortOrder.Ascending ? 
-                entries.OrderBy(e => e.GetData(attribute)) : 
-                entries.OrderByDescending(e => e.GetData(attribute));
+                entries.OrderBy(e => e.GetData(attribute).Result) : 
+                entries.OrderByDescending(e => e.GetData(attribute).Result);
+        }
+
+        public SchemaResult Load(bool overwriteExisting = false)
+        {
+            return Schema.LoadDataScheme(this, overwriteExisting: overwriteExisting);
+        }
+
+        public IEnumerable<AttributeDefinition> GetReferenceAttributes()
+        {
+            return attributes.Where(attr => attr.DataType is ReferenceDataType);
         }
     }
 }

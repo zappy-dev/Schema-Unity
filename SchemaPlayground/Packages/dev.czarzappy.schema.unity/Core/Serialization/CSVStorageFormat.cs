@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Schema.Core.Data;
 using Schema.Core.IO;
+using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.Serialization
 {
@@ -53,10 +54,10 @@ namespace Schema.Core.Serialization
             bool canLoad = header.Select(h => new AttributeDefinition
             {
                 AttributeName = h,
-                DataType = DataType.String, // TODO: determine datatype, maybe scan entries or hint in header name, e.g header (type)
+                DataType = DataType.Text, // TODO: determine datatype, maybe scan entries or hint in header name, e.g header (type). Alternatively, use existing scheme's type info
                 DefaultValue = string.Empty,
                 ColumnWidth = AttributeDefinition.DefaultColumnWidth,
-            }).All(a => importedScheme.AddAttribute(a).IsSuccess);
+            }).All(a => importedScheme.AddAttribute(a).Passed);
 
             if (canLoad)
             {
@@ -83,12 +84,22 @@ namespace Schema.Core.Serialization
             return importedScheme;
         }
 
-        public void SerializeToFile(string filePath, DataScheme scheme)
+        public SchemaResult SerializeToFile(string filePath, DataScheme scheme)
         {
+            if (scheme == null)
+            {
+                return Fail($"Scheme cannot be null", this);
+            }
+            
             StringBuilder csvContent = new StringBuilder();
 
             // Add headers
             int attributeCount = scheme.AttributeCount;
+            if (attributeCount == 0)
+            {
+                return Fail($"Scheme cannot be empty", this);
+            }
+            
             for (int i = 0; i < attributeCount; i++)
             {
                 var attribute = scheme.GetAttribute(i);
@@ -122,6 +133,8 @@ namespace Schema.Core.Serialization
 
             // Write to file
             fileSystem.WriteAllText(filePath, csvContent.ToString());
+            
+            return Pass($"Wrote {scheme} to file: {filePath}");
         }
 
         public string Serialize(DataScheme data)

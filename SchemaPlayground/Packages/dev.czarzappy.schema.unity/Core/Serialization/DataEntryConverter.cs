@@ -40,7 +40,12 @@ namespace Schema.Core.Serialization
             {
                 var property = token as JProperty;
                 var attributeName = property.Name;
-                var data = property.Value.Value<object>();
+                
+                // TODO: How to handle parsing entry data from JSON
+                // Currently using a post-processor after loading a scheme into memory to validate and convert entry data if possible.
+                // Cannot object casting, else this returns a JObject, which makes upstream parsing more complicated
+                // Converting to string for now, since all DataType::ConvertData methods should be able to handle converting from string
+                var data = property.Value.Value<string>(); 
                 entries.Add(attributeName, data);
             }
 
