@@ -7,6 +7,13 @@
       "dependencies": {},
       "hash": "73615c1f6029801d00553e2912714c769941f624"
     },
+    "com.quickeye.icon-browser": {
+      "version": "https://github.com/ErnSur/unity-editor-icons.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "07434fccd016a2fabab284e0aff30a592881c318"
+    },
     "com.unity.ext.nunit": {
       "version": "1.0.6",
       "depth": 1,

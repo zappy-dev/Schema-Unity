@@ -1,4 +1,5 @@
 using Schema.Core;
+using Schema.Core.Data;
 using Schema.Core.Serialization;
 using UnityEditor;
 using UnityEngine;
@@ -38,7 +39,7 @@ namespace Schema.Unity.Editor
             }
             Debug.Log($"Importing scheme from file: {importFilePath}");
 
-            return format.TryDeserializeFromFile(importFilePath, out scheme);
+            return format.DeserializeFromFile(importFilePath).Try(out scheme);
         }
     }
 }

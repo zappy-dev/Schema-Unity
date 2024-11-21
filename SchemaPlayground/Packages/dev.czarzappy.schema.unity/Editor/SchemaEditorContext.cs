@@ -3,12 +3,14 @@ using Logger = Schema.Core.Logger;
 
 namespace Schema.Unity.Editor
 {
-    [InitializeOnLoad]
     public static class SchemaEditorContext
     {
-        static SchemaEditorContext()
+        
+        [InitializeOnLoadMethod]
+        static void OnInitializeOnLoad()
         {
-            Logger.SetLogger(new UnityLogger());
+            var unityLogger = new UnityLogger();
+            Logger.SetLogger(unityLogger);
         }
     }
 }

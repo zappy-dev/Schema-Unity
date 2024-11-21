@@ -1,7 +1,9 @@
 using System.Collections;
 using Moq;
+using Schema.Core.Data;
 using Schema.Core.IO;
 using Schema.Core.Serialization;
+using Schema.Core.Tests.Ext;
 
 namespace Schema.Core.Tests.Data;
 
@@ -31,8 +33,8 @@ public class TestDataType
 
         // pre-load data schemes
         var validScheme = new DataScheme(VALID_SCHEME_NAME);
-        validScheme.AddAttribute(new AttributeDefinition(VALID_REFERENCE_ATTRIBUTE, DataType.String, isIdentifier: true));
-        validScheme.AddAttribute(new AttributeDefinition(INVALID_REFERENCE_ATTRIBUTE, DataType.String));
+        validScheme.AddAttribute(new AttributeDefinition(VALID_REFERENCE_ATTRIBUTE, DataType.Text, isIdentifier: true));
+        validScheme.AddAttribute(new AttributeDefinition(INVALID_REFERENCE_ATTRIBUTE, DataType.Text));
         validScheme.AddEntry(new DataEntry(new Dictionary<string, object>()
         {
             { VALID_REFERENCE_ATTRIBUTE, VALID_REFERENCE_VALUE }
@@ -40,7 +42,7 @@ public class TestDataType
         Schema.LoadDataScheme(validScheme, true);
         
         var validSchemaNoIdentifier = new DataScheme(VALID_SCHEME_NAME_NO_IDENTIFIER);
-        validSchemaNoIdentifier.AddAttribute(new AttributeDefinition(VALID_REFERENCE_ATTRIBUTE, DataType.String));
+        validSchemaNoIdentifier.AddAttribute(new AttributeDefinition(VALID_REFERENCE_ATTRIBUTE, DataType.Text));
         validSchemaNoIdentifier.AddEntry(new DataEntry(new Dictionary<string, object>()
         {
             { VALID_REFERENCE_ATTRIBUTE, VALID_REFERENCE_VALUE }
@@ -49,13 +51,48 @@ public class TestDataType
     }
     
     [Test, TestCaseSource(nameof(ConversionTestCases))]
-    public bool Test_TryToConvertData(object data, DataType fromType, DataType toType, object expectedConvertedResult)
+    public void Test_TryToConvertData(object data, DataType fromType, DataType toType, bool expectSuccessResult, object expectedConvertedResult)
     {
-        bool result = DataType.TryToConvertData(data, fromType, toType, out var convertedData);
-        
-        Assert.That(convertedData, Is.EqualTo(expectedConvertedResult));
+        var conversion = DataType.ConvertData(data, fromType, toType);
 
-        return result;
+        conversion.AssertCondition(expectSuccessResult, expectedConvertedResult);
+    }
+
+    private static IEnumerable ConversionTestCases
+    {
+        get
+        {
+            yield return new TestCaseData("1", DataType.Text, DataType.Integer, true, 1);
+            yield return new TestCaseData("", DataType.Text, DataType.Integer, true, 0);
+            yield return new TestCaseData("foo", DataType.Text, DataType.Integer, false, null);
+            yield return new TestCaseData("foo", DataType.Text, DataType.DateTime, false, null);
+            yield return new TestCaseData("", DataType.Text, DataType.DateTime, true, System.DateTime.Today);
+            
+            // weird unhandled type conversion case
+            yield return new TestCaseData(1, DataType.Integer, DataType.DateTime, false, null);
+
+            var testValidDateStr = "2024-01-01 01:02:03";
+            var testDate = DateTime.Parse(testValidDateStr);
+            yield return new TestCaseData(testValidDateStr, DataType.Text, DataType.DateTime, true, testDate);
+            
+            yield return new TestCaseData(VALID_FILE_PATH, DataType.Text, DataType.FilePath, true, VALID_FILE_PATH);
+            yield return new TestCaseData(INVALID_FILE_PATH, DataType.Text, DataType.FilePath, false, null);
+            yield return new TestCaseData(INVALID_FILE_PATH, DataType.Text, DataType.FilePath, false, null);
+            
+            // Reference type conversions
+            yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.Text, 
+                new ReferenceDataType(VALID_SCHEME_NAME, VALID_REFERENCE_ATTRIBUTE), true, VALID_REFERENCE_VALUE);
+            
+            yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.Text, 
+                new ReferenceDataType(INVALID_SCHEME_NAME, VALID_REFERENCE_ATTRIBUTE), false, null);
+            yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.Text, 
+                new ReferenceDataType(VALID_SCHEME_NAME, INVALID_REFERENCE_ATTRIBUTE), false, null);
+            yield return new TestCaseData(INVALID_REFERENCE_VALUE, DataType.Text, 
+                new ReferenceDataType(VALID_SCHEME_NAME, VALID_REFERENCE_ATTRIBUTE), false, null);
+            
+            yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.Text, 
+                new ReferenceDataType(VALID_SCHEME_NAME_NO_IDENTIFIER, VALID_REFERENCE_ATTRIBUTE), false, null);
+        }
     }
 
     [Test, TestCaseSource(nameof(TypeEqualityTestCases))]
@@ -70,52 +107,16 @@ public class TestDataType
     {
         get
         {
-            yield return new TestCaseData(DataType.String, new DataType("String", string.Empty), true);
-            yield return new TestCaseData(DataType.String, new DataType("String", null), true);
-            yield return new TestCaseData(DataType.DateTime, new DataType("DateTime", null), true);
-            yield return new TestCaseData(DataType.Integer, new DataType("Integer", null), true);
-            yield return new TestCaseData(DataType.FilePath, new DataType("FilePath", null), true);
-            yield return new TestCaseData(DataType.String, DataType.Integer, false);
-            yield return new TestCaseData(DataType.String, new ReferenceDataType("Schema1", "Attribute1"), false);
+            yield return new TestCaseData(DataType.Text, new TextDataType(string.Empty), true);
+            yield return new TestCaseData(DataType.Text, new TextDataType(null), true);
+            yield return new TestCaseData(DataType.DateTime, new DateTimeDataType(), true);
+            yield return new TestCaseData(DataType.Integer, new IntegerDataType(), true);
+            yield return new TestCaseData(DataType.FilePath, new FilePathDataType(), true);
+            yield return new TestCaseData(DataType.Text, DataType.Integer, false);
+            yield return new TestCaseData(DataType.Text, new ReferenceDataType("Schema1", "Attribute1"), false);
             yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema1", "Attribute1"), true);
             yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema2", "Attribute1"), false);
             yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema1", "Attribute2"), false);
-        }
-    }
-
-    private static IEnumerable ConversionTestCases
-    {
-        get
-        {
-            yield return new TestCaseData("1", DataType.String, DataType.Integer, 1).Returns(true);
-            yield return new TestCaseData("", DataType.String, DataType.Integer, 0).Returns(true);
-            yield return new TestCaseData("foo", DataType.String, DataType.Integer, null).Returns(false);
-            yield return new TestCaseData("foo", DataType.String, DataType.DateTime, DateTime.MinValue).Returns(false);
-            
-            // weird unhandled type conversion case
-            yield return new TestCaseData(1, DataType.Integer, DataType.DateTime, null).Returns(false);
-
-            var testValidDateStr = "2024-01-01 01:02:03";
-            var testDate = DateTime.Parse(testValidDateStr);
-            yield return new TestCaseData(testValidDateStr, DataType.String, DataType.DateTime, testDate).Returns(true);
-            
-            yield return new TestCaseData(VALID_FILE_PATH, DataType.String, DataType.FilePath, VALID_FILE_PATH).Returns(true);
-            yield return new TestCaseData(INVALID_FILE_PATH, DataType.String, DataType.FilePath, null).Returns(false);
-            yield return new TestCaseData(INVALID_FILE_PATH, DataType.String, DataType.FilePath, null).Returns(false);
-            
-            // Reference type conversions
-            yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.String, 
-                new ReferenceDataType(VALID_SCHEME_NAME, VALID_REFERENCE_ATTRIBUTE), VALID_REFERENCE_VALUE).Returns(true);
-            
-            yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.String, 
-                new ReferenceDataType(INVALID_SCHEME_NAME, VALID_REFERENCE_ATTRIBUTE), null).Returns(false);
-            yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.String, 
-                new ReferenceDataType(VALID_SCHEME_NAME, INVALID_REFERENCE_ATTRIBUTE), null).Returns(false);
-            yield return new TestCaseData(INVALID_REFERENCE_VALUE, DataType.String, 
-                new ReferenceDataType(VALID_SCHEME_NAME, VALID_REFERENCE_ATTRIBUTE), null).Returns(false);
-            
-            yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.String, 
-                new ReferenceDataType(VALID_SCHEME_NAME_NO_IDENTIFIER, VALID_REFERENCE_ATTRIBUTE), null).Returns(false);
         }
     }
 }

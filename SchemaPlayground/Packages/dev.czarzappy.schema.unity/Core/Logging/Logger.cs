@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Text;
 
 namespace Schema.Core
@@ -20,7 +21,13 @@ namespace Schema.Core
             _logger = logger;
         }
 
-        private static string FormatMessage(string message, object context = null)
+        public static LogLevel Level
+        {
+            get => _logger.LogLevel;
+            set => _logger.LogLevel = value;
+        }
+
+        private static string FormatMessage(string message, LogLevel msgSeverity, object context = null)
         {
             var sb = new StringBuilder();
             sb.Append("[Schema] ");
@@ -29,29 +36,44 @@ namespace Schema.Core
                 sb.Append("[Context=").Append(context).Append("] ");
             }
 
-            sb.Append(message);
+            sb.AppendLine(message);
+
+            if (_logger.LogLevel == LogLevel.VERBOSE && msgSeverity >= LogLevel.WARNING)
+            {
+#if !UNITY_64 // Don't log stack trace in environment that already logs out stack trace
+                StackTrace stackTrace = new StackTrace(4);
+
+
+                sb.AppendLine(stackTrace.ToString());
+#endif
+            }
             
             return sb.ToString();
+        }
+
+        private static void Log(string message, LogLevel msgSeverity, object context = null)
+        {
+            _logger?.Log(msgSeverity, FormatMessage(message, msgSeverity, context));
         }
         
         public static void LogVerbose(string message, object context = null)
         {
-            _logger.Log(LogLevel.VERBOSE, FormatMessage(message, context));
+            Log(message, LogLevel.VERBOSE, context);
         }
 
         public static void Log(string message, object context = null)
         {
-            _logger.Log(LogLevel.INFO, FormatMessage(message, context));
+            Log(message, LogLevel.INFO, context);
         }
 
         public static void LogWarning(string message, object context = null)
         {
-            _logger.Log(LogLevel.WARNING, FormatMessage(message, context));
+            Log(message, LogLevel.WARNING, context);
         }
 
         public static void LogError(string message, object context = null)
         {
-            _logger.Log(LogLevel.ERROR, FormatMessage(message, context));
+            Log(message, LogLevel.ERROR, context);
         }
     }
 

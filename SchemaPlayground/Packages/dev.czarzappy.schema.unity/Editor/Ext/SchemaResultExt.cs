@@ -11,7 +11,7 @@ namespace Schema.Unity
         {
             switch (response.Status)
             {
-                case RequestStatus.Success:
+                case RequestStatus.Passed:
                     return UnityEditor.MessageType.Info;
                 case RequestStatus.Failed:
                     return UnityEditor.MessageType.Error;

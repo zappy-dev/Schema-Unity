@@ -1,13 +1,16 @@
 // using System.IO;
 
+using System;
+using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using Schema.Core.IO;
+using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.Serialization
 {
-    public class JsonStorageFormat : IStorageFormat<DataScheme>
+    public class JsonStorageFormat<T> : IStorageFormat<T>
     {
         private JsonSerializerSettings settings;
         public string Extension => "json";
@@ -24,36 +27,43 @@ namespace Schema.Core.Serialization
                 {
                     NamingStrategy = new DefaultNamingStrategy()
                 },
+                Converters = new List<JsonConverter>
+                {
+                    new DataTypeConverter(),
+                    new DataEntryConverter(),
+                },
                 Formatting = Formatting.Indented,
             };
         }
         
-        public bool TryDeserializeFromFile(string filePath, out DataScheme scheme)
+        public SchemaResult<T> DeserializeFromFile(string filePath)
         {
             string jsonData = fileSystem.ReadAllText(filePath);
 
-            return TryDeserialize(jsonData, out scheme);
+            return Deserialize(jsonData);
         }
 
-        public bool TryDeserialize(string content, out DataScheme dataScheme)
+        public SchemaResult<T> Deserialize(string content)
         {
             // TODO: Handle a non-scheme formatted file, converting into scheme format
             try
             {
-                dataScheme = JsonConvert.DeserializeObject<DataScheme>(content, settings);
-                return true;
+                var data = JsonConvert.DeserializeObject<T>(content, settings);
+                return SchemaResult<T>.Pass(data, "Parsed json data", this);
             }
-            catch (JsonReaderException ex)
+            catch (Exception ex)
             {
-                Logger.LogError($"Error parsing JSON: {ex.Message}");
-                dataScheme = null;
-                return false;
+                return SchemaResult<T>.Fail($"Error parsing JSON: {ex.Message}", this);
             }
         }
 
-        public void SerializeToFile(string filePath, DataScheme data)
+        public SchemaResult SerializeToFile(string filePath, T data)
         {
-            string jsonData = Serialize(data);
+            if (!Serialize(data).Try(out var jsonData))
+            {
+                return Fail("Failed to deserialize JSON", this);
+            }
+            
             // Extract the directory path from the file path
             var directoryPath = Path.GetDirectoryName(filePath);
 
@@ -64,11 +74,13 @@ namespace Schema.Core.Serialization
             }
             
             fileSystem.WriteAllText(filePath, jsonData);
+            return Pass($"Wrote {data} to file {filePath}", this);
         }
 
-        public string Serialize(DataScheme data)
+        public SchemaResult<string> Serialize(T data)
         {
-            return JsonConvert.SerializeObject(data, Formatting.Indented, settings);
+            var jsonContent = JsonConvert.SerializeObject(data, Formatting.Indented, settings);
+            return SchemaResult<string>.Pass(jsonContent, successMessage: "Serialized json data", this);
         }
     }
 }
