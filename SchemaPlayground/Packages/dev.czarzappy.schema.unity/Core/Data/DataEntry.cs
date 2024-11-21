@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
-using Schema.Core.Ext;
 using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.Data
@@ -149,5 +148,37 @@ namespace Schema.Core.Data
         {
             return entryData.GetEnumerator();
         }
+
+        #region Equality Members
+
+        protected bool Equals(DataEntry other)
+        {
+            return entryData.SequenceEqual(other.entryData);
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is null) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != GetType()) return false;
+            return Equals((DataEntry)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return (entryData != null ? entryData.GetHashCode() : 0);
+        }
+
+        public static bool operator ==(DataEntry left, DataEntry right)
+        {
+            return Equals(left, right);
+        }
+
+        public static bool operator !=(DataEntry left, DataEntry right)
+        {
+            return !Equals(left, right);
+        }
+
+        #endregion
     }
 }

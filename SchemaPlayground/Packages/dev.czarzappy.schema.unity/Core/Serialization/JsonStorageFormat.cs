@@ -36,32 +36,34 @@ namespace Schema.Core.Serialization
             };
         }
         
-        public bool TryDeserializeFromFile(string filePath, out T scheme)
+        public SchemaResult<T> DeserializeFromFile(string filePath)
         {
             string jsonData = fileSystem.ReadAllText(filePath);
 
-            return TryDeserialize(jsonData, out scheme);
+            return Deserialize(jsonData);
         }
 
-        public bool TryDeserialize(string content, out T data)
+        public SchemaResult<T> Deserialize(string content)
         {
             // TODO: Handle a non-scheme formatted file, converting into scheme format
             try
             {
-                data = JsonConvert.DeserializeObject<T>(content, settings);
-                return true;
+                var data = JsonConvert.DeserializeObject<T>(content, settings);
+                return SchemaResult<T>.Pass(data, "Parsed json data", this);
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Error parsing JSON: {ex.Message}");
-                data = default;
-                return false;
+                return SchemaResult<T>.Fail($"Error parsing JSON: {ex.Message}", this);
             }
         }
 
         public SchemaResult SerializeToFile(string filePath, T data)
         {
-            string jsonData = Serialize(data);
+            if (!Serialize(data).Try(out var jsonData))
+            {
+                return Fail("Failed to deserialize JSON", this);
+            }
+            
             // Extract the directory path from the file path
             var directoryPath = Path.GetDirectoryName(filePath);
 
@@ -75,9 +77,10 @@ namespace Schema.Core.Serialization
             return Pass($"Wrote {data} to file {filePath}", this);
         }
 
-        public string Serialize(T data)
+        public SchemaResult<string> Serialize(T data)
         {
-            return JsonConvert.SerializeObject(data, Formatting.Indented, settings);
+            var jsonContent = JsonConvert.SerializeObject(data, Formatting.Indented, settings);
+            return SchemaResult<string>.Pass(jsonContent, successMessage: "Serialized json data", this);
         }
     }
 }

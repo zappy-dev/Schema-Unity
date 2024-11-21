@@ -32,7 +32,10 @@ namespace Schema.Core
             }
             else
             {
-                Logger.LogError(logMsg);
+                if (Logger.Level <= Logger.LogLevel.VERBOSE)
+                {
+                    Logger.LogError(logMsg);
+                }
             }
         }
         

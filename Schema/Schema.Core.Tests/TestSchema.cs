@@ -107,12 +107,12 @@ public class TestSchema
         if (mockRead)
         {
             _mockFileSystem.Setup(m => m.ReadAllText(filePath))
-                .Returns(Storage.DefaultManifestStorageFormat.Serialize(scheme)).Verifiable();
+                .Returns(Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed()).Verifiable();
         }
 
         if (mockWrite)
         {
-            _mockFileSystem.Setup(m => m.WriteAllText(filePath, Storage.DefaultManifestStorageFormat.Serialize(scheme))).Verifiable();
+            _mockFileSystem.Setup(m => m.WriteAllText(filePath, Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
         }
     }
 

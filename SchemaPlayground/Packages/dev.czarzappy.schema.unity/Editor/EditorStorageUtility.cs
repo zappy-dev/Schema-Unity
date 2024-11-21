@@ -39,7 +39,7 @@ namespace Schema.Unity.Editor
             }
             Debug.Log($"Importing scheme from file: {importFilePath}");
 
-            return format.TryDeserializeFromFile(importFilePath, out scheme);
+            return format.DeserializeFromFile(importFilePath).Try(out scheme);
         }
     }
 }

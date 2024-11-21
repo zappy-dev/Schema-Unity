@@ -1,11 +1,10 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Newtonsoft.Json;
 using Schema.Core.Ext;
-using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.Data
 {
@@ -68,7 +67,27 @@ namespace Schema.Core.Data
 
         public override string ToString()
         {
-            return $"DataScheme '{SchemeName}'";
+            return ToString(true);
+        }
+
+        public string ToString(bool verbose)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.Append($"DataScheme '{SchemeName}', {AttributeCount} attributes, {AllEntries.Count()} entries");
+            if (verbose)
+            {
+                stringBuilder.AppendLine("==== Attributes ====");
+                foreach (var attribute in attributes)
+                {
+                    stringBuilder.AppendLine($"\t{attribute}");
+                }
+                stringBuilder.AppendLine("==== Entries ====");
+                foreach (var entry in entries)
+                {
+                    stringBuilder.AppendLine($"\t{entry}");
+                }
+            }
+            return stringBuilder.ToString();
         }
 
         #region Attribute Operations
@@ -297,7 +316,7 @@ namespace Schema.Core.Data
                 }
 
                 var entryValue = kvp.Value;
-                var isValidRes = entryValue.IsValidForDataType(attribute.DataType);
+                var isValidRes = attribute.DataType.CheckIfValidData(entryValue);
                 if (isValidRes.Failed)
                 {
                     return isValidRes;
@@ -495,5 +514,46 @@ namespace Schema.Core.Data
         {
             return attributes.Where(attr => attr.DataType is ReferenceDataType);
         }
+
+        #region Equality
+        
+        protected bool Equals(DataScheme other)
+        {
+            if (SchemeName != other.SchemeName) return false;
+            if (!ListExt.ListsAreEqual(attributes, other.attributes)) return false;
+            if (!ListExt.ListsAreEqual(entries, other.entries)) return false;
+            return true;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is null) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != GetType()) return false;
+            return Equals((DataScheme)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                var hashCode = (SchemeName != null ? SchemeName.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ (attributes != null ? attributes.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ (entries != null ? entries.GetHashCode() : 0);
+                return hashCode;
+            }
+        }
+
+        public static bool operator ==(DataScheme left, DataScheme right)
+        {
+            return Equals(left, right);
+        }
+
+        public static bool operator !=(DataScheme left, DataScheme right)
+        {
+            return !Equals(left, right);
+        }
+
+        #endregion
     }
 }

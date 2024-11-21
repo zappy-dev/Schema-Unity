@@ -3,6 +3,7 @@ using Moq;
 using Schema.Core.Data;
 using Schema.Core.IO;
 using Schema.Core.Serialization;
+using Schema.Core.Tests.Ext;
 
 namespace Schema.Core.Tests.Serialization;
 
@@ -19,27 +20,26 @@ public class TestJsonStorageFormat
     }
     
     [Test, TestCaseSource(nameof(JsonSerializationTestCases))]
-    public void Test_TryDeserialize(string testJsonString, bool expectedSuccess, object expectedData, bool _)
+    public void Test_TryDeserialize(string testJsonString, bool expectedSuccess, object expectedData, bool _, string _2)
     {
         // Test code here
-        var result = dataTypeStorageFormat.TryDeserialize(testJsonString, out var data);
-        Assert.That(result, Is.EqualTo(expectedSuccess));
-        Assert.That(data, Is.EqualTo(expectedData));
+        if (dataTypeStorageFormat.Deserialize(testJsonString)
+            .TryAssertCondition(expectedSuccess, out var data))
+        {
+            Assert.That(data, Is.EqualTo(expectedData));
+        }
     }
     
     [Test, TestCaseSource(nameof(JsonSerializationTestCases))]
-    public void Test_Serialize(string expectedJsonString, bool _, DataType expectedData, bool expectedSuccess)
+    public void Test_Serialize(string? expectedJsonString, bool _, DataType expectedData, bool expectedSuccess, string? altExpectedJsonString)
     {
         // Test code here
-        var jsonString = dataTypeStorageFormat.Serialize(expectedData);
-        // Assert.That(result, Is.EqualTo(expectedSuccess));
-        if (expectedSuccess)
+
+        if (dataTypeStorageFormat.Serialize(expectedData).TryAssertCondition(expectedSuccess, out var jsonString))
         {
-            Assert.That(jsonString, Is.EqualTo(expectedJsonString));
-        }
-        else
-        {
-            Assert.That(jsonString, Is.Not.EqualTo(expectedJsonString));
+            var realExpectedJsonString =
+                altExpectedJsonString != null ? altExpectedJsonString : expectedJsonString;
+            Assert.That(jsonString, Is.EqualTo(realExpectedJsonString));
         }
     }
 
@@ -50,27 +50,33 @@ public class TestJsonStorageFormat
             yield return new TestCaseData("{\n  \"TypeName\": \"String\",\n  \"DefaultValue\": \"\"\n}",
                 true,
                 new TextDataType(),
-                true);
-            yield return new TestCaseData("{\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+                true,
+                null);
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
                 true,
                 new FilePathDataType(false),
-                false);
-            yield return new TestCaseData("{\n  \"AllowEmptyPath\": true,\"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+                true,
+                null);
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": true,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
                 true,
                 new FilePathDataType(true),
-                false);
-            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+                true,
+                null);
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
                 true,
                 new FilePathDataType(false),
-                false);
+                true,
+                null);
             yield return new TestCaseData("{\n  \"TypeName\": \"Integer\",\n  \"DefaultValue\": 0\n}",
                 true,
                 new IntegerDataType(),
-                true);
+                true,
+                null);
             yield return new TestCaseData("{\n  \"TypeName\": \"Integer\",\n  \"DefaultValue\": 1\n}",
                 true,
                 new IntegerDataType(1),
-                true);
+                true,
+                null);
             // TODO: Figure out testing for different time zones on different devices
             // yield return new TestCaseData("{\n  \"TypeName\": \"Date Time\",\n  \"DefaultValue\": \""\"\n}",
             //     true,
@@ -80,11 +86,13 @@ public class TestJsonStorageFormat
             yield return new TestCaseData("{\n  \"$type\": \"Schema.Core.Data.ReferenceDataType, Schema.Core\",\n  \"ReferenceSchemeName\": \"SpellStatus\",\n \"ReferenceAttributeName\": \"Status\",\n   \"SupportsEmptyReferences\": true,\n    \"TypeName\": \"Reference/SpellStatus - Status\",\n \"DefaultValue\": null\n}",
                 true,
                 new ReferenceDataType("SpellStatus", "Status"),
-                false);
+                true,
+                "{\n  \"ReferenceSchemeName\": \"SpellStatus\",\n  \"ReferenceAttributeName\": \"Status\",\n  \"SupportsEmptyReferences\": true,\n  \"TypeName\": \"Reference/SpellStatus - Status\",\n  \"DefaultValue\": null\n}");
             yield return new TestCaseData("{\n  \"ReferenceSchemeName\": \"SpellStatus\",\n  \"ReferenceAttributeName\": \"Status\",\n  \"SupportsEmptyReferences\": true,\n  \"TypeName\": \"Reference/SpellStatus - Status\",\n  \"DefaultValue\": null\n}",
                 true,
                 new ReferenceDataType("SpellStatus", "Status"),
-                true);
+                true,
+                null);
         }
     }
 }

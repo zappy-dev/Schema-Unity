@@ -26,10 +26,11 @@ public static class SchemaResultExt
         Assert.IsTrue(result.Failed, result.ToString());
     }
     
-    public static void AssertPassed<TRes>(this SchemaResult<TRes> result)
+    public static TRes AssertPassed<TRes>(this SchemaResult<TRes> result)
     {
         Assert.NotNull(result);
         Assert.IsTrue(result.Passed, result.ToString());
+        return result.Result;
     }
 
     public static void AssertCondition<TRes>(this SchemaResult<TRes> result, bool condition)
@@ -48,10 +49,19 @@ public static class SchemaResultExt
         }
     }
 
-    public static void TryAssert<TRes>(this SchemaResult<TRes> result, out TRes payload)
+    public static bool TryAssert<TRes>(this SchemaResult<TRes> result, out TRes payload)
     {
         Assert.NotNull(result);
         bool success = result.Try(out payload);
         Assert.IsTrue(success, result.ToString());
+        return success;
+    }
+
+    public static bool TryAssertCondition<TRes>(this SchemaResult<TRes> result, bool condition, out TRes payload)
+    {
+        Assert.NotNull(result);
+        bool success = result.Try(out payload);
+        Assert.That(success, Is.EqualTo(condition), result.ToString());
+        return success;
     }
 }

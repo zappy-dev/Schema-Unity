@@ -74,9 +74,16 @@ namespace Schema.Core.Data
             return Pass(refDataType);
         }
 
+        #region Equality
+        
+        // Equality members should be focused on ensuring that data scheme related fields are the same
+        // Less worried about comparing UI properties.
         protected bool Equals(AttributeDefinition other)
         {
-            return AttributeName == other.AttributeName && Equals(DataType, other.DataType) && IsIdentifier == other.IsIdentifier;
+            if (AttributeName != other.AttributeName) return false;
+            if (!Equals(DataType, other.DataType)) return false;
+            if (!Equals(IsIdentifier, other.IsIdentifier)) return false;
+            return true;
         }
 
         public override bool Equals(object obj)
@@ -107,10 +114,11 @@ namespace Schema.Core.Data
         {
             return !Equals(left, right);
         }
+
+        #endregion
         
         internal void UpdateAttributeName(string newAttributeName)
         {
-            
             AttributeName = newAttributeName;
         }
     }

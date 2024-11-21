@@ -12,12 +12,22 @@ public class TestCSVStorageFormat
 {
     private Mock<IFileSystem> mockFileSystem;
     private IStorageFormat<DataScheme> storageFormat;
+    private DataScheme testScheme;
 
     [SetUp]
     public void OnTestSetup()
     {
         mockFileSystem = new Mock<IFileSystem>();
         storageFormat = new CSVStorageFormat(mockFileSystem.Object);
+
+        testScheme = new DataScheme("Test");
+        testScheme.AddAttribute(new AttributeDefinition("StringField", DataType.Text));
+        testScheme.AddAttribute(new AttributeDefinition("IntField", DataType.Integer));
+        testScheme.AddEntry(new DataEntry
+        {
+            {"StringField", "StringData"},
+            {"IntField", 123},
+        });
     }
 
     [Test]
@@ -45,16 +55,7 @@ public class TestCSVStorageFormat
     public void Test_SerializeToFile_Small()
     {
         var schemeFilePath = "Test.csv";
-        var dataScheme = new DataScheme("Test");
-        dataScheme.AddAttribute(new AttributeDefinition("StringField", DataType.Text));
-        dataScheme.AddAttribute(new AttributeDefinition("IntField", DataType.Integer));
-        dataScheme.AddEntry(new DataEntry
-        {
-            {"StringField", "StringData"},
-            {"IntField", 123},
-        });
-        
-        storageFormat.SerializeToFile(schemeFilePath, dataScheme);
+        storageFormat.SerializeToFile(schemeFilePath, testScheme);
 
         var expectedCsvString = """
         StringField,IntField
@@ -63,6 +64,25 @@ public class TestCSVStorageFormat
         """;
         
         mockFileSystem.Verify(fs => fs.WriteAllText(schemeFilePath, expectedCsvString), Times.Once);
+        mockFileSystem.VerifyAll();
+        mockFileSystem.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public void Test_LoadFromRows()
+    {
+        var schemeFilePath = "Test.csv";
+
+        var csvContent = storageFormat.Serialize(testScheme).AssertPassed();
+        Console.WriteLine(csvContent);
+        var csvLines = CSVStorageFormat.SplitToRows(csvContent);
+        mockFileSystem.Setup(fs => fs.ReadAllLines(schemeFilePath))
+            .Returns(csvLines).Verifiable();
+
+        storageFormat.DeserializeFromFile(schemeFilePath).TryAssert(out DataScheme loadedScheme);
+        
+        Assert.That(loadedScheme, Is.EqualTo(testScheme));
+        mockFileSystem.VerifyAll();
         mockFileSystem.VerifyNoOtherCalls();
     }
 }

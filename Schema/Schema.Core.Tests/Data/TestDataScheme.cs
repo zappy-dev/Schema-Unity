@@ -293,7 +293,10 @@ public class TestDataScheme
     public void Test_MoveUpEntry_GoodMove()
     {
         var firstEntry = testScheme.CreateNewEntry();
+        
+        // make sure second entrty does not match first in equality check
         var secondEntry = testScheme.CreateNewEntry();
+        secondEntry.SetData("Foo", "Bar");
         
         var moveRes = testScheme.MoveUpEntry(secondEntry);
         moveRes.AssertPassed();
@@ -303,7 +306,10 @@ public class TestDataScheme
     public void Test_MoveDownEntry_BadMove()
     {
         var firstEntry = testScheme.CreateNewEntry();
+        
+        // amke sure element is different
         var secondEntry = testScheme.CreateNewEntry();
+        secondEntry.SetData("foo", "bar");
         
         var moveRes = testScheme.MoveDownEntry(secondEntry);
         moveRes.AssertFailed();

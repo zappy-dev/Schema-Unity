@@ -21,6 +21,12 @@ namespace Schema.Core
             _logger = logger;
         }
 
+        public static LogLevel Level
+        {
+            get => _logger.LogLevel;
+            set => _logger.LogLevel = value;
+        }
+
         private static string FormatMessage(string message, LogLevel msgSeverity, object context = null)
         {
             var sb = new StringBuilder();

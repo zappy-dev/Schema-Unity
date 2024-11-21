@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -13,12 +14,12 @@ namespace Schema.Core.Serialization
         public string Extension => "csv";
         public bool TryDeserializeFromFile(string filePath, out DataScheme data)
         {
-            throw new NotImplementedException();
+            return DeserializeFromFile(filePath).Try(out data);
         }
 
         public bool TryDeserialize(string content, out DataScheme data)
         {
-            throw new NotImplementedException();
+            return Deserialize(content).Try(out data);
         }
 
         private readonly IFileSystem fileSystem;
@@ -28,7 +29,7 @@ namespace Schema.Core.Serialization
             this.fileSystem = fileSystem;
         }
         
-        public DataScheme TryDeserializeFromFile(string filePath)
+        public SchemaResult<DataScheme> DeserializeFromFile(string filePath)
         {
             var schemeName = Path.GetFileNameWithoutExtension(filePath);
             var rows = fileSystem.ReadAllLines(filePath);
@@ -36,52 +37,142 @@ namespace Schema.Core.Serialization
             return LoadFromRows(schemeName, rows);
         }
 
-        public DataScheme Deserialize(string content)
+        public static string[] SplitToRows(string content) => content.Split(new[]
         {
-            string[] rows = content.Split(new[]
-            {
-                Environment.NewLine,
-            }, StringSplitOptions.None);
+            Environment.NewLine,
+        }, StringSplitOptions.None);
+
+        public SchemaResult<DataScheme> Deserialize(string content)
+        {
+            string[] rows = SplitToRows(content);
 
             return LoadFromRows(schemeName: "unnamed", rows);
         }
 
-        private DataScheme LoadFromRows(string schemeName, string[] rows)
+        private SchemaResult<DataScheme> LoadFromRows(string schemeName, string[] rows)
         {
+            if (rows.Length == 0)
+            {
+                return SchemaResult<DataScheme>.Fail("No rows were provided", this);
+            }
+            
             var importedScheme = new DataScheme(schemeName);
             var header = rows[0].Split(',');
-
-            bool canLoad = header.Select(h => new AttributeDefinition
+            var attrCount = header.Length;
+            
+            var attributes = header.Select(h => new AttributeDefinition
             {
                 AttributeName = h,
-                DataType = DataType.Text, // TODO: determine datatype, maybe scan entries or hint in header name, e.g header (type). Alternatively, use existing scheme's type info
+                DataType = DataType
+                    .Text, // TODO: determine datatype, maybe scan entries or hint in header name, e.g header (type). Alternatively, use existing scheme's type info
                 DefaultValue = string.Empty,
                 ColumnWidth = AttributeDefinition.DefaultColumnWidth,
-            }).All(a => importedScheme.AddAttribute(a).Passed);
+            }).ToArray();
 
-            if (canLoad)
-            {
-                // TODO: Improve CSV validation and error reporting
-                throw new InvalidOperationException("Failed to load data");
-            }
-
+            // validate and extract out raw data
+            var rawDataEntries = new List<string[]>();
             for (var rowIdx = 1; rowIdx < rows.Length; rowIdx++)
             {
                 var row = rows[rowIdx];
-                var entries = row.Split(',');
-
-                var entry = new DataEntry();
-                for (var colIdx = 0; colIdx < header.Length; colIdx++)
+                // skip empty rows / maybe last row
+                if (string.IsNullOrWhiteSpace(row))
                 {
-                    var attributeName = header[colIdx];
-                    
-                    entry.SetData(attributeName, entries[colIdx]);
+                    continue;
+                }
+                var entries = row.Split(',');
+                var numEntries = entries.Length;
+                // skip empty rows / maybe last row
+                if (numEntries == 0)
+                {
+                    continue;
+                }
+                if (numEntries != attrCount)
+                {
+                    return SchemaResult<DataScheme>.Fail($"Row {rowIdx}: Invalid number of rows, expected {attrCount}, found {numEntries}, row: {row}", this);
                 }
                 
-                importedScheme.AddEntry(entry);
+                rawDataEntries.Add(entries);
+            }
+            
+            // determine the best data type for a column
+            for (var attrIdx = 0; attrIdx < attrCount; attrIdx++)
+            {
+                var potentialDataTypes = new HashSet<DataType>(DataType.BuiltInTypes);
+                foreach (var dataEntry in rawDataEntries)
+                {
+                    var rawData = dataEntry[attrIdx];
+                    var enumerator = potentialDataTypes.GetEnumerator();
+                    while (enumerator.MoveNext())
+                    {
+                        if (!enumerator.Current.ConvertData(rawData).Try(out var convertedData))
+                        {
+                            potentialDataTypes.Remove(enumerator.Current);
+                        }
+                    }
+                }
+
+                if (potentialDataTypes.Count == 0)
+                {
+                    return SchemaResult<DataScheme>.Fail($"Could not convert all entries for colunn {attrIdx} to a known data type", context: this);
+                }
+
+                DataType finalDataType;
+                if (potentialDataTypes.Count >= 2)
+                {
+                    // prefer non-text data type if possible
+                    finalDataType = potentialDataTypes.First(dataType => !dataType.Equals(DataType.Text));
+                }
+                else
+                {
+                    finalDataType = potentialDataTypes.First();
+                }
+
+                attributes[attrIdx].DataType = finalDataType;
+            }
+            
+            // add attributes after resolving data type
+            var failures = attributes.Select(a => importedScheme.AddAttribute(a))
+                .Where(res => res.Failed);
+
+            if (failures.Any())
+            {
+                // TODO: Improve CSV validation and error reporting
+                throw new InvalidOperationException(string.Join(",", failures));
+            }
+            
+            // TODO: Is there a way to do this without converting the data twice?
+            // now parse data with the final data type
+            foreach (var rawDataEntry in rawDataEntries)
+            {
+                var entry = new DataEntry();
+                for (var attrIdx = 0; attrIdx < attrCount; attrIdx++)
+                {
+                    var rawData = rawDataEntry[attrIdx];
+                    var dataType = attributes[attrIdx].DataType;
+                    var attributeName = attributes[attrIdx].AttributeName;
+
+                    if (!dataType.ConvertData(rawData).Try(out var convertedData))
+                    {
+                        return SchemaResult<DataScheme>.Fail($"Could not convert entry {rawDataEntry} to type {dataType}", context: this);
+                    }
+
+                    var setDataRes = entry.SetData(attributeName, convertedData);
+                    if (setDataRes.Failed)
+                    {
+                        return SchemaResult<DataScheme>.Fail(setDataRes.Message, context: this);
+                    }
+                }
+                
+                var addRes = importedScheme.AddEntry(entry);
+                if (addRes.Failed)
+                {
+                    return SchemaResult<DataScheme>.Fail(addRes.Message, context: this);
+                }
             }
 
-            return importedScheme;
+            return SchemaResult<DataScheme>.Pass(importedScheme,
+                successMessage: "Loaded scheme",
+                context: this);
         }
 
         public SchemaResult SerializeToFile(string filePath, DataScheme scheme)
@@ -90,14 +181,28 @@ namespace Schema.Core.Serialization
             {
                 return Fail($"Scheme cannot be null", this);
             }
+
+            if (!Serialize(scheme).Try(out var csvContent))
+            {
+                return Fail("Failed to deserialize scheme", this);
+            }
+
+            // Write to file
+            fileSystem.WriteAllText(filePath, csvContent);
             
+            return Pass($"Wrote {scheme} to file: {filePath}");
+        }
+
+        public SchemaResult<string> Serialize(DataScheme scheme)
+        {
             StringBuilder csvContent = new StringBuilder();
 
             // Add headers
             int attributeCount = scheme.AttributeCount;
             if (attributeCount == 0)
             {
-                return Fail($"Scheme cannot be empty", this);
+                // return null;
+                return SchemaResult<string>.Fail($"Scheme cannot be empty", this);
             }
             
             for (int i = 0; i < attributeCount; i++)
@@ -131,15 +236,9 @@ namespace Schema.Core.Serialization
                 csvContent.AppendLine();
             }
 
-            // Write to file
-            fileSystem.WriteAllText(filePath, csvContent.ToString());
-            
-            return Pass($"Wrote {scheme} to file: {filePath}");
-        }
-
-        public string Serialize(DataScheme data)
-        {
-            throw new NotImplementedException();
+            return SchemaResult<string>.Pass(csvContent.ToString(),
+                successMessage: "Parsed CSV content",
+                this);
         }
     }
 }

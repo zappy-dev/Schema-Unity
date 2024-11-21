@@ -1,11 +1,9 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using Schema.Core.Data;
-using Schema.Core.Ext;
 using Schema.Core.Serialization;
 using static Schema.Core.SchemaResult;
 
@@ -234,6 +232,7 @@ namespace Schema.Core
                         var validateData = attribute.DataType.CheckIfValidData(fieldData);
                         if (validateData.Failed)
                         {
+                            
                             var conversion = attribute.DataType.ConvertData(fieldData);
                             if (conversion.Failed)
                             {
@@ -298,7 +297,8 @@ namespace Schema.Core
             
                 progress?.Report((0f, $"Loading: {manifestPath}..."));
                 Logger.Log($"Loading manifest from file: {manifestPath}...", "Manifest");
-                if (!Storage.DefaultManifestStorageFormat.TryDeserializeFromFile(manifestPath, out var loadedManifestSchema))
+                if (!Storage.DefaultManifestStorageFormat.DeserializeFromFile(manifestPath)
+                        .Try( out var loadedManifestSchema))
                 {
                     return Fail("Failed to load manifest schema.", context: "Manifest");
                 }
@@ -443,8 +443,8 @@ namespace Schema.Core
             progress?.Report(schemeFilePath);
                 
             // TODO support async loading
-            if (!Storage.DefaultSchemaStorageFormat.TryDeserializeFromFile(schemeFilePath,
-                    out var loadedSchema))
+            if (!Storage.DefaultSchemaStorageFormat.DeserializeFromFile(schemeFilePath)
+                    .Try(out var loadedSchema))
             {
                 return SchemaResult<DataScheme>.Fail("Failed to load scheme from file.", context: Context.Manifest);
             }
@@ -559,6 +559,12 @@ namespace Schema.Core
 
         public static bool TryGetSchemeForAttribute(AttributeDefinition searchAttr, out DataScheme ownerScheme)
         {
+            if (!IsInitialized)
+            {
+                ownerScheme = null;
+                return false;
+            }
+            
             ownerScheme = dataSchemes.Values.FirstOrDefault(scheme =>
             {
                 return scheme.GetAttribute(attr => attr.Equals(searchAttr)).Try(out _);
