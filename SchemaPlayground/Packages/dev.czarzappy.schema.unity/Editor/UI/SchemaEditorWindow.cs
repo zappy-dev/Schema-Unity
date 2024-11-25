@@ -848,7 +848,7 @@ namespace Schema.Unity.Editor
             
             rowOptionsMenu.AddItem(new GUIContent("Move To Top"), isDisabled: canMoveUp, () =>
             {
-                scheme.MoveEntry(entry, 0);
+                scheme.MoveEntryToTop(entry);
                 SaveDataScheme(scheme, saveManifest: false);
             });
             rowOptionsMenu.AddItem(new GUIContent("Move Up"), isDisabled: canMoveUp, () =>
@@ -863,7 +863,7 @@ namespace Schema.Unity.Editor
             });
             rowOptionsMenu.AddItem(new GUIContent("Move To Bottom"), isDisabled: canMoveDown, () =>
             {
-                scheme.MoveEntry(entry, entryCount - 1);
+                scheme.MoveEntryToBottom(entry);
                 SaveDataScheme(scheme, saveManifest: false);
             });
             rowOptionsMenu.AddSeparator("");
@@ -886,12 +886,12 @@ namespace Schema.Unity.Editor
             // attribute column ordering options
             columnOptionsMenu.AddItem(new GUIContent("Move Left"), isDisabled: attributeIdx == 0, () =>
             {
-                scheme.IncreaseAttributeRank(attribute);
+                scheme.MoveAttributeForward(attribute);
                 SaveDataScheme(scheme, saveManifest: false);
             });
             columnOptionsMenu.AddItem(new GUIContent("Move Right"), isDisabled: attributeIdx == attributeCount - 1, () =>
             {
-                scheme.DecreaseAttributeRank(attribute);
+                scheme.MoveAttributeBack(attribute);
                 SaveDataScheme(scheme, saveManifest: false);
             });
                             

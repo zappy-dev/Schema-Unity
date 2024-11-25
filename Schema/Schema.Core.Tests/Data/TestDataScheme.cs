@@ -326,20 +326,43 @@ public class TestDataScheme
     }
 
     [Test]
-    [TestCase(0, false)]
-    [TestCase(1, true)]
-    [TestCase(2, false)]
-    public void Test_MoveEntry(int moveIdx, bool expected)
+    public void Test_MoveEntryToBottom_Good()
     {
         var firstEntry = testScheme.CreateNewEntry();
         var secondEntry = testScheme.CreateNewEntry();
 
-        var res = testScheme.MoveEntry(firstEntry, moveIdx);
-        Assert.That(res.Passed, Is.EqualTo(expected));
+        testScheme.MoveEntryToBottom(firstEntry).AssertPassed();
+    }
+
+    [Test]
+    public void Test_MoveEntryToBottom_Bad()
+    {
+        var firstEntry = testScheme.CreateNewEntry();
+        var secondEntry = testScheme.CreateNewEntry();
+
+        testScheme.MoveEntryToBottom(secondEntry).AssertPassed();
+    }
+
+    [Test]
+    public void Test_MoveEntryToTop_Good()
+    {
+        var firstEntry = testScheme.CreateNewEntry();
+        var secondEntry = testScheme.CreateNewEntry();
+
+        testScheme.MoveEntryToTop(firstEntry).AssertPassed();
+    }
+
+    [Test]
+    public void Test_MoveEntryToTop_Bad()
+    {
+        var firstEntry = testScheme.CreateNewEntry();
+        var secondEntry = testScheme.CreateNewEntry();
+
+        testScheme.MoveEntryToTop(secondEntry).AssertPassed();
     }
     
     [Test]
-    public void Test_IncreaseAttributeRank()
+    public void Test_MoveAttributeForward()
     {
         // Arrange
         var dataScheme = new DataScheme("Foo");
@@ -351,7 +374,7 @@ public class TestDataScheme
         dataScheme.AddAttribute(thirdAttribute);
         
         // Act
-        var increaseResponse = dataScheme.IncreaseAttributeRank(secondAttribute);
+        var increaseResponse = dataScheme.MoveAttributeForward(secondAttribute);
         
         // Assert
         Assert.IsTrue(increaseResponse.Passed);
@@ -360,7 +383,7 @@ public class TestDataScheme
     }
     
     [Test]
-    public void Test_DecreaseAttributeRank()
+    public void Test_MoveAttributeBack()
     {
         // Arrange
         var dataScheme = new DataScheme("Foo");
@@ -372,12 +395,55 @@ public class TestDataScheme
         dataScheme.AddAttribute(thirdAttribute);
         
         // Act
-        var increaseResponse = dataScheme.DecreaseAttributeRank(firstAttribute);
+        var increaseResponse = dataScheme.MoveAttributeBack(firstAttribute);
         
         // Assert
         Assert.IsTrue(increaseResponse.Passed);
         Assert.That(dataScheme.GetAttribute(0), Is.EqualTo(secondAttribute));
         Assert.That(dataScheme.GetAttribute(1), Is.EqualTo(firstAttribute));
+    }
+    
+    [Test]
+    public void Test_MoveAttributeToFront()
+    {
+        // Arrange
+        var dataScheme = new DataScheme("Foo");
+        var firstAttribute = new AttributeDefinition("FirstAttribute", DataType.Text);
+        var secondAttribute = new AttributeDefinition("SecondAttribute", DataType.Text);
+        var thirdAttribute = new AttributeDefinition("ThirdAttribute", DataType.Text);
+        dataScheme.AddAttribute(firstAttribute);
+        dataScheme.AddAttribute(secondAttribute);
+        dataScheme.AddAttribute(thirdAttribute);
+        
+        // Act
+        var increaseResponse = dataScheme.MoveAttributeToFront(secondAttribute);
+        
+        // Assert
+        Assert.IsTrue(increaseResponse.Passed);
+        Assert.That(dataScheme.GetAttribute(0), Is.EqualTo(secondAttribute));
+        Assert.That(dataScheme.GetAttribute(1), Is.EqualTo(firstAttribute));
+    }
+    
+    [Test]
+    public void Test_MoveAttributeToBack()
+    {
+        // Arrange
+        var dataScheme = new DataScheme("Foo");
+        var firstAttribute = new AttributeDefinition("FirstAttribute", DataType.Text);
+        var secondAttribute = new AttributeDefinition("SecondAttribute", DataType.Text);
+        var thirdAttribute = new AttributeDefinition("ThirdAttribute", DataType.Text);
+        dataScheme.AddAttribute(firstAttribute);
+        dataScheme.AddAttribute(secondAttribute);
+        dataScheme.AddAttribute(thirdAttribute);
+        
+        // Act
+        var increaseResponse = dataScheme.MoveAttributeToBack(firstAttribute);
+        
+        // Assert
+        Assert.IsTrue(increaseResponse.Passed);
+        Assert.That(dataScheme.GetAttribute(0), Is.EqualTo(secondAttribute));
+        Assert.That(dataScheme.GetAttribute(1), Is.EqualTo(thirdAttribute));
+        Assert.That(dataScheme.GetAttribute(2), Is.EqualTo(firstAttribute));
     }
 
     [Test]

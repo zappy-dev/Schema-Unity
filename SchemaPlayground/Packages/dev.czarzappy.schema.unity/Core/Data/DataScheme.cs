@@ -25,7 +25,7 @@ namespace Schema.Core.Data
         private IEnumerable<AttributeDefinition> AllAttributes => attributes;
         
         [JsonProperty("Entries")]
-        private List<DataEntry> entries { get; set; }
+        private LinkedList<DataEntry> entries { get; set; }
         
         [JsonIgnore]
         public IEnumerable<DataEntry> AllEntries => entries;
@@ -48,17 +48,17 @@ namespace Schema.Core.Data
         public DataScheme()
         {
             attributes = new List<AttributeDefinition>();
-            entries = new List<DataEntry>();
+            entries = new LinkedList<DataEntry>();
         }
 
-        public DataScheme(string schemeName, List<AttributeDefinition> attributes, List<DataEntry> entries)
+        public DataScheme(string schemeName, List<AttributeDefinition> attributes, LinkedList<DataEntry> entries)
         {
             SchemeName = schemeName;
             this.attributes = attributes;
             this.entries = entries;
         }
 
-        public DataScheme(string schemeName) : this(schemeName, new List<AttributeDefinition>(), new List<DataEntry>())
+        public DataScheme(string schemeName) : this(schemeName, new List<AttributeDefinition>(), new LinkedList<DataEntry>())
         {
             SchemeName = schemeName;
         }
@@ -262,18 +262,30 @@ namespace Schema.Core.Data
 
         #region Attribute Ordering Operations
         
-        public SchemaResult IncreaseAttributeRank(AttributeDefinition attribute)
+        public SchemaResult MoveAttributeForward(AttributeDefinition attribute)
         {
             var attributeIdx = attributes.IndexOf(attribute);
             var newIdx = attributeIdx - 1; // shift lower to appear sooner
             return Swap(attributeIdx, newIdx, attributes);
         }
 
-        public SchemaResult DecreaseAttributeRank(AttributeDefinition attribute)
+        public SchemaResult MoveAttributeBack(AttributeDefinition attribute)
         {
             var attributeIdx = attributes.IndexOf(attribute);
             var newIdx = attributeIdx + 1; // shift higher to appear later
             return Swap(attributeIdx, newIdx, attributes);
+        }
+        
+        public SchemaResult MoveAttributeToFront(AttributeDefinition attribute)
+        {
+            var attributeIdx = attributes.IndexOf(attribute);
+            return Swap(attributeIdx, 0, attributes);
+        }
+
+        public SchemaResult MoveAttributeToBack(AttributeDefinition attribute)
+        {
+            var attributeIdx = attributes.IndexOf(attribute);
+            return Swap(attributeIdx, attributes.Count - 1, attributes);
         }
 
         #endregion
@@ -290,7 +302,7 @@ namespace Schema.Core.Data
                 entry.SetData(attribute.AttributeName, attribute.CloneDefaultValue());
             }
             
-            entries.Add(entry);
+            entries.AddLast(entry);
             return entry;
         }
 
@@ -333,7 +345,7 @@ namespace Schema.Core.Data
                 newEntry.SetData(attribute.AttributeName, attribute.CloneDefaultValue());
             }
             
-            entries.Add(newEntry);
+            entries.AddLast(newEntry);
             return SchemaResult.Pass($"Added {newEntry}", this);
         }
 
@@ -359,16 +371,32 @@ namespace Schema.Core.Data
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public DataEntry GetEntry(int entryIndex)
         {
-            return entries[entryIndex];
+            return entries.ElementAt(entryIndex);
         }
 
         #region Entry Ordering Operations
         
         public SchemaResult MoveUpEntry(DataEntry entry)
         {
-            var entryIdx = entries.IndexOf(entry);
-            var newIdx = entryIdx - 1;
-            return SwapEntries(entryIdx, newIdx);
+            return MoveUp(entries, entry);
+        }
+
+        private SchemaResult MoveUp<T>(LinkedList<T> list, T entry)
+        {
+            var entryNode = list.Find(entry);
+            if (entryNode == null)
+            {
+                return Fail("Entry not found");
+            }
+            
+            if (entryNode.Previous == null)
+            {
+                return Fail("Entry already moved to the top");
+            }
+
+            list.Remove(entryNode);
+            list.AddBefore(entryNode, entryNode.Previous);
+            return Pass("Entry moved up");
         }
 
         public SchemaResult MoveDownEntry(DataEntry entry)
@@ -377,27 +405,17 @@ namespace Schema.Core.Data
             var newIdx = entryIdx + 1;
             return SwapEntries(entryIdx, newIdx);
         }
-
-        public SchemaResult MoveEntry(DataEntry entry, int targetIndex)
+        
+        public SchemaResult MoveEntryToTop(DataEntry entry)
         {
-            if (targetIndex < 0 || targetIndex >= entries.Count)
-            {
-                return SchemaResult.Fail($"Target index {targetIndex} is out of range.", this);
-            }
-            
             var entryIdx = entries.IndexOf(entry);
-            if (entryIdx == -1)
-            {
-                return SchemaResult.Fail("Entry not found", this);
-            }
-            if (entryIdx == targetIndex)
-            {
-                return SchemaResult.Fail("Entry cannot be the same as the target.", this);
-            }
-            entries.RemoveAt(entryIdx);
-            entries.Insert(targetIndex, entry);
-            
-            return SchemaResult.Pass($"Moved {entry} from {entryIdx} to {targetIndex}", this);
+            return SwapEntries(entryIdx, 0);
+        }
+
+        public SchemaResult MoveEntryToBottom(DataEntry entry)
+        {
+            var entryIdx = entries.IndexOf(entry);
+            return SwapEntries(entryIdx, entries.Count - 1);
         }
 
         public SchemaResult SwapEntries(int srcIndex, int dstIndex)
@@ -415,6 +433,11 @@ namespace Schema.Core.Data
             if (dstIndex < 0 || dstIndex >= data.Count)
             {
                 return SchemaResult.Fail($"Attempted to move entry {srcIndex} to invalid destination {dstIndex} is out of range.", this);
+            }
+
+            if (srcIndex == dstIndex)
+            {
+                return SchemaResult.Pass($"Entry already in target position", this);
             }
             
             (data[srcIndex], data[dstIndex]) = (data[dstIndex], data[srcIndex]);
