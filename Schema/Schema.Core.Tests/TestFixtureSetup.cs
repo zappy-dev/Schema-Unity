@@ -7,5 +7,6 @@ public class TestFixtureSetup
     public void OneTimeSetUp()
     {
         Logger.SetLogger(new TestLogger());
+        Logger.Level = Logger.LogLevel.ERROR;
     }
 }

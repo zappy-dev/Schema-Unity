@@ -19,7 +19,7 @@ jobs:
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '7.0.x' # specify the version your project requires
+        dotnet-version: '8.0.x' # specify the version your project requires
 
     - name: Restore dependencies
       run: dotnet restore Schema/Schema.sln
@@ -43,7 +43,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Upload coverage report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage-report
         path: TestResults/**/coverage.cobertura.xml

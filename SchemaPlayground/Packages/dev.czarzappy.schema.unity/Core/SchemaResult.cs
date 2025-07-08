@@ -4,6 +4,8 @@ namespace Schema.Core
 {
     public struct SchemaResult
     {
+        public static readonly SchemaResult NoOp = new SchemaResult(status: RequestStatus.Passed, "NoOp");
+
         public enum RequestStatus
         {
             Passed,
@@ -28,7 +30,7 @@ namespace Schema.Core
             string logMsg = $"[Context={context}] {message}";
             if (status == RequestStatus.Passed)
             {
-                Logger.LogVerbose(logMsg);
+                Logger.LogDbgVerbose(logMsg);
             }
             else
             {
@@ -91,7 +93,7 @@ namespace Schema.Core
             string logMsg = $"[Context={context}] {message}";
             if (status == SchemaResult.RequestStatus.Passed)
             {
-                Logger.LogVerbose(logMsg);
+                Logger.LogDbgVerbose(logMsg);
             }
             else
             {

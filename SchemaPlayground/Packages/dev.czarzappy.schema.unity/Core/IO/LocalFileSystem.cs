@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 
 namespace Schema.Core.IO
@@ -31,11 +32,21 @@ namespace Schema.Core.IO
         
         public bool DirectoryExists(string directoryPath)
         {
+            if (string.IsNullOrWhiteSpace(directoryPath))
+            {
+                throw new ArgumentNullException(nameof(directoryPath));
+            }
+            
             return Directory.Exists(directoryPath);
         }
 
         public void CreateDirectory(string directoryPath)
         {
+            if (string.IsNullOrWhiteSpace(directoryPath))
+            {
+                throw new ArgumentNullException(nameof(directoryPath));
+            }
+            
             Directory.CreateDirectory(directoryPath);
         }
         

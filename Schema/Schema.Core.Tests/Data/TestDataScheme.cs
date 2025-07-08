@@ -23,6 +23,44 @@ public class TestDataScheme
         testScheme.AddAttribute(new AttributeDefinition(EXISTING_STRING_ATTRIBUTE_NAME, DataType.Text)).AssertPassed();
         testScheme.AddAttribute(new AttributeDefinition(EXISTING_INTEGER_ATTRIBUTE_NAME, DataType.Integer)).AssertPassed();
     }
+    
+
+    [Test]
+    public void Test_AutomaticReferenceUpdate_WhenIdentifierValueChanges()
+    {
+        // Arrange
+        // Schema A: RewardTypes
+        var rewardTypeScheme = new DataScheme("RewardTypes");
+        var nameAttr = new AttributeDefinition("Name", DataType.Text, isIdentifier: true);
+        rewardTypeScheme.AddAttribute(nameAttr).AssertPassed();
+        rewardTypeScheme.AddEntry(new DataEntry { { nameAttr.AttributeName, "GOLD" } });
+        rewardTypeScheme.AddEntry(new DataEntry { { nameAttr.AttributeName, "SILVER" } });
+        rewardTypeScheme.AddEntry(new DataEntry { { nameAttr.AttributeName, "COPPER" } });
+        rewardTypeScheme.Load().AssertPassed();
+        rewardTypeScheme.GetIdentifierAttribute().TryAssert(out var rewardTypeIdAttr);
+        rewardTypeIdAttr.CreateReferenceType().TryAssert(out var rewardTypeRefType);
+
+        // Schema B: LootRolls, referencing RewardTypes.Name
+        var lootRollsScheme = new DataScheme("LootRolls");
+        lootRollsScheme.AddAttribute(new AttributeDefinition("RewardType", rewardTypeRefType)).AssertPassed();
+        lootRollsScheme.AddAttribute(new AttributeDefinition("Amount", DataType.Integer)).AssertPassed();
+        lootRollsScheme.AddEntry(new DataEntry { { "RewardType", "GOLD" }, { "Amount", 100 } });
+        lootRollsScheme.AddEntry(new DataEntry { { "RewardType", "SILVER" }, { "Amount", 50 } });
+        lootRollsScheme.Load().AssertPassed();
+
+        // Act: Use the new centralized update method
+        var result = Schema.UpdateIdentifierValue(rewardTypeScheme.SchemeName, nameAttr.AttributeName, "GOLD", "PLATINUM");
+        Assert.That(result.Passed, Is.True, result.Message);
+
+        // Assert: All references in Schema B are updated
+        foreach (var entry in lootRollsScheme.AllEntries)
+        {
+            var rewardType = entry.GetDataAsString("RewardType");
+            Assert.That(rewardType, Is.Not.EqualTo("GOLD"), "Reference to old identifier should be updated");
+        }
+        Assert.That(lootRollsScheme.AllEntries.Any(e => e.GetDataAsString("RewardType") == "PLATINUM"),
+            Is.True, "Reference to new identifier should exist");
+    }
 
     [Test, TestCaseSource(nameof(AddEntry_BadCases))]
     public void Test_AddEntry_BadCases(DataEntry badEntry)

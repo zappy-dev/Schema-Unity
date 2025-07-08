@@ -1,4 +1,4 @@
-using System;
+// #define SCHEMA_DEBUG
 using System.Diagnostics;
 using System.Text;
 
@@ -36,15 +36,13 @@ namespace Schema.Core
                 sb.Append("[Context=").Append(context).Append("] ");
             }
 
-            sb.AppendLine(message);
+            sb.Append(message);
 
             if (_logger.LogLevel == LogLevel.VERBOSE && msgSeverity >= LogLevel.WARNING)
             {
-#if !UNITY_64 // Don't log stack trace in environment that already logs out stack trace
+#if !UNITY_64 && INCLUDE_STACK_TRACE // Don't log stack trace in environment that already logs out stack trace
                 StackTrace stackTrace = new StackTrace(4);
-
-
-                sb.AppendLine(stackTrace.ToString());
+                sb.Append(stackTrace);
 #endif
             }
             
@@ -54,6 +52,12 @@ namespace Schema.Core
         private static void Log(string message, LogLevel msgSeverity, object context = null)
         {
             _logger?.Log(msgSeverity, FormatMessage(message, msgSeverity, context));
+        }
+        
+        [Conditional("SCHEMA_DEBUG")]
+        public static void LogDbgVerbose(string message, object context = null)
+        {
+            Log(message, LogLevel.VERBOSE, context);
         }
         
         public static void LogVerbose(string message, object context = null)
@@ -67,6 +71,12 @@ namespace Schema.Core
         }
 
         public static void LogWarning(string message, object context = null)
+        {
+            Log(message, LogLevel.WARNING, context);
+        }
+
+        [Conditional("SCHEMA_DEBUG")]
+        public static void LogDbgWarning(string message, object context = null)
         {
             Log(message, LogLevel.WARNING, context);
         }

@@ -12,21 +12,21 @@ namespace Schema.Unity.Editor
 
         public EditorProgressReporter(string title, string info)
         {
-            Logger.LogVerbose($"EditorProgressReporter reporting");
+            Logger.LogDbgVerbose($"EditorProgressReporter reporting");
             this.title = title;
             this.info = info;
         }
 
         public void Report((float value, string message) progress)
         {
-            Logger.LogVerbose($"EditorProgressReporter reporting progress: {progress.message}");
+            Logger.LogDbgVerbose($"EditorProgressReporter reporting progress: {progress.message}");
             // Display the progress bar in Unity Editor
             EditorUtility.DisplayProgressBar(title, $"{info} - {progress.message}", Mathf.Clamp01(progress.value));
         }
 
         public void Dispose()
         {
-            Logger.LogVerbose($"EditorProgressReporter disposed");
+            Logger.LogDbgVerbose($"EditorProgressReporter disposed");
             // Clear the progress bar when finished
             EditorUtility.ClearProgressBar();
         }

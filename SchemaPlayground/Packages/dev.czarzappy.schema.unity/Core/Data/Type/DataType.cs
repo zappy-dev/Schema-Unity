@@ -64,7 +64,7 @@ namespace Schema.Core.Data
 
         public static SchemaResult<object> ConvertData(object entryData, DataType fromType, DataType toType)
         {
-            Logger.LogVerbose($"Trying to convert {entryData} to {toType}", "DataConversion");
+            Logger.LogDbgVerbose($"Trying to convert {entryData} to {toType}", "DataConversion");
             // Handle unknown types from their default string values
             bool isUnknownType = !BuiltInTypes.Contains(fromType);
 
