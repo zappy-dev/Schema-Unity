@@ -84,11 +84,11 @@ namespace Schema.Unity.Editor
 
         private void SaveSettings()
         {
-            attribute.Copy(editAttribute);
-            
             scheme.UpdateAttributeName(attribute.AttributeName, editAttribute.AttributeName);
+            attribute.Copy(editAttribute);
 
-            Core.Schema.SaveDataScheme(scheme, saveManifest: false);
+            // Updating an attribute name can impact referencing schemes, save all dirty
+            Core.Schema.Save();
             
             Close();
         }

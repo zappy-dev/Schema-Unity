@@ -86,7 +86,7 @@ namespace Schema.Unity.Editor
 
         private void OnEnable()
         {
-            Logger.LogVerbose("Scheme Editor enabled", this);
+            Logger.LogDbgVerbose("Scheme Editor enabled", this);
             isInitialized = false;
             EditorApplication.update += InitializeSafely;
         }
@@ -94,7 +94,7 @@ namespace Schema.Unity.Editor
         private void InitializeSafely()
         {
             if (isInitialized) return;
-            Logger.LogVerbose("InitializeSafely", this);
+            Logger.LogDbgVerbose("InitializeSafely", this);
             
             // return;
             selectedSchemaIndex = -1;
@@ -119,7 +119,7 @@ namespace Schema.Unity.Editor
             // return;
             if (!string.IsNullOrEmpty(storedSelectedSchema))
             {
-                Logger.LogVerbose($"Selected schema found: {storedSelectedSchema}", this);
+                Logger.LogDbgVerbose($"Selected schema found: {storedSelectedSchema}", this);
                 OnSelectScheme(storedSelectedSchema, "Restoring from Editor Preferences");
             }
 
@@ -223,7 +223,7 @@ namespace Schema.Unity.Editor
 
         private SchemaResult OnLoadManifest(string context)
         {
-            Logger.LogVerbose($"Loading Manifest", context);
+            Logger.LogDbgVerbose($"Loading Manifest", context);
             // TODO: Figure out why progress reporting is making the Unity Editor unhappy
             // using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
             LatestResponse = LoadFromManifest(manifestFilePath);
@@ -406,6 +406,9 @@ namespace Schema.Unity.Editor
             }
         }
 
+        /// <summary>
+        /// Renders the Schema sidebar to view and interact with various Schema datatypes
+        /// </summary>
         private void RenderSchemaExplorer()
         {
             using (new EditorGUILayout.VerticalScope(GUILayout.Width(400)))
@@ -416,16 +419,23 @@ namespace Schema.Unity.Editor
                 {
                     explorerScrollPosition = explorerScrollView.scrollPosition;
                     // list available schemes
-                    var schemeNames = AllSchemes.ToArray();
+                    string DisplayName(DataScheme s)
+                    {
+                        var dirtyPostfix = s.IsDirty ? "*" : string.Empty;
+                        return $"{s.SchemeName}{dirtyPostfix}";
+                    }
+                    
+                    var schemeNames = GetSchemes()
+                        .Select(s => (DisplayName: DisplayName(s), SchemeName: s.SchemeName)).ToArray();
 
                     using (var schemeChange = new EditorGUI.ChangeCheckScope())
                     {
-                        selectedSchemaIndex = GUILayout.SelectionGrid(selectedSchemaIndex, schemeNames, 1, LeftAlignedButtonStyle);
+                        selectedSchemaIndex = GUILayout.SelectionGrid(selectedSchemaIndex, schemeNames.Select(s => s.DisplayName).ToArray(), 1, LeftAlignedButtonStyle);
                         
                         if (schemeChange.changed)
                         {
                             var nextSelectedSchema = schemeNames[selectedSchemaIndex];
-                            OnSelectScheme(nextSelectedSchema, "Selected Schema in Explorer");
+                            OnSelectScheme(nextSelectedSchema.SchemeName, "Selected Schema in Explorer");
                         }
                     }
                 
@@ -509,10 +519,21 @@ namespace Schema.Unity.Editor
                         
                         EditorGUILayout.TextField(storagePath);
                     }
-                    if (GUILayout.Button("Save", GUILayout.ExpandWidth(true)))
+                    
+                    var dirtyPostfix = scheme.IsDirty ? "*" : string.Empty;
+                    
+                    if (GUILayout.Button($"Save{dirtyPostfix}", GUILayout.ExpandWidth(true)))
                     {
                         LatestResponse = SaveDataScheme(scheme, saveManifest: false);
                     }
+                    
+                    // TODO: Open raw schema files
+                    // if (GUILayout.Button("Open", GUILayout.ExpandWidth(true)) &&
+                    //     GetManifestEntryForScheme(scheme).Try(out var manifestEntry))
+                    // {
+                    //     var storagePath = manifestEntry.GetDataAsString(MANIFEST_ATTRIBUTE_FILEPATH);
+                    //     Application.OpenURL(storagePath);
+                    // }
                     
                     // render export options
                     if (EditorGUILayout.DropdownButton(new GUIContent("Export"), 
@@ -566,7 +587,7 @@ namespace Schema.Unity.Editor
                                 bool didSetLoad = false;
                                 if (!entry.GetData(attribute).Try(out entryValue))
                                 {
-                                    Logger.LogWarning($"Setting {attribute} data for {entry}");
+                                    Logger.LogDbgWarning($"Setting {attribute} data for {entry}");
                                     // for some reason this data wasn't set yet
                                     entryValue = attribute.CloneDefaultValue();
                                     didSetLoad = true;
@@ -591,7 +612,7 @@ namespace Schema.Unity.Editor
 
                                 if (didSetLoad)
                                 {
-                                    entry.SetData(attributeName, entryValue);
+                                    scheme.SetDataOnEntry(entry, attributeName, entryValue);
                                 }
 
                                 var attributeFieldWidth = GUILayout.Width(attribute.ColumnWidth);
@@ -622,6 +643,7 @@ namespace Schema.Unity.Editor
                                     }
                                     else if (attribute.DataType is ReferenceDataType refDataType)
                                     {
+                                        // Render Reference Data Type options
                                         var gotoButtonWidth = 20;
                                         var refDropdownWidth = attribute.ColumnWidth - gotoButtonWidth;
                                         var currentValue = entryValue == null ? "..." : entryValue.ToString();
@@ -637,7 +659,7 @@ namespace Schema.Unity.Editor
                                                     referenceEntryOptions.AddItem(new GUIContent(identifierValue.ToString()),
                                                         on: identifierValue.Equals(currentValue), () =>
                                                         {
-                                                            entry.SetData(attributeName, identifierValue);
+                                                            scheme.SetDataOnEntry(entry, attributeName, identifierValue);
                                                         });
                                                 }
                                             }
@@ -681,8 +703,19 @@ namespace Schema.Unity.Editor
 
                                         if (shouldUpdateEntry)
                                         {
-                                            entry.SetData(attributeName, entryValue);
-                                            LatestResponse = SaveDataScheme(scheme, saveManifest: false);
+                                            if (attribute.IsIdentifier)
+                                            {
+                                                UpdateIdentifierValue(scheme.SchemeName, 
+                                                    attributeName,
+                                                    entry.GetData(attributeName), entryValue);
+                                            }
+                                            else
+                                            {
+                                                scheme.SetDataOnEntry(entry, attributeName, entryValue);
+                                            }
+                                            
+                                            // This operation can dirty multiple data schemes, save any affected
+                                            LatestResponse = Save();
                                         }
                                     }
                                 }

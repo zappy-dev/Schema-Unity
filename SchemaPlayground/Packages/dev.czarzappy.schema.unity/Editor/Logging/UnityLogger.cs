@@ -1,4 +1,4 @@
-// #define SCHEMA_DEBUG
+#define SCHEMA_DEBUG
 using System;
 using UnityEngine;
 using ILogger = Schema.Core.ILogger;

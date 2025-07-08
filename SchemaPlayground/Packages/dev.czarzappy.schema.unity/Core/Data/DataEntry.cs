@@ -78,6 +78,14 @@ namespace Schema.Core.Data
             return false;
         }
         
+        /// <summary>
+        /// Sets the value for an attribute in this entry.
+        /// <b>Warning:</b> Do not call this directly for identifier attributes. Use <see cref="DataScheme.SetDataOnEntry"/> instead to ensure data integrity.
+        /// </summary>
+        /// <param name="attributeName">The attribute name to set.</param>
+        /// <param name="value">The value to set.</param>
+        /// <returns>A SchemaResult indicating success or failure.</returns>
+        [Obsolete("Do not call SetData directly. Use DataScheme.SetDataOnEntry instead to ensure identifier safety.", false)]
         public SchemaResult SetData(string attributeName, object value)
         {
             if (string.IsNullOrWhiteSpace(attributeName))
