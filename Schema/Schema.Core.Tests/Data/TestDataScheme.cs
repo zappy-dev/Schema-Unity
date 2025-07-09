@@ -481,4 +481,72 @@ public class TestDataScheme
             yield return new TestCaseData(new AttributeDefinition("UnknownField", DataType.Default), false);
         }
     }
+
+    [Test]
+    public void Test_MoveAttributeRank_ToFrontAndBack()
+    {
+        var dataScheme = new DataScheme("Foo");
+        var firstAttribute = new AttributeDefinition("FirstAttribute", DataType.Text);
+        var secondAttribute = new AttributeDefinition("SecondAttribute", DataType.Text);
+        var thirdAttribute = new AttributeDefinition("ThirdAttribute", DataType.Text);
+        dataScheme.AddAttribute(firstAttribute);
+        dataScheme.AddAttribute(secondAttribute);
+        dataScheme.AddAttribute(thirdAttribute);
+
+        // Move third to front
+        var moveFrontRes = dataScheme.MoveAttributeRank(thirdAttribute, 0);
+        Assert.IsTrue(moveFrontRes.Passed);
+        Assert.That(dataScheme.GetAttribute(0), Is.EqualTo(thirdAttribute));
+        Assert.That(dataScheme.GetAttribute(1), Is.EqualTo(firstAttribute));
+        Assert.That(dataScheme.GetAttribute(2), Is.EqualTo(secondAttribute));
+
+        // Move first to back
+        var moveBackRes = dataScheme.MoveAttributeRank(firstAttribute, 2);
+        Assert.IsTrue(moveBackRes.Passed);
+        Assert.That(dataScheme.GetAttribute(0), Is.EqualTo(thirdAttribute));
+        Assert.That(dataScheme.GetAttribute(1), Is.EqualTo(secondAttribute));
+        Assert.That(dataScheme.GetAttribute(2), Is.EqualTo(firstAttribute));
+    }
+
+    [Test]
+    public void Test_MoveAttributeRank_ToMiddle()
+    {
+        var dataScheme = new DataScheme("Foo");
+        var firstAttribute = new AttributeDefinition("FirstAttribute", DataType.Text);
+        var secondAttribute = new AttributeDefinition("SecondAttribute", DataType.Text);
+        var thirdAttribute = new AttributeDefinition("ThirdAttribute", DataType.Text);
+        dataScheme.AddAttribute(firstAttribute);
+        dataScheme.AddAttribute(secondAttribute);
+        dataScheme.AddAttribute(thirdAttribute);
+
+        // Move first to index 1 (middle)
+        var moveMiddleRes = dataScheme.MoveAttributeRank(firstAttribute, 1);
+        Assert.IsTrue(moveMiddleRes.Passed);
+        Assert.That(dataScheme.GetAttribute(0), Is.EqualTo(secondAttribute));
+        Assert.That(dataScheme.GetAttribute(1), Is.EqualTo(firstAttribute));
+        Assert.That(dataScheme.GetAttribute(2), Is.EqualTo(thirdAttribute));
+    }
+
+    [Test]
+    public void Test_MoveAttributeRank_Invalid()
+    {
+        var dataScheme = new DataScheme("Foo");
+        var firstAttribute = new AttributeDefinition("FirstAttribute", DataType.Text);
+        var secondAttribute = new AttributeDefinition("SecondAttribute", DataType.Text);
+        dataScheme.AddAttribute(firstAttribute);
+        dataScheme.AddAttribute(secondAttribute);
+
+        // Try to move to negative index
+        var moveNeg = dataScheme.MoveAttributeRank(firstAttribute, -1);
+        Assert.IsFalse(moveNeg.Passed);
+
+        // Try to move to out-of-bounds index
+        var moveOob = dataScheme.MoveAttributeRank(firstAttribute, 5);
+        Assert.IsFalse(moveOob.Passed);
+
+        // Try to move attribute not in scheme
+        var thirdAttribute = new AttributeDefinition("ThirdAttribute", DataType.Text);
+        var moveMissing = dataScheme.MoveAttributeRank(thirdAttribute, 0);
+        Assert.IsFalse(moveMissing.Passed);
+    }
 }

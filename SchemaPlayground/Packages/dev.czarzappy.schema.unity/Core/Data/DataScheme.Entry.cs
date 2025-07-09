@@ -119,24 +119,7 @@ namespace Schema.Core.Data
 
         public SchemaResult MoveEntry(DataEntry entry, int targetIndex)
         {
-            if (targetIndex < 0 || targetIndex >= entries.Count)
-            {
-                return SchemaResult.Fail($"Target index {targetIndex} is out of range.", this);
-            }
-            
-            var entryIdx = entries.IndexOf(entry);
-            if (entryIdx == -1)
-            {
-                return SchemaResult.Fail("Entry not found", this);
-            }
-            if (entryIdx == targetIndex)
-            {
-                return SchemaResult.Fail("Entry cannot be the same as the target.", this);
-            }
-            entries.RemoveAt(entryIdx);
-            entries.Insert(targetIndex, entry);
-            
-            return SchemaResult.Pass($"Moved {entry} from {entryIdx} to {targetIndex}", this);
+            return Move(entry, targetIndex, entries);
         }
 
         public SchemaResult SwapEntries(int srcIndex, int dstIndex)

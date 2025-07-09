@@ -221,6 +221,11 @@ namespace Schema.Core.Data
         #endregion
         
         #region Attribute Ordering Operations
+
+        public SchemaResult MoveAttributeRank(AttributeDefinition attribute, int moveRank)
+        {
+            return Move(attribute, moveRank, attributes);
+        }
         
         public SchemaResult IncreaseAttributeRank(AttributeDefinition attribute)
         {

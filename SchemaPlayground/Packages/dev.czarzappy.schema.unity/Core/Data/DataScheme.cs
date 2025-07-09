@@ -143,6 +143,28 @@ namespace Schema.Core.Data
             return SchemaResult.Pass("Successfully swapped entry", this);
         }
         
+        public SchemaResult Move<T>(T element, int targetIndex, List<T> data)
+        {
+            if (targetIndex < 0 || targetIndex >= data.Count)
+            {
+                return SchemaResult.Fail($"Target index {targetIndex} is out of range.", this);
+            }
+            
+            var entryIdx = data.IndexOf(element);
+            if (entryIdx == -1)
+            {
+                return SchemaResult.Fail("Element not found", this);
+            }
+            if (entryIdx == targetIndex)
+            {
+                return SchemaResult.Fail("Element cannot be the same as the target.", this);
+            }
+            data.RemoveAt(entryIdx);
+            data.Insert(targetIndex, element);
+            
+            return SchemaResult.Pass($"Moved {element} from {entryIdx} to {targetIndex}", this);
+        }
+        
         #endregion
         
         #region Value Operations
