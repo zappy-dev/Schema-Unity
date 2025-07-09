@@ -36,7 +36,7 @@ namespace Schema.Core
             {
                 if (Logger.Level <= Logger.LogLevel.VERBOSE)
                 {
-                    Logger.LogError(logMsg);
+                    Logger.LogDbgError(logMsg);
                 }
             }
         }
@@ -97,7 +97,7 @@ namespace Schema.Core
             }
             else
             {
-                Logger.LogError(logMsg);
+                Logger.LogDbgError(logMsg);
             }
         }
         

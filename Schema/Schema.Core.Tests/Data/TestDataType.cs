@@ -92,6 +92,16 @@ public class TestDataType
             
             yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.Text, 
                 new ReferenceDataType(VALID_SCHEME_NAME_NO_IDENTIFIER, VALID_REFERENCE_ATTRIBUTE), false, null);
+
+            // Boolean conversions
+            yield return new TestCaseData(true, DataType.Boolean, DataType.Boolean, true, true);
+            yield return new TestCaseData(false, DataType.Boolean, DataType.Boolean, true, false);
+            yield return new TestCaseData("true", DataType.Text, DataType.Boolean, true, true);
+            yield return new TestCaseData("false", DataType.Text, DataType.Boolean, true, false);
+            yield return new TestCaseData("notabool", DataType.Text, DataType.Boolean, false, null);
+            yield return new TestCaseData(1, DataType.Integer, DataType.Boolean, true, true);
+            yield return new TestCaseData(0, DataType.Integer, DataType.Boolean, true, false);
+            yield return new TestCaseData(2, DataType.Integer, DataType.Boolean, true, true);
         }
     }
 
@@ -117,6 +127,18 @@ public class TestDataType
             yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema1", "Attribute1"), true);
             yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema2", "Attribute1"), false);
             yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema1", "Attribute2"), false);
+            yield return new TestCaseData(DataType.Boolean, new BooleanDataType(), true);
+            yield return new TestCaseData(DataType.Boolean, DataType.Text, false);
         }
+    }
+
+    [Test]
+    public void Test_BooleanDataType_CheckIfValidData()
+    {
+        var boolType = new BooleanDataType();
+        Assert.That(boolType.CheckIfValidData(true).Passed, Is.True);
+        Assert.That(boolType.CheckIfValidData(false).Passed, Is.True);
+        Assert.That(boolType.CheckIfValidData("true").Passed, Is.False);
+        Assert.That(boolType.CheckIfValidData(1).Passed, Is.False);
     }
 }

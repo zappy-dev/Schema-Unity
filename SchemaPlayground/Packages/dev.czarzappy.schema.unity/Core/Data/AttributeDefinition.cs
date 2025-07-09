@@ -53,6 +53,7 @@ namespace Schema.Core.Data
         {
             AttributeName = other.AttributeName;
             AttributeToolTip = other.AttributeToolTip;
+            DefaultValue = other.DefaultValue;
             DataType = other.DataType;
             ColumnWidth = other.ColumnWidth;
             IsIdentifier = other.IsIdentifier;

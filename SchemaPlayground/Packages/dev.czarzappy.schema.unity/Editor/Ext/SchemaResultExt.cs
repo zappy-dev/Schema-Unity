@@ -20,5 +20,19 @@ namespace Schema.Unity
                     return UnityEditor.MessageType.None;
             }
         }
+        
+        public static MessageType MessageType<T>(this SchemaResult<T> response)
+        {
+            switch (response.Status)
+            {
+                case RequestStatus.Passed:
+                    return UnityEditor.MessageType.Info;
+                case RequestStatus.Failed:
+                    return UnityEditor.MessageType.Error;
+                default:
+                    Debug.LogErrorFormat("Schema{0}", response.Status);
+                    return UnityEditor.MessageType.None;
+            }
+        }
     }
 }

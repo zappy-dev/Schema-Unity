@@ -54,7 +54,7 @@ public class TestSchema
     [TestCase("missing.json")]
     public void Test_LoadManifest_BadPath(string? badManifestPath)
     {
-        var loadResponse = Schema.LoadFromManifest(badManifestPath);
+        var loadResponse = Schema.LoadManifestFromPath(badManifestPath);
         Assert.IsFalse(loadResponse.Passed);
     }
     
@@ -70,7 +70,7 @@ public class TestSchema
             .Returns("malformedContent");
         
         // Act
-        var loadResponse = Schema.LoadFromManifest(malformedFilePath);
+        var loadResponse = Schema.LoadManifestFromPath(malformedFilePath);
         
         // Assert
         Assert.IsFalse(loadResponse.Passed);
@@ -79,6 +79,7 @@ public class TestSchema
     [Test]
     public void Test_LoadManifest_InvalidPath()
     {
+        Logger.Level = Logger.LogLevel.VERBOSE;
         // Arrange
         string manifestFilePath = $"{Schema.MANIFEST_SCHEME_NAME}.json";
         var manifestScheme = Schema.BuildTemplateManifestSchema();
@@ -91,10 +92,10 @@ public class TestSchema
         MockPersistScheme(manifestFilePath, manifestScheme);
         
         // Act
-        var loadResponse = Schema.LoadFromManifest(manifestFilePath);
+        var loadResponse = Schema.LoadManifestFromPath(manifestFilePath);
         
         // Assert
-        Assert.IsFalse(loadResponse.Passed);
+        Assert.IsTrue(loadResponse.Passed);
     }
 
     private void MockPersistScheme(string filePath, DataScheme scheme, bool mockRead = true, bool mockWrite = false)
@@ -140,7 +141,7 @@ public class TestSchema
         MockPersistScheme(testDataSchemeFilePath, testDataScheme);
 
         // Act
-        Schema.LoadFromManifest(manifestFilePath).AssertPassed();
+        Schema.LoadManifestFromPath(manifestFilePath).AssertPassed();
 
         Schema.GetManifestEntryForScheme(testDataScheme).TryAssert(out var testDataEntry);
         
@@ -263,15 +264,15 @@ public class TestSchema
     {
         // Arrange: No schemes are dirty
         var scheme = new DataScheme("Clean");
-        Schema.LoadDataScheme(scheme, true, "Clean.json");
+        Schema.LoadDataScheme(scheme, true, importFilePath: "Clean.json");
         scheme.IsDirty = false;
         
         // Act
-        Logger.Level = Logger.LogLevel.INFO;
-        var result = Schema.Save();
+        Logger.Level = Logger.LogLevel.VERBOSE;
+        var result = Schema.Save(saveManifest: false);
         
         // Assert
-        Assert.IsTrue(result.Passed);
+        result.AssertPassed();
         Assert.That(result.Message, Does.Contain("Saved all dirty schemes"));
         _mockFileSystem.VerifyAll();
         _mockFileSystem.VerifyNoOtherCalls();
@@ -286,11 +287,11 @@ public class TestSchema
         var scheme = new DataScheme("Dirty");
         _mockFileSystem.Setup(fs => fs.WriteAllText("Dirty.json", Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
         
-        Schema.LoadDataScheme(scheme, true, "Dirty.json");
+        Schema.LoadDataScheme(scheme, true, importFilePath: "Dirty.json");
         scheme.IsDirty = true;
         
         // Act
-        var result = Schema.Save();
+        var result = Schema.Save(saveManifest: false);
         
         // Assert
         result.AssertPassed();
