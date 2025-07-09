@@ -46,7 +46,7 @@ namespace Schema.Core.Data
         /// <summary>
         /// Indicates whether there is a change to this in-memory data that should get persiste.
         /// </summary>
-        private bool isDirty = true;
+        private bool isDirty = false;
 
         [JsonIgnore]
         public bool IsDirty
@@ -54,7 +54,7 @@ namespace Schema.Core.Data
             get => isDirty;
             set
             {
-                Logger.LogDbgVerbose(message: $"IsDirty=>{value}", context: this);
+                Logger.LogVerbose(message: $"IsDirty=>{value}", context: this);
                 isDirty = value;
             }
         }

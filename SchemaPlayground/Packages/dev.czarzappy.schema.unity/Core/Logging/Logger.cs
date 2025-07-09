@@ -85,6 +85,12 @@ namespace Schema.Core
         {
             Log(message, LogLevel.ERROR, context);
         }
+
+        [Conditional("SCHEMA_DEBUG")]
+        public static void LogDbgError(string message, object context = null)
+        {
+            Log(message, LogLevel.ERROR, context);
+        }
     }
 
     public interface ILogger

@@ -36,7 +36,7 @@ namespace Schema.Unity.Editor
         private bool isInitialized;
         private bool showDebugView;
         
-        public SchemaResult LatestManifestLoadResponse { get; set; }
+        public SchemaResult<ManifestLoadStatus> LatestManifestLoadResponse { get; set; }
         private List<SchemaResult> responseHistory = new List<SchemaResult>();
         private DateTime latestResponseTime;
         private SchemaResult LatestResponse
@@ -189,8 +189,10 @@ namespace Schema.Unity.Editor
                 overwriteExisting = EditorUtility.DisplayDialog("Add Schema", $"A Schema named {newSchema.SchemeName} already exists. " +
                                                                               $"Do you want to overwrite this sceham>", "Yes", "No");
             }
-            
-            LatestResponse = LoadDataScheme(newSchema, overwriteExisting, importFilePath: importFilePath);
+
+            newSchema.IsDirty = true;
+            LatestResponse = LoadDataScheme(newSchema, overwriteExisting: overwriteExisting, importFilePath: importFilePath);
+            Core.Schema.Save(true); // Adding a new schema updates the manifest
             switch (LatestResponse.Status)
             {
                 case RequestStatus.Failed:
@@ -207,6 +209,8 @@ namespace Schema.Unity.Editor
 
         private void OnSelectScheme(string schemeName, string context)
         {
+            // Unfocus any selected control fields when selecting a new scheme
+            GUI.FocusControl(null);
             var schemeNames = AllSchemes.ToArray();
             var prevSelectedIndex = Array.IndexOf(schemeNames, schemeName);
             if (prevSelectedIndex == -1)
@@ -226,8 +230,8 @@ namespace Schema.Unity.Editor
             Logger.LogDbgVerbose($"Loading Manifest", context);
             // TODO: Figure out why progress reporting is making the Unity Editor unhappy
             // using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
-            LatestResponse = LoadFromManifest(manifestFilePath);
-            LatestManifestLoadResponse = LatestResponse;
+            LatestManifestLoadResponse = LoadManifestFromPath(manifestFilePath);
+            LatestResponse = CheckIf(LatestManifestLoadResponse.Passed, LatestManifestLoadResponse.Message);
             return LatestResponse;
         }
         
@@ -299,8 +303,12 @@ namespace Schema.Unity.Editor
                 EditorGUILayout.HelpBox("Hello! Would you like to Create an Empty Project or Load an Existing Project Manifest", MessageType.Info);
                 if (GUILayout.Button("Start Empty Project"))
                 {
+                    // TODO: Handle this better? move to Schema Core?
                     LatestResponse = SaveManifest(_defaultManifestLoadPath);
-                    LatestManifestLoadResponse = LatestResponse;
+                    LatestManifestLoadResponse = SchemaResult<ManifestLoadStatus>.CheckIf(LatestResponse.Passed, 
+                        ManifestLoadStatus.FULLY_LOADED, 
+                        LatestResponse.Message,
+                        "Loaded template manifest");
                 }
                 return;
             }
@@ -400,9 +408,39 @@ namespace Schema.Unity.Editor
                 }
             }
 
+            if (LatestManifestLoadResponse.Message != null)
+            {
+                EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestManifestLoadResponse.Result}: {LatestManifestLoadResponse.Message}", LatestManifestLoadResponse.MessageType());
+            }
+            
             if (LatestResponse.Message != null)
             {
                 EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestResponse.Message}", LatestResponse.MessageType());
+            }
+
+            if (GUILayout.Button("Add SCHEMA_DEBUG Scripting Define"))
+            {
+                var buildTargetGroup = UnityEditor.EditorUserBuildSettings.selectedBuildTargetGroup;
+                var defines = UnityEditor.PlayerSettings.GetScriptingDefineSymbolsForGroup(buildTargetGroup);
+                if (!defines.Contains("SCHEMA_DEBUG"))
+                {
+                    if (!string.IsNullOrEmpty(defines))
+                        defines += ";";
+                    defines += "SCHEMA_DEBUG";
+                    UnityEditor.PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, defines);
+                    Debug.Log("Added SCHEMA_DEBUG scripting define.");
+                }
+            }
+            if (GUILayout.Button("Remove SCHEMA_DEBUG Scripting Define"))
+            {
+                var buildTargetGroup = UnityEditor.EditorUserBuildSettings.selectedBuildTargetGroup;
+                var defines = UnityEditor.PlayerSettings.GetScriptingDefineSymbolsForGroup(buildTargetGroup);
+                if (defines.Contains("SCHEMA_DEBUG"))
+                {
+                    var newDefines = string.Join(";", defines.Split(';').Where(d => d != "SCHEMA_DEBUG"));
+                    UnityEditor.PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, newDefines);
+                    Debug.Log("Removed SCHEMA_DEBUG scripting define.");
+                }
             }
         }
 
@@ -414,7 +452,48 @@ namespace Schema.Unity.Editor
             using (new EditorGUILayout.VerticalScope(GUILayout.Width(400)))
             {
                 GUILayout.Label($"Schema Explorer ({AllSchemes.Count()} count):", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
+                
+                // New Schema creation form
+                using (new EditorGUILayout.HorizontalScope(GUILayout.ExpandWidth(false)))
+                {
+                    // Input field to add a new scheme
+                    newSchemeName = EditorGUILayout.TextField( newSchemeName, GUILayout.ExpandWidth(false));
 
+                    using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newSchemeName)))
+                    {
+                        if (AddButton("Create New Schema"))
+                        {
+                            var newSchema = new DataScheme(newSchemeName);
+                            AddSchema(newSchema, importFilePath: GetContentPath($"{newSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}"));
+                            newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name
+                        }
+                    }
+                }
+                
+                EditorGUILayout.Space(10, false);
+                    
+                // render import options
+                if (EditorGUILayout.DropdownButton(new GUIContent("Import"), 
+                        FocusType.Keyboard, GUILayout.ExpandWidth(false)))
+                {
+                    GenericMenu menu = new GenericMenu();
+
+                    foreach (var storageFormat in Storage.AllFormats)
+                    {
+                        menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), false, () =>
+                        {
+                            if (storageFormat.TryImport(out var importedSchema, out var importFilePath))
+                            {
+                                AddSchema(importedSchema, importFilePath: importFilePath);
+                            }
+                        });
+                    }
+                            
+                    menu.ShowAsContext();
+                }
+                    
+                EditorGUILayout.Space(10, false);
+                
                 using (var explorerScrollView = new EditorGUILayout.ScrollViewScope(explorerScrollPosition))
                 {
                     explorerScrollPosition = explorerScrollView.scrollPosition;
@@ -437,46 +516,6 @@ namespace Schema.Unity.Editor
                             var nextSelectedSchema = schemeNames[selectedSchemaIndex];
                             OnSelectScheme(nextSelectedSchema.SchemeName, "Selected Schema in Explorer");
                         }
-                    }
-                
-                    // New Schema creation form
-                    EditorGUILayout.Space(10, false);
-                    using (new EditorGUILayout.HorizontalScope(GUILayout.ExpandWidth(false)))
-                    {
-                        // Input field to add a new scheme
-                        newSchemeName = EditorGUILayout.TextField( newSchemeName, GUILayout.ExpandWidth(false));
-
-                        using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newSchemeName)))
-                        {
-                            if (AddButton("Create New Schema"))
-                            {
-                                var newSchema = new DataScheme(newSchemeName);
-                                AddSchema(newSchema, importFilePath: GetContentPath($"{newSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}"));
-                                newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name
-                            }
-                        }
-                    }
-                    
-                    EditorGUILayout.Space(10, false);
-                    
-                    // render import options
-                    if (EditorGUILayout.DropdownButton(new GUIContent("Import"), 
-                            FocusType.Keyboard, GUILayout.ExpandWidth(false)))
-                    {
-                        GenericMenu menu = new GenericMenu();
-
-                        foreach (var storageFormat in Storage.AllFormats)
-                        {
-                            menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), false, () =>
-                            {
-                                if (storageFormat.TryImport(out var importedSchema, out var importFilePath))
-                                {
-                                    AddSchema(importedSchema, importFilePath: importFilePath);
-                                }
-                            });
-                        }
-                            
-                        menu.ShowAsContext();
                     }
                 }
             }
@@ -524,7 +563,7 @@ namespace Schema.Unity.Editor
                     
                     if (GUILayout.Button($"Save{dirtyPostfix}", GUILayout.ExpandWidth(true)))
                     {
-                        LatestResponse = SaveDataScheme(scheme, saveManifest: false);
+                        LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
                     }
                     
                     // TODO: Open raw schema files
@@ -552,9 +591,11 @@ namespace Schema.Unity.Editor
                         menu.ShowAsContext();
                     }
                 }
-                    
+                
+                
                 tableViewScrollPosition = GUILayout.BeginScrollView(tableViewScrollPosition, alwaysShowHorizontal: true, alwaysShowVertical: true);
                 
+                // TODO: Figure out how to freeze the table header so it doesn't scroll
                 RenderTableHeader(attributeCount, scheme);
                 
                 var sortOrder = GetSortOrderForScheme(scheme);
@@ -622,6 +663,17 @@ namespace Schema.Unity.Editor
                                     {
                                         entryValue = EditorGUILayout.IntField(Convert.ToInt32(entryValue), cellStyle.FieldStyle,
                                             attributeFieldWidth);
+                                    }
+                                    else if (attribute.DataType is BooleanDataType)
+                                    {
+                                        bool boolValue = false;
+                                        if (entryValue is bool b)
+                                            boolValue = b;
+                                        else if (entryValue is string s && bool.TryParse(s, out var parsed))
+                                            boolValue = parsed;
+                                        else if (entryValue is int i)
+                                            boolValue = i != 0;
+                                        entryValue = EditorGUILayout.Toggle(boolValue, attributeFieldWidth);
                                     }
                                     else if (attribute.DataType == DataType.FilePath)
                                     {
@@ -863,7 +915,7 @@ namespace Schema.Unity.Editor
                         });
                         if (LatestResponse.Passed) 
                         {
-                            LatestResponse = SaveDataScheme(scheme, saveManifest: false);
+                            LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
                         }
                         newAttributeName = string.Empty; // clear out attribute name field since it's unlikely someone wants to make another attribute with the same name
                     }
@@ -882,22 +934,22 @@ namespace Schema.Unity.Editor
             rowOptionsMenu.AddItem(new GUIContent("Move To Top"), isDisabled: canMoveUp, () =>
             {
                 scheme.MoveEntry(entry, 0);
-                SaveDataScheme(scheme, saveManifest: false);
+                SaveDataScheme(scheme, alsoSaveManifest: false);
             });
             rowOptionsMenu.AddItem(new GUIContent("Move Up"), isDisabled: canMoveUp, () =>
             {
                 scheme.MoveUpEntry(entry);
-                SaveDataScheme(scheme, saveManifest: false);
+                SaveDataScheme(scheme, alsoSaveManifest: false);
             });
             rowOptionsMenu.AddItem(new GUIContent("Move Down"), isDisabled: canMoveDown, () =>
             {
                 scheme.MoveDownEntry(entry);
-                SaveDataScheme(scheme, saveManifest: false);
+                SaveDataScheme(scheme, alsoSaveManifest: false);
             });
             rowOptionsMenu.AddItem(new GUIContent("Move To Bottom"), isDisabled: canMoveDown, () =>
             {
                 scheme.MoveEntry(entry, entryCount - 1);
-                SaveDataScheme(scheme, saveManifest: false);
+                SaveDataScheme(scheme, alsoSaveManifest: false);
             });
             rowOptionsMenu.AddSeparator("");
             rowOptionsMenu.AddItem(new GUIContent("Delete Entry"), false, () =>
@@ -905,7 +957,7 @@ namespace Schema.Unity.Editor
                 if (EditorUtility.DisplayDialog("Schema", "Are you s you want to delete this entry?", "Yes, delete this entry", "No, cancel"))
                 {
                     LatestResponse = scheme.DeleteEntry(entry);
-                    SaveDataScheme(scheme, saveManifest: false);
+                    SaveDataScheme(scheme, alsoSaveManifest: false);
                 }
             });
             rowOptionsMenu.ShowAsContext();
@@ -920,12 +972,12 @@ namespace Schema.Unity.Editor
             columnOptionsMenu.AddItem(new GUIContent("Move Left"), isDisabled: attributeIdx == 0, () =>
             {
                 scheme.IncreaseAttributeRank(attribute);
-                SaveDataScheme(scheme, saveManifest: false);
+                SaveDataScheme(scheme, alsoSaveManifest: false);
             });
             columnOptionsMenu.AddItem(new GUIContent("Move Right"), isDisabled: attributeIdx == attributeCount - 1, () =>
             {
                 scheme.DecreaseAttributeRank(attribute);
-                SaveDataScheme(scheme, saveManifest: false);
+                SaveDataScheme(scheme, alsoSaveManifest: false);
             });
                             
             // Sorting options
@@ -975,7 +1027,7 @@ namespace Schema.Unity.Editor
                                 newType: builtInType);
                         if (LatestResponse.Passed) 
                         {
-                            LatestResponse = SaveDataScheme(scheme, saveManifest: false);
+                            LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
                         }
                     });
             }
@@ -997,7 +1049,7 @@ namespace Schema.Unity.Editor
                                     newType: referenceDataType);
                             if (LatestResponse.Passed) 
                             {
-                                LatestResponse = SaveDataScheme(scheme, saveManifest: false);
+                                LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
                             }
                         });
                 }
@@ -1012,7 +1064,7 @@ namespace Schema.Unity.Editor
                     LatestResponse = scheme.DeleteAttribute(attribute);
                     if (LatestResponse.Passed)
                     {
-                        LatestResponse = SaveDataScheme(scheme, saveManifest: false);
+                        LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
                     }
                 }
             });
