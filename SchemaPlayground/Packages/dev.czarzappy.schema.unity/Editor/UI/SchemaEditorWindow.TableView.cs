@@ -244,25 +244,12 @@ namespace Schema.Unity.Editor
                                         var gotoButtonWidth = 20;
                                         var refDropdownWidth = attribute.ColumnWidth - gotoButtonWidth;
                                         var currentValue = entryValue == null ? "..." : entryValue.ToString();
-                                        if (DropdownButton(currentValue, refDropdownWidth, cellStyle.DropdownStyle))
-                                        {
-                                            var referenceEntryOptions = new GenericMenu();
-
-                                            if (GetScheme(refDataType.ReferenceSchemeName)
-                                                .Try(out var refSchema))
+                                        ReferenceDropdown.Draw(null, currentValue, refDataType, 
+                                            (newValue) =>
                                             {
-                                                foreach (var identifierValue in refSchema.GetIdentifierValues())
-                                                {
-                                                    referenceEntryOptions.AddItem(new GUIContent(identifierValue.ToString()),
-                                                        on: identifierValue.Equals(currentValue), () =>
-                                                        {
-                                                            scheme.SetDataOnEntry(entry, attributeName, identifierValue);
-                                                        });
-                                                }
-                                            }
-                                            referenceEntryOptions.ShowAsContext();
-                                        }
-                                        
+                                                scheme.SetDataOnEntry(entry, attributeName, newValue);
+                                            },
+                                            refDropdownWidth, cellStyle.DropdownStyle);
                                         if (GUILayout.Button("O", GUILayout.Width(gotoButtonWidth)))
                                         {
                                             FocusOnEntry(refDataType.ReferenceSchemeName, refDataType.ReferenceAttributeName, currentValue);
@@ -462,7 +449,10 @@ namespace Schema.Unity.Editor
                 // Filter row
                 using (new GUILayout.HorizontalScope())
                 {
-                    GUILayout.Space(SETTINGS_WIDTH); // for the row number column
+                    EditorGUILayout.LabelField("", RightAlignedLabelStyle, 
+                        GUILayout.Width(SETTINGS_WIDTH),
+                        GUILayout.ExpandWidth(false));
+                    // GUILayout.Space(SETTINGS_WIDTH); // for the row number column
                     for (var attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                     {
                         var attribute = scheme.GetAttribute(attributeIdx);

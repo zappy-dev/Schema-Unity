@@ -22,6 +22,13 @@ namespace Schema.Core.Data
         {
             ReferenceSchemeName = schemeName;
             ReferenceAttributeName = identifierAttribute;
+            
+            // Set an initial default value
+            if (Schema.GetScheme(ReferenceSchemeName).Try(out var refScheme))
+            {
+                var values = refScheme.GetIdentifierValues().Select(v => v?.ToString() ?? "").ToList();
+                DefaultValue = values.Count > 0 ? values[0] : "";
+            }
         }
 
         public override string TypeName => $"{TypeNamePrefix}/{ReferenceSchemeName} - {ReferenceAttributeName}";

@@ -2,6 +2,7 @@ using System.Linq;
 using Schema.Core.Data;
 using UnityEditor;
 using UnityEngine;
+using static Schema.Core.Schema;
 
 namespace Schema.Unity.Editor
 {
@@ -16,7 +17,7 @@ namespace Schema.Unity.Editor
             // Show a new instance of the prompt window
             var prompt = GetWindow<AttributeSettingsPrompt>(utility: true, $"Column Settings - {attribute.AttributeName}");
             prompt.Initialize(scheme, attribute);
-            prompt.ShowModalUtility();
+            prompt.ShowUtility(); // Use over ModelUtility to prevent UI issues with GenericMenu popup
         }
 
         private void Initialize(DataScheme scheme, AttributeDefinition attribute)
@@ -34,7 +35,18 @@ namespace Schema.Unity.Editor
             EditorGUILayout.LabelField("Attribute Tooltip");
             editAttribute.AttributeToolTip = EditorGUILayout.TextArea(editAttribute.AttributeToolTip);
 
-            editAttribute.DefaultValue = EditorGUILayout.TextField("Default Value", editAttribute.DefaultValue.ToString());
+            // Support Reference DataType default value selection
+            if (editAttribute.DataType is ReferenceDataType refType)
+            {
+                ReferenceDropdown.Draw("Default Value", editAttribute.DefaultValue, refType, newValue =>
+                {
+                    editAttribute.DefaultValue = newValue;
+                });
+            }
+            else
+            {
+                editAttribute.DefaultValue = EditorGUILayout.TextField("Default Value", editAttribute.DefaultValue?.ToString() ?? "");
+            }
 
             var identifierLabel = new GUIContent("Is Identifier?",
                 "Only one attribute is allowed to be an identifier per Schema. Identifier Attributes must also be unique.");
@@ -88,7 +100,7 @@ namespace Schema.Unity.Editor
             attribute.Copy(editAttribute);
 
             // Updating an attribute name can impact referencing schemes, save all dirty
-            Core.Schema.Save();
+            Save();
             
             Close();
         }
