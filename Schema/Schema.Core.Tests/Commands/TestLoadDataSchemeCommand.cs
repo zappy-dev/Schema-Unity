@@ -108,7 +108,7 @@ namespace Schema.Core.Tests.Commands
 
             // Assert
             Assert.IsTrue(undoResult.IsFailure);
-            Assert.That(undoResult.Message, Does.Contain("not executed"));
+            Assert.That(undoResult.Message, Does.Contain("Command 'Load data scheme 'TestScheme'' cannot be undone"));
         }
     }
 } 

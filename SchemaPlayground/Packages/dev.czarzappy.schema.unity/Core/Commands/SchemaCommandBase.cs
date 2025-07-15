@@ -28,10 +28,12 @@ namespace Schema.Core.Commands
             return result.ToCommandResult();
         }
 
+        private bool wasExecuted = false;
+        
         /// <summary>
         /// Indicates whether this command can be undone
         /// </summary>
-        public virtual bool CanUndo => true;
+        public virtual bool CanUndo => wasExecuted; // cannot undo something that wasn't executed
         
         /// <summary>
         /// Timestamp when the command was created
@@ -55,12 +57,14 @@ namespace Schema.Core.Commands
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 var result = await ExecuteInternalAsync(cancellationToken);
-                
+                wasExecuted = true;
+
                 stopwatch.Stop();
-                Logger.LogDbgVerbose($"Command executed successfully: {Description} ({stopwatch.ElapsedMilliseconds}ms)", this);
-                
+                Logger.LogDbgVerbose(
+                    $"Command executed successfully: {Description} ({stopwatch.ElapsedMilliseconds}ms)", this);
+
                 return result;
             }
             catch (OperationCanceledException)
@@ -72,8 +76,10 @@ namespace Schema.Core.Commands
             catch (Exception ex)
             {
                 stopwatch.Stop();
-                Logger.LogDbgError($"Command failed: {Description} - {ex.Message} ({stopwatch.ElapsedMilliseconds}ms)", this);
-                return CommandResult<TResult>.Failure($"Command '{Description}' failed: {ex.Message}", ex, stopwatch.Elapsed);
+                Logger.LogDbgError($"Command failed: {Description} - {ex.Message} ({stopwatch.ElapsedMilliseconds}ms)",
+                    this);
+                return CommandResult<TResult>.Failure($"Command '{Description}' failed: {ex.Message}", ex,
+                    stopwatch.Elapsed);
             }
         }
         
@@ -95,6 +101,7 @@ namespace Schema.Core.Commands
                 cancellationToken.ThrowIfCancellationRequested();
                 
                 var result = await UndoInternalAsync(cancellationToken);
+                wasExecuted = false;
                 
                 stopwatch.Stop();
                 Logger.LogDbgVerbose($"Command undone successfully: {Description} ({stopwatch.ElapsedMilliseconds}ms)", this);

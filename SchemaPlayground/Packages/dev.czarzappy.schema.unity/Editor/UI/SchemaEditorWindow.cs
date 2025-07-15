@@ -208,29 +208,57 @@ namespace Schema.Unity.Editor
         
         #region UI Command Handling
 
-        private void AddSchema(DataScheme newSchema, string importFilePath = null)
+        // Async version of adding a schema using command system
+        private async Task AddSchemaAsync(DataScheme newSchema, string importFilePath = null)
         {
+            if (_operationInProgress) return;
+
+            // Confirm overwrite if needed
             bool overwriteExisting = false;
             if (DoesSchemeExist(newSchema.SchemeName))
             {
-                overwriteExisting = EditorUtility.DisplayDialog("Add Schema", $"A Schema named {newSchema.SchemeName} already exists. " +
-                                                                              $"Do you want to overwrite this sceham>", "Yes", "No");
+                overwriteExisting = EditorUtility.DisplayDialog(
+                    "Add Schema",
+                    $"A Schema named {newSchema.SchemeName} already exists. Do you want to overwrite this scheme?",
+                    "Yes",
+                    "No");
+                if (!overwriteExisting) return; // user cancelled
             }
 
-            newSchema.IsDirty = true;
-            LatestResponse = LoadDataScheme(newSchema, overwriteExisting: overwriteExisting, importFilePath: importFilePath);
-            Core.Schema.Save(true); // Adding a new schema updates the manifest
-            switch (LatestResponse.Status)
+            _operationInProgress = true;
+            _currentOperationDescription = $"Adding schema '{newSchema.SchemeName}'";
+
+            try
             {
-                case RequestStatus.Failed:
-                    Debug.LogError(LatestResponse.Message);
-                    break;
-                case RequestStatus.Passed:
-                    Debug.Log($"New scheme '{newSchema.SchemeName}' created.");
-                    OnSelectScheme(newSchema.SchemeName, "Added scheme");
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
+                var progress = new Progress<CommandProgress>(UpdateProgress);
+                var command = new LoadDataSchemeCommand(
+                    newSchema,
+                    overwriteExisting: overwriteExisting,
+                    progress: progress);
+
+                var result = await _commandHistory.ExecuteAsync(command, _cancellationTokenSource.Token);
+
+                if (result.IsSuccess)
+                {
+                    OnSelectScheme(newSchema.SchemeName, "Added schema");
+                    // Persist changes
+                    Core.Schema.Save(true);
+                }
+                else
+                {
+                    Debug.LogError(result.Message);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.Log("Add schema operation cancelled");
+            }
+            finally
+            {
+                _operationInProgress = false;
+                _currentProgress = 0f;
+                _currentProgressMessage = string.Empty;
+                Repaint();
             }
         }
 
@@ -495,7 +523,7 @@ namespace Schema.Unity.Editor
                         if (AddButton("Create New Schema"))
                         {
                             var newSchema = new DataScheme(newSchemeName);
-                            AddSchema(newSchema, importFilePath: GetContentPath($"{newSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}"));
+                            AddSchemaAsync(newSchema, importFilePath: GetContentPath($"{newSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}"));
                             newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name
                         }
                     }
@@ -515,7 +543,7 @@ namespace Schema.Unity.Editor
                         {
                             if (storageFormat.TryImport(out var importedSchema, out var importFilePath))
                             {
-                                AddSchema(importedSchema, importFilePath: importFilePath);
+                                AddSchemaAsync(importedSchema, importFilePath: importFilePath);
                             }
                         });
                     }
@@ -684,7 +712,7 @@ namespace Schema.Unity.Editor
 
                                 if (didSetLoad)
                                 {
-                                    scheme.SetDataOnEntry(entry, attributeName, entryValue);
+                                    _ = ExecuteSetDataOnEntryAsync(scheme, entry, attributeName, entryValue);
                                 }
 
                                 var attributeFieldWidth = GUILayout.Width(attribute.ColumnWidth);
@@ -742,7 +770,7 @@ namespace Schema.Unity.Editor
                                                     referenceEntryOptions.AddItem(new GUIContent(identifierValue.ToString()),
                                                         on: identifierValue.Equals(currentValue), () =>
                                                         {
-                                                            scheme.SetDataOnEntry(entry, attributeName, identifierValue);
+                                                            _ = ExecuteSetDataOnEntryAsync(scheme, entry, attributeName, identifierValue);
                                                         });
                                                 }
                                             }
@@ -794,7 +822,7 @@ namespace Schema.Unity.Editor
                                             }
                                             else
                                             {
-                                                scheme.SetDataOnEntry(entry, attributeName, entryValue);
+                                                _ = ExecuteSetDataOnEntryAsync(scheme, entry, attributeName, entryValue);
                                             }
                                             
                                             // This operation can dirty multiple data schemes, save any affected
@@ -1237,6 +1265,37 @@ namespace Schema.Unity.Editor
             _cancellationTokenSource?.Dispose();
             _cancellationTokenSource = new CancellationTokenSource();
             _operationInProgress = false;
+        }
+
+        // NEW: executes SetDataOnEntryCommand through command history
+        private async Task ExecuteSetDataOnEntryAsync(DataScheme scheme, DataEntry entry, string attributeName, object value)
+        {
+            if (_operationInProgress) return;
+            _operationInProgress = true;
+            _currentOperationDescription = $"Updating '{scheme.SchemeName}.{attributeName}'";
+            try
+            {
+                var progress = new Progress<CommandProgress>(UpdateProgress);
+                var cmd = new SetDataOnEntryCommand(scheme, entry, attributeName, value);
+                var result = await _commandHistory.ExecuteAsync(cmd, _cancellationTokenSource.Token);
+                if (!result.IsSuccess)
+                {
+                    Debug.LogError(result.Message);
+                }
+                else
+                {
+                    // Persist change
+                    Schema.Core.Schema.Save();
+                }
+            }
+            catch (OperationCanceledException) { }
+            finally
+            {
+                _operationInProgress = false;
+                _currentProgress = 0f;
+                _currentProgressMessage = string.Empty;
+                Repaint();
+            }
         }
     }
 }
