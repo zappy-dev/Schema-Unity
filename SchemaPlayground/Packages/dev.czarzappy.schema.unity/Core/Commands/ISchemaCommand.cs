@@ -7,7 +7,7 @@ namespace Schema.Core.Commands
     /// <summary>
     /// Base interface for all schema operations that can be executed and undone
     /// </summary>
-    public interface ISchemaCommand<TResult>
+    public interface ISchemaCommand<TResult> : ISchemaCommand
     {
         /// <summary>
         /// Executes the command asynchronously
@@ -15,13 +15,21 @@ namespace Schema.Core.Commands
         /// <param name="cancellationToken">Token to cancel the operation</param>
         /// <returns>Command result with operation outcome</returns>
         Task<CommandResult<TResult>> ExecuteAsync(CancellationToken cancellationToken = default);
-        
+    }
+    
+    /// <summary>
+    /// Non-generic base interface for command operations
+    /// </summary>
+    public interface ISchemaCommand
+    {
         /// <summary>
         /// Undoes the command asynchronously
         /// </summary>
         /// <param name="cancellationToken">Token to cancel the undo operation</param>
         /// <returns>Command result indicating undo success</returns>
         Task<CommandResult> UndoAsync(CancellationToken cancellationToken = default);
+        
+        Task<CommandResult> RedoAsync(CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Indicates whether this command can be undone
@@ -42,12 +50,5 @@ namespace Schema.Core.Commands
         /// Timestamp when the command was created
         /// </summary>
         DateTime CreatedAt { get; }
-    }
-    
-    /// <summary>
-    /// Non-generic base interface for command operations
-    /// </summary>
-    public interface ISchemaCommand : ISchemaCommand<object>
-    {
     }
 }

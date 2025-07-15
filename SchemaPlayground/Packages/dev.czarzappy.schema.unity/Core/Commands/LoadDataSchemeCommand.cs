@@ -1,8 +1,10 @@
+#define SCHEMA_DEBUG
 using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Schema.Core.Data;
+using Schema.Core.Logging;
 using Schema.Core.Storage;
 
 namespace Schema.Core.Commands
@@ -134,6 +136,7 @@ namespace Schema.Core.Commands
                     
                     // Update manifest to remove the entry
                     await RemoveFromManifestAsync(_scheme.SchemeName, cancellationToken);
+                    await UnloadSchemeFromSystemAsync(_scheme.SchemeName, cancellationToken);
                 }
                 
                 return CommandResult.Success($"Successfully undone load of scheme '{_scheme.SchemeName}'");
@@ -144,7 +147,7 @@ namespace Schema.Core.Commands
                 return CommandResult.Failure($"Failed to undo load: {ex.Message}", ex);
             }
         }
-        
+
         private async Task<CommandResult<DataScheme>> ProcessSchemeDataAsync(DataScheme scheme, CancellationToken cancellationToken)
         {
             ThrowIfCancellationRequested(cancellationToken);
@@ -224,6 +227,21 @@ namespace Schema.Core.Commands
             }, cancellationToken);
             
             return CommandResult<DataScheme>.Success(scheme);
+        }
+
+        private async Task UnloadSchemeFromSystemAsync(string schemeName, CancellationToken cancellationToken)
+        {
+            ThrowIfCancellationRequested(cancellationToken);
+            
+            // This is a temporary implementation - will be replaced when Schema interface is updated
+            await Task.Run(() =>
+            {
+                var result = Schema.UnloadScheme(schemeName);
+                if (result.Failed)
+                {
+                    throw new InvalidOperationException($"Failed to load scheme: {result.Message}");
+                }
+            }, cancellationToken);
         }
         
         private async Task UpdateManifestAsync(DataScheme scheme, string importFilePath, CancellationToken cancellationToken)

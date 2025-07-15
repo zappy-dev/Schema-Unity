@@ -2,6 +2,7 @@ using System.Collections;
 using Moq;
 using Schema.Core.Data;
 using Schema.Core.IO;
+using Schema.Core.Logging;
 using Schema.Core.Tests.Ext;
 
 namespace Schema.Core.Tests;

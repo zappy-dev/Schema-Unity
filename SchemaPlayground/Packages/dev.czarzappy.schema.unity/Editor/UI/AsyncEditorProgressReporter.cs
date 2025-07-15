@@ -2,6 +2,7 @@ using System;
 using Schema.Core.Commands;
 using UnityEditor;
 using UnityEngine;
+using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Unity.Editor
 {
@@ -21,7 +22,7 @@ namespace Schema.Unity.Editor
             _title = title ?? "Schema Operation";
             _info = info ?? "Processing...";
             
-            Core.Logger.LogDbgVerbose($"AsyncEditorProgressReporter created: {_title} - {_info}");
+            Logger.LogDbgVerbose($"AsyncEditorProgressReporter created: {_title} - {_info}");
         }
         
         public void Report(CommandProgress progress)
@@ -34,7 +35,7 @@ namespace Schema.Unity.Editor
             var displayMessage = $"{_info} - {progress.Message}";
             var progressValue = Mathf.Clamp01(progress.Value);
             
-            Core.Logger.LogDbgVerbose($"AsyncEditorProgressReporter reporting: {displayMessage} ({progressValue:P0})");
+            Logger.LogDbgVerbose($"AsyncEditorProgressReporter reporting: {displayMessage} ({progressValue:P0})");
             
             // Update Unity's progress bar
             EditorUtility.DisplayProgressBar(_title, displayMessage, progressValue);
@@ -57,7 +58,7 @@ namespace Schema.Unity.Editor
             _isDisposed = true;
             EditorUtility.ClearProgressBar();
             
-            Core.Logger.LogDbgVerbose($"AsyncEditorProgressReporter disposed: {_title}");
+            Logger.LogDbgVerbose($"AsyncEditorProgressReporter disposed: {_title}");
         }
     }
     

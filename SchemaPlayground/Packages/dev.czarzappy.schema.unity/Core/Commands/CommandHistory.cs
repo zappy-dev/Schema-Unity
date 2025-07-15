@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Schema.Core.Logging;
 
 namespace Schema.Core.Commands
 {
@@ -23,7 +24,15 @@ namespace Schema.Core.Commands
         /// </summary>
         public int MaxHistorySize { get; set; } = 100;
         
-        public bool CanUndo => _undoStack.Count > 0;
+        public bool CanUndo
+        {
+            get
+            {
+                Logger.LogVerbose($"CanUndo: {_undoStack.Count > 0} (count: {_undoStack.Count})");
+                return _undoStack.Count > 0;
+            }
+        }
+
         public bool CanRedo => _redoStack.Count > 0;
         
         public IReadOnlyList<ISchemaCommand> History => _allCommands.AsReadOnly();
@@ -121,7 +130,7 @@ namespace Schema.Core.Commands
                 }
                 
                 var command = _undoStack.Pop();
-                Logger.LogDbgVerbose($"Undoing command: {command.Description}", this);
+                Logger.LogVerbose($"Undoing command: {command.Description}", this);
                 
                 var stopwatch = Stopwatch.StartNew();
                 var result = await command.UndoAsync(cancellationToken);
@@ -162,14 +171,14 @@ namespace Schema.Core.Commands
                 Logger.LogDbgVerbose($"Redoing command: {command.Description}", this);
                 
                 var stopwatch = Stopwatch.StartNew();
-                var result = await command.ExecuteAsync(cancellationToken);
+                var result = await command.RedoAsync(cancellationToken);
                 stopwatch.Stop();
                 
                 if (result.IsSuccess)
                 {
                     _undoStack.Push(command);
                     Logger.LogDbgVerbose($"Command redone successfully: {command.Description} ({stopwatch.ElapsedMilliseconds}ms)", this);
-                    CommandRedone?.Invoke(this, new CommandRedoneEventArgs(command, result.ToCommandResult(), stopwatch.Elapsed));
+                    CommandRedone?.Invoke(this, new CommandRedoneEventArgs(command, result, stopwatch.Elapsed));
                 }
                 else
                 {
@@ -178,7 +187,7 @@ namespace Schema.Core.Commands
                     Logger.LogDbgError($"Redo failed: {command.Description} - {result.Message}", this);
                 }
                 
-                return result.ToCommandResult();
+                return result;
             }
             finally
             {

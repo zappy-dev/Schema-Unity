@@ -18,6 +18,7 @@ namespace Schema.Core
             public const string DataConversion = "Conversion";
             public const string Manifest = "Manifest";
             public const string Schema = "Schema";
+            public const string System = "System";
         }
 
         public static string ManifestLoadPath
@@ -33,7 +34,7 @@ namespace Schema.Core
             }
         }
 
-        private static readonly Dictionary<string, DataScheme> dataSchemes = new Dictionary<string, DataScheme>();
+        private static readonly Dictionary<string, DataScheme> LoadedSchemes = new Dictionary<string, DataScheme>();
         
         /// <summary>
         /// Returns all the available valid scheme names.
@@ -94,7 +95,7 @@ namespace Schema.Core
         public static void Reset()
         {
             IsInitialized = false;
-            dataSchemes.Clear();
+            LoadedSchemes.Clear();
 
             var initResult = InitializeTemplateManifestScheme();
             IsInitialized = initResult.Passed;
@@ -107,7 +108,7 @@ namespace Schema.Core
 
         public static bool DoesSchemeExist(string schemeName)
         {
-            return dataSchemes.ContainsKey(schemeName);
+            return LoadedSchemes.ContainsKey(schemeName);
         }
 
         // TODO support async
@@ -118,7 +119,7 @@ namespace Schema.Core
                 return SchemaResult<DataScheme>.Fail("Scheme not initialized!", Context.Schema);
             }
             
-            var success = dataSchemes.TryGetValue(schemeName, out var scheme);
+            var success = LoadedSchemes.TryGetValue(schemeName, out var scheme);
             return SchemaResult<DataScheme>.CheckIf(success, scheme, 
                 errorMessage: $"Scheme '{schemeName}' is not loaded.",
                 successMessage: $"Scheme '{schemeName}' is loaded.");
@@ -132,7 +133,7 @@ namespace Schema.Core
                 return false;
             }
             
-            ownerScheme = dataSchemes.Values.FirstOrDefault(scheme =>
+            ownerScheme = LoadedSchemes.Values.FirstOrDefault(scheme =>
             {
                 return scheme.GetAttribute(attr => attr.Equals(searchAttr)).Try(out _);
             });

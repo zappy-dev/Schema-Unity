@@ -8,11 +8,14 @@ using Schema.Core.Serialization;
 using Unity.Profiling;
 using UnityEditor;
 using UnityEngine;
+using static Schema.Core.Logging.Logger;
 using static Schema.Core.Schema;
 using static Schema.Core.SchemaResult;
 using static Schema.Unity.Editor.SchemaLayout;
-using Logger = Schema.Core.Logger;
 using Random = System.Random;
+using Schema.Core.Commands;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Schema.Unity.Editor
 {
@@ -74,6 +77,19 @@ namespace Schema.Unity.Editor
         private readonly Dictionary<string, AttributeSortOrder> primarySchemeSort = 
             new Dictionary<string, AttributeSortOrder>();
         
+        // NEW FIELDS FOR ASYNC COMMAND SYSTEM
+        private readonly ICommandHistory _commandHistory = new CommandHistory();
+        private CancellationTokenSource _cancellationTokenSource;
+
+        // Progress tracking
+        private bool _operationInProgress;
+        private string _currentOperationDescription;
+        private float _currentProgress;
+        private string _currentProgressMessage;
+
+        // Undo/Redo UI toggle
+        private bool _showUndoRedoPanel = true;
+        
         #endregion
 
         #region Unity Lifecycle Methods
@@ -86,15 +102,20 @@ namespace Schema.Unity.Editor
 
         private void OnEnable()
         {
-            Logger.LogDbgVerbose("Scheme Editor enabled", this);
+            LogDbgVerbose("Scheme Editor enabled", this);
             isInitialized = false;
             EditorApplication.update += InitializeSafely;
+            _cancellationTokenSource = new CancellationTokenSource();
+            // Subscribe to command history events for repainting
+            _commandHistory.CommandExecuted += (_, __) => Repaint();
+            _commandHistory.CommandUndone += (_, __) => Repaint();
+            _commandHistory.CommandRedone += (_, __) => Repaint();
         }
 
         private void InitializeSafely()
         {
             if (isInitialized) return;
-            Logger.LogDbgVerbose("InitializeSafely", this);
+            LogDbgVerbose("InitializeSafely", this);
             
             // return;
             selectedSchemaIndex = -1;
@@ -119,7 +140,7 @@ namespace Schema.Unity.Editor
             // return;
             if (!string.IsNullOrEmpty(storedSelectedSchema))
             {
-                Logger.LogDbgVerbose($"Selected schema found: {storedSelectedSchema}", this);
+                LogDbgVerbose($"Selected schema found: {storedSelectedSchema}", this);
                 OnSelectScheme(storedSelectedSchema, "Restoring from Editor Preferences");
             }
 
@@ -175,6 +196,12 @@ namespace Schema.Unity.Editor
             // Clean up event handlers to prevent memory leaks
             EditorApplication.delayCall -= InitializeSafely;
             manifestWatcher?.Dispose();
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
+            _commandHistory.CommandExecuted -= (_, __) => Repaint();
+            _commandHistory.CommandUndone -= (_, __) => Repaint();
+            _commandHistory.CommandRedone -= (_, __) => Repaint();
         }
 
         #endregion
@@ -218,7 +245,7 @@ namespace Schema.Unity.Editor
                 return;
             }
             
-            Logger.Log($"Opening Schema '{schemeName}' for editing, {context}...");
+            Log($"Opening Schema '{schemeName}' for editing, {context}...");
             selectedSchemeName = schemeName;
             selectedSchemaIndex = prevSelectedIndex;
             EditorPrefs.SetString(EDITORPREFS_KEY_SELECTEDSCHEME, schemeName);
@@ -227,7 +254,7 @@ namespace Schema.Unity.Editor
 
         private SchemaResult OnLoadManifest(string context)
         {
-            Logger.LogDbgVerbose($"Loading Manifest", context);
+            LogDbgVerbose($"Loading Manifest", context);
             // TODO: Figure out why progress reporting is making the Unity Editor unhappy
             // using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
             LatestManifestLoadResponse = LoadManifestFromPath(manifestFilePath);
@@ -237,7 +264,7 @@ namespace Schema.Unity.Editor
         
         private void SetColumnSort(DataScheme scheme, AttributeDefinition attribute, SortOrder sortOrder)
         {
-            Logger.Log($"Set column sort '{sortOrder}' for schema '{scheme.SchemeName}'.", this);
+            Log($"Set column sort '{sortOrder}' for schema '{scheme.SchemeName}'.", this);
             primarySchemeSort[scheme.SchemeName] = new AttributeSortOrder(attribute.AttributeName, sortOrder);
         }
 
@@ -297,6 +324,10 @@ namespace Schema.Unity.Editor
             debugIdx = 0;
             GUILayout.Label("Scheme Editor", EditorStyles.largeLabel, 
                 GUILayout.ExpandWidth(true));
+
+            // NEW: Undo/Redo controls and progress display
+            DrawUndoRedoPanel();
+            DrawProgressBar();
 
             if (!LatestManifestLoadResponse.Passed)
             {
@@ -402,7 +433,7 @@ namespace Schema.Unity.Editor
 
                     if (numDeleted > 0)
                     {
-                        Logger.LogWarning($"Scheme '{schemeName}' has deleted {numDeleted} entries.");
+                        LogWarning($"Scheme '{schemeName}' has deleted {numDeleted} entries.");
                         SaveDataScheme(scheme, false);
                     }
                 }
@@ -628,7 +659,7 @@ namespace Schema.Unity.Editor
                                 bool didSetLoad = false;
                                 if (!entry.GetData(attribute).Try(out entryValue))
                                 {
-                                    Logger.LogDbgWarning($"Setting {attribute} data for {entry}");
+                                    LogDbgWarning($"Setting {attribute} data for {entry}");
                                     // for some reason this data wasn't set yet
                                     entryValue = attribute.CloneDefaultValue();
                                     didSetLoad = true;
@@ -1105,5 +1136,107 @@ namespace Schema.Unity.Editor
             GUILayout.Button(new GUIContent(text, EditorGUIUtility.IconContent(iconName).image), options);
         
         #endregion
+
+        // NEW: Undo/Redo Panel
+        private void DrawUndoRedoPanel()
+        {
+            _showUndoRedoPanel = EditorGUILayout.Foldout(_showUndoRedoPanel, "Undo/Redo Controls");
+            if (!_showUndoRedoPanel) return;
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUI.BeginDisabledGroup(!_commandHistory.CanUndo || _operationInProgress);
+            if (GUILayout.Button($"Undo ({_commandHistory.UndoHistory.Count})", GUILayout.Width(100)))
+            {
+                _ = ExecuteUndoAsync();
+            }
+            EditorGUI.EndDisabledGroup();
+
+            EditorGUI.BeginDisabledGroup(!_commandHistory.CanRedo || _operationInProgress);
+            if (GUILayout.Button($"Redo ({_commandHistory.RedoHistory.Count})", GUILayout.Width(100)))
+            {
+                _ = ExecuteRedoAsync();
+            }
+            EditorGUI.EndDisabledGroup();
+
+            EditorGUI.BeginDisabledGroup(_commandHistory.Count == 0 || _operationInProgress);
+            if (GUILayout.Button("Clear History", GUILayout.Width(100)))
+            {
+                _commandHistory.ClearHistory();
+            }
+            EditorGUI.EndDisabledGroup();
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.Space();
+        }
+
+        // NEW: Progress Bar rendering
+        private void DrawProgressBar()
+        {
+            if (!_operationInProgress) return;
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(_currentOperationDescription ?? "Working...", GUILayout.Width(200));
+            var rect = EditorGUILayout.GetControlRect();
+            EditorGUI.ProgressBar(rect, _currentProgress, _currentProgressMessage ?? string.Empty);
+            if (GUILayout.Button("Cancel", GUILayout.Width(60)))
+            {
+                CancelCurrentOperation();
+            }
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.Space();
+        }
+
+        // NEW: Async helper methods for undo/redo
+        private async Task ExecuteUndoAsync()
+        {
+            if (_operationInProgress) return;
+            _operationInProgress = true;
+            _currentOperationDescription = "Undoing last command";
+            try
+            {
+                await _commandHistory.UndoAsync(_cancellationTokenSource.Token);
+                // Persist sync save for now
+                Schema.Core.Schema.Save();
+            }
+            catch (OperationCanceledException) { }
+            finally
+            {
+                _operationInProgress = false;
+                Repaint();
+            }
+        }
+
+        private async Task ExecuteRedoAsync()
+        {
+            if (_operationInProgress) return;
+            _operationInProgress = true;
+            _currentOperationDescription = "Redoing last undone command";
+            try
+            {
+                await _commandHistory.RedoAsync(_cancellationTokenSource.Token);
+                Schema.Core.Schema.Save();
+            }
+            catch (OperationCanceledException) { }
+            finally
+            {
+                _operationInProgress = false;
+                Repaint();
+            }
+        }
+
+        // NEW: Progress update callback (placeholder for future commands)
+        private void UpdateProgress(CommandProgress progress)
+        {
+            _currentProgress = progress.Value;
+            _currentProgressMessage = progress.Message;
+            EditorApplication.delayCall += Repaint;
+        }
+
+        private void CancelCurrentOperation()
+        {
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = new CancellationTokenSource();
+            _operationInProgress = false;
+        }
     }
 }

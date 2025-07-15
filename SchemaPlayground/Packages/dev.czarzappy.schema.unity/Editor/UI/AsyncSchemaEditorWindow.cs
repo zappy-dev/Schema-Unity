@@ -11,6 +11,7 @@ using Schema.Core.Storage;
 using UnityEditor;
 using UnityEngine;
 using static Schema.Core.Schema;
+using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Unity.Editor
 {
@@ -55,7 +56,7 @@ namespace Schema.Unity.Editor
         
         private void OnEnable()
         {
-            Core.Logger.LogDbgVerbose("Async Schema Editor enabled", this);
+            Logger.LogDbgVerbose("Async Schema Editor enabled", this);
             _cancellationTokenSource = new CancellationTokenSource();
             
             // Subscribe to command history events
@@ -93,7 +94,7 @@ namespace Schema.Unity.Editor
             }
             catch (Exception ex)
             {
-                Core.Logger.LogDbgError($"Failed to initialize async schema editor: {ex.Message}", this);
+                Logger.LogDbgError($"Failed to initialize async schema editor: {ex.Message}", this);
             }
         }
         
@@ -112,7 +113,7 @@ namespace Schema.Unity.Editor
                 var manifestResult = LoadManifestFromPath(manifestFilePath);
                 if (manifestResult.Passed)
                 {
-                    Core.Logger.LogDbgVerbose("Manifest loaded successfully", this);
+                    Logger.LogDbgVerbose("Manifest loaded successfully", this);
                 }
             }
         }
@@ -124,21 +125,21 @@ namespace Schema.Unity.Editor
         private void OnCommandExecuted(object sender, CommandExecutedEventArgs e)
         {
             responseHistory.Add(e.Result);
-            Core.Logger.LogDbgVerbose($"Command executed: {e.Command.Description} ({e.Duration.TotalMilliseconds}ms)", this);
+            Logger.LogDbgVerbose($"Command executed: {e.Command.Description} ({e.Duration.TotalMilliseconds}ms)", this);
             Repaint();
         }
         
         private void OnCommandUndone(object sender, CommandUndoneEventArgs e)
         {
             responseHistory.Add(e.Result);
-            Core.Logger.LogDbgVerbose($"Command undone: {e.Command.Description} ({e.Duration.TotalMilliseconds}ms)", this);
+            Logger.LogDbgVerbose($"Command undone: {e.Command.Description} ({e.Duration.TotalMilliseconds}ms)", this);
             Repaint();
         }
         
         private void OnCommandRedone(object sender, CommandRedoneEventArgs e)
         {
             responseHistory.Add(e.Result);
-            Core.Logger.LogDbgVerbose($"Command redone: {e.Command.Description} ({e.Duration.TotalMilliseconds}ms)", this);
+            Logger.LogDbgVerbose($"Command redone: {e.Command.Description} ({e.Duration.TotalMilliseconds}ms)", this);
             Repaint();
         }
         
@@ -329,11 +330,11 @@ namespace Schema.Unity.Editor
             }
             catch (OperationCanceledException)
             {
-                Core.Logger.LogDbgVerbose("Create scheme operation was cancelled", this);
+                Logger.LogDbgVerbose("Create scheme operation was cancelled", this);
             }
             catch (Exception ex)
             {
-                Core.Logger.LogDbgError($"Failed to create scheme: {ex.Message}", this);
+                Logger.LogDbgError($"Failed to create scheme: {ex.Message}", this);
             }
             finally
             {
@@ -360,11 +361,11 @@ namespace Schema.Unity.Editor
             }
             catch (OperationCanceledException)
             {
-                Core.Logger.LogDbgVerbose("Undo operation was cancelled", this);
+                Logger.LogDbgVerbose("Undo operation was cancelled", this);
             }
             catch (Exception ex)
             {
-                Core.Logger.LogDbgError($"Failed to undo: {ex.Message}", this);
+                Logger.LogDbgError($"Failed to undo: {ex.Message}", this);
             }
             finally
             {
@@ -391,11 +392,11 @@ namespace Schema.Unity.Editor
             }
             catch (OperationCanceledException)
             {
-                Core.Logger.LogDbgVerbose("Redo operation was cancelled", this);
+                Logger.LogDbgVerbose("Redo operation was cancelled", this);
             }
             catch (Exception ex)
             {
-                Core.Logger.LogDbgError($"Failed to redo: {ex.Message}", this);
+                Logger.LogDbgError($"Failed to redo: {ex.Message}", this);
             }
             finally
             {
@@ -410,11 +411,11 @@ namespace Schema.Unity.Editor
             {
                 // Use existing save functionality for now
                 await Task.Run(() => Core.Schema.Save());
-                Core.Logger.LogDbgVerbose("Schema saved successfully", this);
+                Logger.LogDbgVerbose("Schema saved successfully", this);
             }
             catch (Exception ex)
             {
-                Core.Logger.LogDbgError($"Failed to save schema: {ex.Message}", this);
+                Logger.LogDbgError($"Failed to save schema: {ex.Message}", this);
             }
         }
         
@@ -441,7 +442,7 @@ namespace Schema.Unity.Editor
             _cancellationTokenSource = new CancellationTokenSource();
             
             _operationInProgress = false;
-            Core.Logger.LogDbgVerbose("Current operation cancelled", this);
+            Logger.LogDbgVerbose("Current operation cancelled", this);
             
             Repaint();
         }

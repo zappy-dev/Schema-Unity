@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Schema.Core.Logging;
 
 namespace Schema.Core.Data
 {
