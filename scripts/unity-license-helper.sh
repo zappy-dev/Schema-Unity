@@ -81,9 +81,11 @@ find_unity_license() {
     done
     
     if [ -z "$LICENSE_FILE" ]; then
-        print_error "Unity license file not found"
-        print_status "Please ensure Unity is activated on this machine"
-        return 1
+        print_warning "Unity license file not found"
+        print_status "This is normal for Unity Personal licenses"
+        print_status "You can still use email/password authentication"
+        export LICENSE_FILE=""
+        return 0
     fi
     
     print_success "License file found at: $LICENSE_FILE"
@@ -95,9 +97,11 @@ find_unity_license() {
 validate_unity_license() {
     print_status "Validating Unity license..."
     
-    if [ ! -f "$LICENSE_FILE" ]; then
-        print_error "License file not found: $LICENSE_FILE"
-        return 1
+    if [ ! -f "$LICENSE_FILE" ] || [ -z "$LICENSE_FILE" ]; then
+        print_warning "No license file found - using email/password authentication"
+        print_status "This is normal for Unity Personal licenses"
+        print_status "Unity will be activated during CI using UNITY_EMAIL and UNITY_PASSWORD"
+        return 0
     fi
     
     # Check if license file contains expected content
@@ -122,11 +126,6 @@ validate_unity_license() {
 generate_github_secrets() {
     print_status "Generating GitHub secrets configuration..."
     
-    if [ ! -f "$LICENSE_FILE" ]; then
-        print_error "License file not found"
-        return 1
-    fi
-    
     # Create temporary file with secrets
     SECRETS_FILE="unity-github-secrets.txt"
     
@@ -135,20 +134,35 @@ generate_github_secrets() {
     echo "# Go to: Settings → Secrets and variables → Actions" >> "$SECRETS_FILE"
     echo "" >> "$SECRETS_FILE"
     
+    echo "# Required for all Unity licenses:" >> "$SECRETS_FILE"
     echo "UNITY_EMAIL=your-unity-email@example.com" >> "$SECRETS_FILE"
     echo "UNITY_PASSWORD=your-unity-password" >> "$SECRETS_FILE"
     echo "" >> "$SECRETS_FILE"
-    echo "# UNITY_LICENSE content (paste the entire content below):" >> "$SECRETS_FILE"
-    echo "# =========================================" >> "$SECRETS_FILE"
-    cat "$LICENSE_FILE" >> "$SECRETS_FILE"
-    echo "" >> "$SECRETS_FILE"
-    echo "# =========================================" >> "$SECRETS_FILE"
     
-    print_success "GitHub secrets configuration saved to: $SECRETS_FILE"
-    print_warning "Remember to:"
-    print_warning "1. Replace 'your-unity-email@example.com' with your actual Unity email"
-    print_warning "2. Replace 'your-unity-password' with your actual Unity password"
-    print_warning "3. Add these secrets to your GitHub repository settings"
+    if [ -f "$LICENSE_FILE" ] && [ -n "$LICENSE_FILE" ]; then
+        echo "# UNITY_LICENSE content (for Pro/Plus licenses only):" >> "$SECRETS_FILE"
+        echo "# =========================================" >> "$SECRETS_FILE"
+        cat "$LICENSE_FILE" >> "$SECRETS_FILE"
+        echo "" >> "$SECRETS_FILE"
+        echo "# =========================================" >> "$SECRETS_FILE"
+        echo "" >> "$SECRETS_FILE"
+        print_success "GitHub secrets configuration saved to: $SECRETS_FILE"
+        print_warning "Remember to:"
+        print_warning "1. Replace 'your-unity-email@example.com' with your actual Unity email"
+        print_warning "2. Replace 'your-unity-password' with your actual Unity password"
+        print_warning "3. Add the UNITY_LICENSE content to your GitHub repository settings"
+    else
+        echo "# UNITY_LICENSE is not required for Unity Personal licenses" >> "$SECRETS_FILE"
+        echo "# The workflow will automatically activate Unity using email/password" >> "$SECRETS_FILE"
+        echo "" >> "$SECRETS_FILE"
+        print_success "GitHub secrets configuration saved to: $SECRETS_FILE"
+        print_warning "Remember to:"
+        print_warning "1. Replace 'your-unity-email@example.com' with your actual Unity email"
+        print_warning "2. Replace 'your-unity-password' with your actual Unity password"
+        print_warning "3. You don't need to add UNITY_LICENSE (Unity Personal license will be activated automatically)"
+    fi
+    
+    print_warning "4. Add these secrets to your GitHub repository settings"
     
     return 0
 }
@@ -184,6 +198,9 @@ show_help() {
     echo "  test        Test Unity activation"
     echo "  all         Run all checks and generate secrets"
     echo "  help        Show this help message"
+    echo ""
+    echo "Note: This script supports both Unity Pro/Plus licenses (with license file)"
+    echo "      and Unity Personal licenses (email/password only)."
     echo ""
     echo "Examples:"
     echo "  $0 check      # Check Unity and license status"

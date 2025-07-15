@@ -69,7 +69,8 @@ This project includes comprehensive CI/CD workflows to ensure code quality:
 - **File**: `.github/workflows/unity.yml`
 - **Purpose**: Verifies Unity project compilation and testing
 - **Features**: Multi-platform builds, Unity tests, package validation
-- **Setup**: See [UNITY_CI_SETUP.md](UNITY_CI_SETUP.md) for configuration
+- **Quick Start**: See [UNITY_CI_QUICK_START.md](UNITY_CI_QUICK_START.md) for easy setup
+- **Detailed Setup**: See [UNITY_CI_SETUP.md](UNITY_CI_SETUP.md) for complete configuration
 
 ### Status Badges
 ![.NET Build](https://github.com/yourusername/Schema-Unity/workflows/.NET%20Core%20CI/badge.svg)

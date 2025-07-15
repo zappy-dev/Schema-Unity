@@ -46,7 +46,8 @@ jobs:
       - name: Setup Unity
         uses: game-ci/unity-builder@v4
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          # Only set UNITY_LICENSE if the secret exists
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE && secrets.UNITY_LICENSE || '' }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
@@ -90,7 +91,8 @@ jobs:
       - name: Run Unity Tests
         uses: game-ci/unity-test-runner@v4
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          # Only set UNITY_LICENSE if the secret exists
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE && secrets.UNITY_LICENSE || '' }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
@@ -195,7 +197,8 @@ jobs:
       - name: Check Unity Compilation
         uses: game-ci/unity-builder@v4
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          # Only set UNITY_LICENSE if the secret exists
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE && secrets.UNITY_LICENSE || '' }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:

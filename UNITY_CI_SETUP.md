@@ -25,9 +25,11 @@ You have two options for Unity license activation:
 2. `UNITY_EMAIL` - Email associated with your Unity account
 3. `UNITY_PASSWORD` - Password for your Unity account
 
-#### Option 2: Unity Personal License
+#### Option 2: Unity Personal License (Email/Password Only)
 1. `UNITY_EMAIL` - Email associated with your Unity account
 2. `UNITY_PASSWORD` - Password for your Unity account
+
+**Note**: If you only have `UNITY_EMAIL` and `UNITY_PASSWORD`, the workflow will automatically perform license activation during the CI run. You don't need to provide `UNITY_LICENSE` for Unity Personal licenses.
 
 ### How to Set Up Unity Secrets
 
@@ -45,9 +47,9 @@ You have two options for Unity license activation:
    - Go to your repository on GitHub
    - Navigate to Settings → Secrets and variables → Actions
    - Add the following secrets:
-     - `UNITY_LICENSE`: Paste your entire license file content
-     - `UNITY_EMAIL`: Your Unity account email
-     - `UNITY_PASSWORD`: Your Unity account password
+     - `UNITY_EMAIL`: Your Unity account email (required)
+     - `UNITY_PASSWORD`: Your Unity account password (required)
+     - `UNITY_LICENSE`: Your license file content (optional, for Pro/Plus licenses only)
 
 ## Workflow Jobs
 
@@ -134,9 +136,11 @@ The workflow generates the following artifacts:
 ### Common Issues
 
 1. **License Activation Failed**
-   - Verify `UNITY_LICENSE`, `UNITY_EMAIL`, and `UNITY_PASSWORD` secrets
-   - Ensure license file content is complete (including headers/footers)
+   - For Unity Pro/Plus: Verify `UNITY_LICENSE`, `UNITY_EMAIL`, and `UNITY_PASSWORD` secrets
+   - For Unity Personal: Only `UNITY_EMAIL` and `UNITY_PASSWORD` are required
+   - Ensure license file content is complete (including headers/footers) if using Pro/Plus
    - Check Unity account credentials
+   - Verify your Unity account has the appropriate license type
 
 2. **Build Compilation Errors**
    - Review the compilation check job logs
@@ -163,6 +167,23 @@ To test the Unity project locally:
 # Run tests via Window → General → Test Runner
 # Build via File → Build Settings
 ```
+
+## Email/Password Only Setup (Unity Personal)
+
+If you're using Unity Personal license and don't have access to a license file:
+
+1. **Skip the license file step** - You don't need `UNITY_LICENSE`
+2. **Only add these secrets to GitHub:**
+   ```
+   UNITY_EMAIL=your-unity-email@example.com
+   UNITY_PASSWORD=your-unity-password
+   ```
+3. **The workflow will automatically:**
+   - Detect that `UNITY_LICENSE` is not provided
+   - Activate Unity using your email and password
+   - Run all builds and tests normally
+
+This is the recommended approach for Unity Personal license users.
 
 ## Integration with .NET Workflow
 
