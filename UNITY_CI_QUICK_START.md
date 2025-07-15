@@ -88,10 +88,18 @@ env:
 
 ### Without License File (Personal)
 ```yaml
-env:
-  UNITY_LICENSE: '' # Empty, triggers automatic activation
-  UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-  UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+# Unity Personal license activation steps
+- name: Request Unity Activation File
+  if: env.UNITY_LICENSE == ''
+  uses: game-ci/unity-request-activation-file@v2
+  env:
+    UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+    
+- name: Build Unity Project
+  env:
+    UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+    UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+    UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 ```
 
 ## 🚨 Common Issues & Solutions

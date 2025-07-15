@@ -31,20 +31,24 @@ jobs:
 
       # Activate Unity License (for Unity Personal)
       - name: Request Unity Activation File
-        if: ${{ secrets.UNITY_LICENSE == '' }}
+        if: env.UNITY_LICENSE == ''
         uses: game-ci/unity-request-activation-file@v2
         id: getManualLicenseFile
         with:
           unityVersion: 2020.3.21f1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           
       - name: Activate Unity License
-        if: ${{ secrets.UNITY_LICENSE == '' }}
+        if: env.UNITY_LICENSE == ''
         uses: game-ci/unity-activate-license@v2
         with:
           unityVersion: 2020.3.21f1
           unityLicenseRequestFile: ${{ steps.getManualLicenseFile.outputs.filePath }}
           unityEmail: ${{ secrets.UNITY_EMAIL }}
           unityPassword: ${{ secrets.UNITY_PASSWORD }}
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
 
       # Simple Unity Build
       - name: Build Unity Project

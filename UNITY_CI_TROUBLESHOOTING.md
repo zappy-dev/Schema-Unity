@@ -120,14 +120,20 @@ Error: The job was canceled because it exceeded the maximum execution time
 #### Error: "Unrecognized named-value: 'secrets'"
 ```
 The workflow is not valid. .github/workflows/unity.yml (Line: 47, Col: 13): 
-Unrecognized named-value: 'secrets'. Located at position 2 within expression: !secrets.UNITY_LICENSE
+Unrecognized named-value: 'secrets'. Located at position 1 within expression: secrets.UNITY_LICENSE == ''
 ```
 
 **Solutions:**
-- This is a GitHub Actions syntax error
-- Change `if: ${{ !secrets.UNITY_LICENSE }}` to `if: ${{ secrets.UNITY_LICENSE == '' }}`
-- The correct syntax to check if a secret is empty is `secrets.UNITY_LICENSE == ''`
-- Use `secrets.UNITY_LICENSE == '' || secrets.UNITY_LICENSE == null` for more robust checking
+- This is a GitHub Actions syntax error when checking secrets directly in conditionals
+- **Problem**: `if: ${{ secrets.UNITY_LICENSE == '' }}` and `if: ${{ !secrets.UNITY_LICENSE }}` are invalid
+- **Solution**: Use environment variables instead:
+  ```yaml
+  - name: Step Name
+    if: env.UNITY_LICENSE == ''
+    env:
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+  ```
+- The correct approach is to set the secret as an environment variable, then check the environment variable
 
 ## 🛠️ Debugging Steps
 
@@ -181,20 +187,24 @@ env:
 ```yaml
 # Proper Unity Personal license activation steps
 - name: Request Unity Activation File
-  if: ${{ secrets.UNITY_LICENSE == '' }}
+  if: env.UNITY_LICENSE == ''
   uses: game-ci/unity-request-activation-file@v2
   id: getManualLicenseFile
   with:
     unityVersion: 2020.3.21f1
+  env:
+    UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
     
 - name: Activate Unity License
-  if: ${{ secrets.UNITY_LICENSE == '' }}
+  if: env.UNITY_LICENSE == ''
   uses: game-ci/unity-activate-license@v2
   with:
     unityVersion: 2020.3.21f1
     unityLicenseRequestFile: ${{ steps.getManualLicenseFile.outputs.filePath }}
     unityEmail: ${{ secrets.UNITY_EMAIL }}
     unityPassword: ${{ secrets.UNITY_PASSWORD }}
+  env:
+    UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
 ```
 
 ### Fix 2: Minimal Working Configuration
