@@ -42,12 +42,28 @@ jobs:
             Library-${{ matrix.targetPlatform }}-
             Library-
 
+      # Activate Unity License (for Unity Personal)
+      - name: Request Unity Activation File
+        if: ${{ !secrets.UNITY_LICENSE }}
+        uses: game-ci/unity-request-activation-file@v2
+        id: getManualLicenseFile
+        with:
+          unityVersion: 2020.3.21f1
+          
+      - name: Activate Unity License
+        if: ${{ !secrets.UNITY_LICENSE }}
+        uses: game-ci/unity-activate-license@v2
+        with:
+          unityVersion: 2020.3.21f1
+          unityLicenseRequestFile: ${{ steps.getManualLicenseFile.outputs.filePath }}
+          unityEmail: ${{ secrets.UNITY_EMAIL }}
+          unityPassword: ${{ secrets.UNITY_PASSWORD }}
+
       # Setup Unity Hub and Unity Editor
       - name: Setup Unity
         uses: game-ci/unity-builder@v4
         env:
-          # Only set UNITY_LICENSE if the secret exists
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE && secrets.UNITY_LICENSE || '' }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
@@ -87,12 +103,28 @@ jobs:
             Library-Test-
             Library-
 
+      # Activate Unity License (for Unity Personal)
+      - name: Request Unity Activation File
+        if: ${{ !secrets.UNITY_LICENSE }}
+        uses: game-ci/unity-request-activation-file@v2
+        id: getManualLicenseFile
+        with:
+          unityVersion: 2020.3.21f1
+          
+      - name: Activate Unity License
+        if: ${{ !secrets.UNITY_LICENSE }}
+        uses: game-ci/unity-activate-license@v2
+        with:
+          unityVersion: 2020.3.21f1
+          unityLicenseRequestFile: ${{ steps.getManualLicenseFile.outputs.filePath }}
+          unityEmail: ${{ secrets.UNITY_EMAIL }}
+          unityPassword: ${{ secrets.UNITY_PASSWORD }}
+
       # Run Unity tests
       - name: Run Unity Tests
         uses: game-ci/unity-test-runner@v4
         env:
-          # Only set UNITY_LICENSE if the secret exists
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE && secrets.UNITY_LICENSE || '' }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
@@ -193,12 +225,28 @@ jobs:
             Library-Compilation-
             Library-
 
+      # Activate Unity License (for Unity Personal)
+      - name: Request Unity Activation File
+        if: ${{ !secrets.UNITY_LICENSE }}
+        uses: game-ci/unity-request-activation-file@v2
+        id: getManualLicenseFile
+        with:
+          unityVersion: 2020.3.21f1
+          
+      - name: Activate Unity License
+        if: ${{ !secrets.UNITY_LICENSE }}
+        uses: game-ci/unity-activate-license@v2
+        with:
+          unityVersion: 2020.3.21f1
+          unityLicenseRequestFile: ${{ steps.getManualLicenseFile.outputs.filePath }}
+          unityEmail: ${{ secrets.UNITY_EMAIL }}
+          unityPassword: ${{ secrets.UNITY_PASSWORD }}
+
       # Check Unity project compilation
       - name: Check Unity Compilation
         uses: game-ci/unity-builder@v4
         env:
-          # Only set UNITY_LICENSE if the secret exists
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE && secrets.UNITY_LICENSE || '' }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:

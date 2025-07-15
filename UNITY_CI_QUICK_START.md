@@ -96,6 +96,21 @@ env:
 
 ## 🚨 Common Issues & Solutions
 
+### "Missing Unity License File and no Serial was found"
+**This is the most common error for Unity Personal licenses.**
+
+**Error message:**
+```
+Error: Missing Unity License File and no Serial was found. If this
+is a personal license, make sure to follow the activation steps...
+```
+
+**Solution:**
+- This means the workflow needs proper Unity Personal license activation steps
+- The updated workflow now includes automatic activation for Unity Personal licenses
+- Make sure you have `UNITY_EMAIL` and `UNITY_PASSWORD` secrets set
+- Do NOT set `UNITY_LICENSE` secret for Unity Personal licenses
+
 ### "License activation failed"
 - **Unity Personal**: Make sure `UNITY_EMAIL` and `UNITY_PASSWORD` are correct
 - **Unity Pro/Plus**: Verify all three secrets are set correctly

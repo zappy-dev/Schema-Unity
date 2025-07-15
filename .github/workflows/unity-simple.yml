@@ -1,0 +1,81 @@
+name: Unity Build (Simple)
+
+# This is a simplified Unity workflow for troubleshooting
+# Use this if the main Unity workflow has issues
+
+on:
+  workflow_dispatch: # Manual trigger only
+  
+jobs:
+  unity-build-simple:
+    name: Unity Build (Simple Test)
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      # Cache Unity Library folder
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: SchemaPlayground/Library
+          key: Library-Simple-${{ hashFiles('SchemaPlayground/Packages/manifest.json') }}
+          restore-keys: |
+            Library-Simple-
+            Library-
+
+      # Activate Unity License (for Unity Personal)
+      - name: Request Unity Activation File
+        if: ${{ !secrets.UNITY_LICENSE }}
+        uses: game-ci/unity-request-activation-file@v2
+        id: getManualLicenseFile
+        with:
+          unityVersion: 2020.3.21f1
+          
+      - name: Activate Unity License
+        if: ${{ !secrets.UNITY_LICENSE }}
+        uses: game-ci/unity-activate-license@v2
+        with:
+          unityVersion: 2020.3.21f1
+          unityLicenseRequestFile: ${{ steps.getManualLicenseFile.outputs.filePath }}
+          unityEmail: ${{ secrets.UNITY_EMAIL }}
+          unityPassword: ${{ secrets.UNITY_PASSWORD }}
+
+      # Simple Unity Build
+      - name: Build Unity Project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: SchemaPlayground
+          targetPlatform: StandaloneLinux64
+          unityVersion: 2020.3.21f1
+          buildName: Schema-Simple
+          buildsPath: build
+
+      # Upload simple build artifact
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unity-Build-Simple
+          path: build
+          retention-days: 1
+
+      # Show build summary
+      - name: Build Summary
+        run: |
+          echo "## Unity Simple Build Summary 🎮" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "**Unity Version**: 2020.3.21f1" >> $GITHUB_STEP_SUMMARY
+          echo "**Platform**: StandaloneLinux64" >> $GITHUB_STEP_SUMMARY
+          echo "**Project**: SchemaPlayground" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "If this simple build works, the issue is likely with the main workflow configuration." >> $GITHUB_STEP_SUMMARY

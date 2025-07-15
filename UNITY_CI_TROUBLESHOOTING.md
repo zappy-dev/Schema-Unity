@@ -6,6 +6,17 @@ This guide covers common issues and solutions for the Unity GitHub Actions workf
 
 ### 1. License Activation Errors
 
+#### Error: "Missing Unity License File and no Serial was found"
+```
+Error: Missing Unity License File and no Serial was found. If this
+is a personal license, make sure to follow the activation steps and set the UNITY_LICENSE GitHub secret or enter a Unity serial number inside the UNITY_SERIAL GitHub secret.
+```
+
+**Solutions:**
+- **Unity Personal**: This is the exact error you're seeing. The fix is to use the proper activation steps in the workflow
+- **Unity Pro/Plus**: Add the `UNITY_LICENSE` secret with your license file content
+- The updated workflow now includes proper Unity Personal license activation steps
+
 #### Error: "License activation failed"
 ```
 Error: License activation failed
