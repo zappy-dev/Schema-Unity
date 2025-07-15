@@ -21,7 +21,7 @@ namespace Schema.Unity.Editor
             _title = title ?? "Schema Operation";
             _info = info ?? "Processing...";
             
-            Logger.LogDbgVerbose($"AsyncEditorProgressReporter created: {_title} - {_info}");
+            Core.Logger.LogDbgVerbose($"AsyncEditorProgressReporter created: {_title} - {_info}");
         }
         
         public void Report(CommandProgress progress)
@@ -34,7 +34,7 @@ namespace Schema.Unity.Editor
             var displayMessage = $"{_info} - {progress.Message}";
             var progressValue = Mathf.Clamp01(progress.Value);
             
-            Logger.LogDbgVerbose($"AsyncEditorProgressReporter reporting: {displayMessage} ({progressValue:P0})");
+            Core.Logger.LogDbgVerbose($"AsyncEditorProgressReporter reporting: {displayMessage} ({progressValue:P0})");
             
             // Update Unity's progress bar
             EditorUtility.DisplayProgressBar(_title, displayMessage, progressValue);
@@ -57,7 +57,7 @@ namespace Schema.Unity.Editor
             _isDisposed = true;
             EditorUtility.ClearProgressBar();
             
-            Logger.LogDbgVerbose($"AsyncEditorProgressReporter disposed: {_title}");
+            Core.Logger.LogDbgVerbose($"AsyncEditorProgressReporter disposed: {_title}");
         }
     }
     
