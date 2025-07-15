@@ -51,7 +51,7 @@ namespace Schema.Core.Commands
             await _semaphore.WaitAsync(cancellationToken);
             try
             {
-                _logger.LogDbgVerbose($"Executing command: {command.Description}", this);
+                Logger.LogDbgVerbose($"Executing command: {command.Description}", this);
                 
                 var stopwatch = Stopwatch.StartNew();
                 var result = await command.ExecuteAsync(cancellationToken);
@@ -60,12 +60,12 @@ namespace Schema.Core.Commands
                 if (result.IsSuccess)
                 {
                     // Add to history if command executed successfully
-                    _allCommands.Add(command);
+                    _allCommands.Add(command as ISchemaCommand);
                     
                     // Add to undo stack if command can be undone
                     if (command.CanUndo)
                     {
-                        _undoStack.Push(command);
+                        _undoStack.Push(command as ISchemaCommand);
                         _redoStack.Clear(); // Clear redo stack on new command
                     }
                     
@@ -94,12 +94,12 @@ namespace Schema.Core.Commands
                         }
                     }
                     
-                    _logger.LogDbgVerbose($"Command executed successfully: {command.Description} ({stopwatch.ElapsedMilliseconds}ms)", this);
-                    CommandExecuted?.Invoke(this, new CommandExecutedEventArgs(command, result.ToCommandResult(), stopwatch.Elapsed));
+                    Logger.LogDbgVerbose($"Command executed successfully: {command.Description} ({stopwatch.ElapsedMilliseconds}ms)", this);
+                    CommandExecuted?.Invoke(this, new CommandExecutedEventArgs(command as ISchemaCommand, result.ToCommandResult(), stopwatch.Elapsed));
                 }
                 else
                 {
-                    _logger.LogDbgError($"Command failed: {command.Description} - {result.Message}", this);
+                    Logger.LogDbgError($"Command failed: {command.Description} - {result.Message}", this);
                 }
                 
                 return result;
@@ -121,7 +121,7 @@ namespace Schema.Core.Commands
                 }
                 
                 var command = _undoStack.Pop();
-                _logger.LogDbgVerbose($"Undoing command: {command.Description}", this);
+                Logger.LogDbgVerbose($"Undoing command: {command.Description}", this);
                 
                 var stopwatch = Stopwatch.StartNew();
                 var result = await command.UndoAsync(cancellationToken);
@@ -130,14 +130,14 @@ namespace Schema.Core.Commands
                 if (result.IsSuccess)
                 {
                     _redoStack.Push(command);
-                    _logger.LogDbgVerbose($"Command undone successfully: {command.Description} ({stopwatch.ElapsedMilliseconds}ms)", this);
+                    Logger.LogDbgVerbose($"Command undone successfully: {command.Description} ({stopwatch.ElapsedMilliseconds}ms)", this);
                     CommandUndone?.Invoke(this, new CommandUndoneEventArgs(command, result, stopwatch.Elapsed));
                 }
                 else
                 {
                     // Put command back on undo stack if undo failed
                     _undoStack.Push(command);
-                    _logger.LogDbgError($"Undo failed: {command.Description} - {result.Message}", this);
+                    Logger.LogDbgError($"Undo failed: {command.Description} - {result.Message}", this);
                 }
                 
                 return result;
@@ -159,7 +159,7 @@ namespace Schema.Core.Commands
                 }
                 
                 var command = _redoStack.Pop();
-                _logger.LogDbgVerbose($"Redoing command: {command.Description}", this);
+                Logger.LogDbgVerbose($"Redoing command: {command.Description}", this);
                 
                 var stopwatch = Stopwatch.StartNew();
                 var result = await command.ExecuteAsync(cancellationToken);
@@ -168,17 +168,17 @@ namespace Schema.Core.Commands
                 if (result.IsSuccess)
                 {
                     _undoStack.Push(command);
-                    _logger.LogDbgVerbose($"Command redone successfully: {command.Description} ({stopwatch.ElapsedMilliseconds}ms)", this);
+                    Logger.LogDbgVerbose($"Command redone successfully: {command.Description} ({stopwatch.ElapsedMilliseconds}ms)", this);
                     CommandRedone?.Invoke(this, new CommandRedoneEventArgs(command, result.ToCommandResult(), stopwatch.Elapsed));
                 }
                 else
                 {
                     // Put command back on redo stack if redo failed
                     _redoStack.Push(command);
-                    _logger.LogDbgError($"Redo failed: {command.Description} - {result.Message}", this);
+                    Logger.LogDbgError($"Redo failed: {command.Description} - {result.Message}", this);
                 }
                 
-                return result;
+                return result.ToCommandResult();
             }
             finally
             {
@@ -195,7 +195,7 @@ namespace Schema.Core.Commands
                 _redoStack.Clear();
                 _allCommands.Clear();
                 
-                _logger.LogDbgVerbose("Command history cleared", this);
+                Logger.LogDbgVerbose("Command history cleared", this);
                 HistoryCleared?.Invoke(this, EventArgs.Empty);
             }
             finally
@@ -215,7 +215,7 @@ namespace Schema.Core.Commands
     /// </summary>
     internal class NullLogger : ILogger
     {
-        public Logger.LogLevel LogLevel { get; set; } = Logger.LogLevel.None;
+        public Logger.LogLevel LogLevel { get; set; } = Logger.LogLevel.VERBOSE;
         
         public void Log(Logger.LogLevel logLevel, string message) { }
         public void LogDbgVerbose(string message, object context = null) { }

@@ -46,7 +46,7 @@ namespace Schema.Core.Commands
         
         public override string ToString()
         {
-            return _value.ToString("N")[..8]; // Short 8-character representation
+            return _value.ToString("N").Substring(0, 8); // Short 8-character representation
         }
         
         public string ToFullString()

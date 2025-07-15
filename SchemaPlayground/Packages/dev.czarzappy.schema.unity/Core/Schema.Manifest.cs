@@ -120,7 +120,7 @@ namespace Schema.Core
         /// Gets the manifest scheme if loaded and initialized.
         /// </summary>
         /// <returns>A <see cref="SchemaResult{DataScheme}"/> indicating success or failure, and the manifest scheme if successful.</returns>
-        private static SchemaResult<DataScheme> GetManifestScheme()
+        public static SchemaResult<DataScheme> GetManifestScheme()
         {
             if (!IsInitialized)
             {

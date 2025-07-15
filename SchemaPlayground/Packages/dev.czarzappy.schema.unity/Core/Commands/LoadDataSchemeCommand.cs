@@ -243,7 +243,7 @@ namespace Schema.Core.Commands
                     
                     if (manifestEntry == null)
                     {
-                        manifestEntry = manifestScheme.CreateEntry();
+                        manifestEntry = manifestScheme.CreateNewEntry();
                         manifestScheme.SetDataOnEntry(manifestEntry, Schema.MANIFEST_ATTRIBUTE_SCHEME_NAME, scheme.SchemeName);
                     }
                     
@@ -266,7 +266,7 @@ namespace Schema.Core.Commands
                     
                     if (manifestEntry != null)
                     {
-                        manifestScheme.RemoveEntry(manifestEntry);
+                        manifestScheme.DeleteEntry(manifestEntry);
                         manifestScheme.IsDirty = true;
                     }
                 }

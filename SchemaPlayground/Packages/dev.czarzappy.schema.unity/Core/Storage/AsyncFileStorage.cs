@@ -19,8 +19,8 @@ namespace Schema.Core.Storage
         
         public AsyncFileStorage(IStorageFormat<DataScheme> storageFormat = null, IFileSystem fileSystem = null)
         {
-            _storageFormat = storageFormat ?? Storage.DefaultManifestStorageFormat;
-            _fileSystem = fileSystem ?? Storage.FileSystem;
+            _storageFormat = storageFormat ?? Serialization.Storage.DefaultManifestStorageFormat;
+            _fileSystem = fileSystem ?? Serialization.Storage.FileSystem;
         }
         
         public async Task<bool> FileExistsAsync(string path, CancellationToken cancellationToken = default)
