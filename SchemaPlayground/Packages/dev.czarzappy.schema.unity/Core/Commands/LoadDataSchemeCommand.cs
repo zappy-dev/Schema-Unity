@@ -235,7 +235,7 @@ namespace Schema.Core.Commands
                 var result = Schema.UnloadScheme(schemeName);
                 if (result.Failed)
                 {
-                    throw new InvalidOperationException($"Failed to load scheme: {result.Message}");
+                    throw new InvalidOperationException($"Failed to unload scheme: {result.Message}");
                 }
             }, cancellationToken);
         }
