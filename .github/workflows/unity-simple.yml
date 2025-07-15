@@ -31,14 +31,14 @@ jobs:
 
       # Activate Unity License (for Unity Personal)
       - name: Request Unity Activation File
-        if: ${{ !secrets.UNITY_LICENSE }}
+        if: ${{ secrets.UNITY_LICENSE == '' }}
         uses: game-ci/unity-request-activation-file@v2
         id: getManualLicenseFile
         with:
           unityVersion: 2020.3.21f1
           
       - name: Activate Unity License
-        if: ${{ !secrets.UNITY_LICENSE }}
+        if: ${{ secrets.UNITY_LICENSE == '' }}
         uses: game-ci/unity-activate-license@v2
         with:
           unityVersion: 2020.3.21f1

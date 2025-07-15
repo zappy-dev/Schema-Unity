@@ -115,6 +115,20 @@ Error: The job was canceled because it exceeded the maximum execution time
 - Use build caching more effectively
 - Consider reducing the number of build targets
 
+### 5. Workflow Syntax Errors
+
+#### Error: "Unrecognized named-value: 'secrets'"
+```
+The workflow is not valid. .github/workflows/unity.yml (Line: 47, Col: 13): 
+Unrecognized named-value: 'secrets'. Located at position 2 within expression: !secrets.UNITY_LICENSE
+```
+
+**Solutions:**
+- This is a GitHub Actions syntax error
+- Change `if: ${{ !secrets.UNITY_LICENSE }}` to `if: ${{ secrets.UNITY_LICENSE == '' }}`
+- The correct syntax to check if a secret is empty is `secrets.UNITY_LICENSE == ''`
+- Use `secrets.UNITY_LICENSE == '' || secrets.UNITY_LICENSE == null` for more robust checking
+
 ## 🛠️ Debugging Steps
 
 ### Step 1: Check Basic Configuration
@@ -158,9 +172,29 @@ yamllint .github/workflows/unity.yml
 ```yaml
 # In your workflow, ensure environment variables are set correctly
 env:
-  UNITY_LICENSE: ${{ secrets.UNITY_LICENSE && secrets.UNITY_LICENSE || '' }}
+  UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
   UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
   UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+```
+
+### Fix 1b: Correct Unity Personal License Activation
+```yaml
+# Proper Unity Personal license activation steps
+- name: Request Unity Activation File
+  if: ${{ secrets.UNITY_LICENSE == '' }}
+  uses: game-ci/unity-request-activation-file@v2
+  id: getManualLicenseFile
+  with:
+    unityVersion: 2020.3.21f1
+    
+- name: Activate Unity License
+  if: ${{ secrets.UNITY_LICENSE == '' }}
+  uses: game-ci/unity-activate-license@v2
+  with:
+    unityVersion: 2020.3.21f1
+    unityLicenseRequestFile: ${{ steps.getManualLicenseFile.outputs.filePath }}
+    unityEmail: ${{ secrets.UNITY_EMAIL }}
+    unityPassword: ${{ secrets.UNITY_PASSWORD }}
 ```
 
 ### Fix 2: Minimal Working Configuration
