@@ -30,7 +30,7 @@ namespace Schema.Core
                 return SchemaResult<ManifestLoadStatus>.Fail("Manifest path is invalid: " + manifestPath, context: "Manifest");
             }
 
-            if (!Storage.FileSystem.FileExists(manifestPath))
+            if (!Serialization.Storage.FileSystem.FileExists(manifestPath))
             {
                 return SchemaResult<ManifestLoadStatus>.Fail($"No Manifest scheme found.\nSearched the following path: {manifestPath}\nLoad an existing manifest scheme or save the empty template.", context: "Manifest");
             }
@@ -43,7 +43,7 @@ namespace Schema.Core
             
                 progress?.Report((0f, $"Loading: {manifestPath}..."));
                 Logger.Log($"Loading manifest from file: {manifestPath}...", "Manifest");
-                if (!Storage.DefaultManifestStorageFormat.DeserializeFromFile(manifestPath)
+                if (!Serialization.Storage.DefaultManifestStorageFormat.DeserializeFromFile(manifestPath)
                         .Try( out var loadedManifestSchema))
                 {
                     return SchemaResult<ManifestLoadStatus>.Fail("Failed to load manifest schema.", context: "Manifest");
@@ -175,7 +175,7 @@ namespace Schema.Core
                     Context.Manifest);
             }
 
-            if (string.IsNullOrWhiteSpace(schemeFilePath) || !Storage.FileSystem.FileExists(schemeFilePath))
+            if (string.IsNullOrWhiteSpace(schemeFilePath) || !Serialization.Storage.FileSystem.FileExists(schemeFilePath))
             {
                 return SchemaResult<DataScheme>.Fail($"{manifestEntry} Invalid scheme file path: {schemeFilePath}",
                     Context.Manifest);
@@ -184,7 +184,7 @@ namespace Schema.Core
             progress?.Report(schemeFilePath);
                 
             // TODO support async loading
-            if (!Storage.DefaultSchemaStorageFormat.DeserializeFromFile(schemeFilePath)
+            if (!Serialization.Storage.DefaultSchemaStorageFormat.DeserializeFromFile(schemeFilePath)
                     .Try(out var loadedSchema))
             {
                 return SchemaResult<DataScheme>.Fail("Failed to load scheme from file.", context: Context.Manifest);
@@ -315,7 +315,7 @@ namespace Schema.Core
                 {
                     ManifestSelfEntry.SetData(MANIFEST_ATTRIBUTE_FILEPATH, manifestPath);
 
-                    if (Storage.DefaultManifestStorageFormat.SerializeToFile(manifestPath, GetManifestScheme().Result).Passed)
+                    if (Serialization.Storage.DefaultManifestStorageFormat.SerializeToFile(manifestPath, GetManifestScheme().Result).Passed)
                     {
                         GetManifestScheme().Result.IsDirty = false;
                     }
@@ -376,7 +376,7 @@ namespace Schema.Core
                 // TODO: Handle if the data doesn't yet have a save path from the manifest
                 savePath = schemeManifestEntry.GetDataAsString(MANIFEST_ATTRIBUTE_FILEPATH);
                 Logger.Log($"Saving {scheme} to file {savePath}", "Storage");
-                result = Storage.DefaultSchemaStorageFormat.SerializeToFile(savePath, scheme);
+                result = Serialization.Storage.DefaultSchemaStorageFormat.SerializeToFile(savePath, scheme);
             }
 
             if (isManifestScheme || alsoSaveManifest)

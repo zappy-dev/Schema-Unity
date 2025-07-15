@@ -2,7 +2,6 @@ using System.Collections;
 using Moq;
 using Schema.Core.Data;
 using Schema.Core.IO;
-using Schema.Core.Serialization;
 using Schema.Core.Tests.Ext;
 
 namespace Schema.Core.Tests;
@@ -17,7 +16,7 @@ public class TestSchema
     {
         _mockFileSystem = new Mock<IFileSystem>();
         
-        Storage.SetFileSystem(_mockFileSystem.Object);
+        Core.Serialization.Storage.SetFileSystem(_mockFileSystem.Object);
         Schema.Reset();
     }
 
@@ -105,14 +104,14 @@ public class TestSchema
         if (mockRead)
         {
             _mockFileSystem.Setup(m => m.ReadAllText(filePath))
-                .Returns(Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed()).Verifiable();
+                .Returns(Core.Serialization.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed()).Verifiable();
         }
 
         if (mockWrite)
         {
             _mockFileSystem.Setup(m => m.DirectoryExists("")).Returns(true).Verifiable();
             _mockFileSystem.Setup(m => m.FileExists(filePath)).Returns(true).Verifiable();
-            _mockFileSystem.Setup(m => m.WriteAllText(filePath, Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
+            _mockFileSystem.Setup(m => m.WriteAllText(filePath, Core.Serialization.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
         }
     }
 
@@ -285,7 +284,7 @@ public class TestSchema
         
         // Arrange
         var scheme = new DataScheme("Dirty");
-        _mockFileSystem.Setup(fs => fs.WriteAllText("Dirty.json", Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
+        _mockFileSystem.Setup(fs => fs.WriteAllText("Dirty.json", Core.Serialization.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
         
         Schema.LoadDataScheme(scheme, true, importFilePath: "Dirty.json");
         scheme.IsDirty = true;

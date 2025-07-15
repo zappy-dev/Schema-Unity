@@ -30,9 +30,7 @@ namespace Schema.Core.Commands
             bool overwriteExisting, 
             string importFilePath = null,
             IProgress<CommandProgress> progress = null,
-            IAsyncStorage storage = null,
-            ILogger logger = null) 
-            : base(logger)
+            IAsyncStorage storage = null)
         {
             _scheme = scheme ?? throw new ArgumentNullException(nameof(scheme));
             _overwriteExisting = overwriteExisting;

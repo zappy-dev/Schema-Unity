@@ -26,7 +26,7 @@ public class TestDataType
     {
         Schema.Reset();
         _mockFileSystem = new Mock<IFileSystem>();
-        Storage.SetFileSystem(_mockFileSystem.Object);
+        Core.Serialization.Storage.SetFileSystem(_mockFileSystem.Object);
 
         _mockFileSystem.Setup(m => m.FileExists(VALID_FILE_PATH)).Returns(true);
         _mockFileSystem.Setup(m => m.FileExists(INVALID_FILE_PATH)).Returns(false);

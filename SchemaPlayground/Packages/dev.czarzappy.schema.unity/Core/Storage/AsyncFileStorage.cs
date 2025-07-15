@@ -36,10 +36,10 @@ namespace Schema.Core.Storage
             
             return await Task.Run(() =>
             {
-                var result = _storageFormat.DeserializeFromFile<TResult>(path);
-                if (result.Try(out var value))
+                var result = _storageFormat.DeserializeFromFile(path);
+                if (result.Try(out var value) && value is TResult typedValue)
                 {
-                    return value;
+                    return typedValue;
                 }
                 throw new InvalidOperationException($"Failed to deserialize from file: {path}");
             }, cancellationToken);
@@ -51,10 +51,17 @@ namespace Schema.Core.Storage
             
             await Task.Run(() =>
             {
-                var result = _storageFormat.SerializeToFile(path, data);
-                if (result.Failed)
+                if (data is DataScheme scheme)
                 {
-                    throw new InvalidOperationException($"Failed to serialize to file: {path} - {result.Message}");
+                    var result = _storageFormat.SerializeToFile(path, scheme);
+                    if (result.Failed)
+                    {
+                        throw new InvalidOperationException($"Failed to serialize to file: {path} - {result.Message}");
+                    }
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Cannot serialize type {typeof(TData).Name} to file: {path}");
                 }
             }, cancellationToken);
         }

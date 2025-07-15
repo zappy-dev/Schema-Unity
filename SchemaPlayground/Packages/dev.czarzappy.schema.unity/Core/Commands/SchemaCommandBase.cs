@@ -31,16 +31,10 @@ namespace Schema.Core.Commands
         /// </summary>
         public DateTime CreatedAt { get; }
         
-        /// <summary>
-        /// Logger instance for this command
-        /// </summary>
-        protected ILogger Logger { get; }
-        
-        protected SchemaCommandBase(ILogger logger = null)
+        protected SchemaCommandBase()
         {
             Id = CommandId.NewId();
             CreatedAt = DateTime.UtcNow;
-            Logger = logger ?? new NullLogger();
         }
         
         /// <summary>
