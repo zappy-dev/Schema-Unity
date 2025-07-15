@@ -10,6 +10,7 @@ namespace Schema.Core.Serialization
 
         public static IStorageFormat<DataScheme> JSONStorageFormat;
         public static IStorageFormat<DataScheme> CSVStorageFormat;
+        public static IStorageFormat<DataScheme> CSharpCodeExportFormat;
         
         public static IStorageFormat<DataScheme> DefaultSchemaStorageFormat => JSONStorageFormat;
 
@@ -19,6 +20,7 @@ namespace Schema.Core.Serialization
         {
             JSONStorageFormat,
             CSVStorageFormat,
+            CSharpCodeExportFormat,
         };
 
         public static IFileSystem FileSystem { get; private set; }
@@ -28,6 +30,7 @@ namespace Schema.Core.Serialization
             FileSystem = fileSystem;
             JSONStorageFormat = new JsonStorageFormat<DataScheme>(fileSystem);
             CSVStorageFormat = new CSVStorageFormat(fileSystem);
+            CSharpCodeExportFormat = new CSharpCodeExportFormat(fileSystem);
         }
 
         static Storage()
