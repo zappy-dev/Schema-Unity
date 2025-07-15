@@ -58,6 +58,200 @@ namespace Schema.Core.Data
             return entryData.TryGetValue(attributeName, out var value) ? value.ToString() : null;
         }
 
+        public int GetDataAsInt(string attributeName)
+        {
+            if (!entryData.TryGetValue(attributeName, out var value))
+                return 0;
+                
+            if (value is int intValue)
+                return intValue;
+                
+            if (value is long longValue)
+                return (int)longValue;
+                
+            if (int.TryParse(value.ToString(), out var parsedValue))
+                return parsedValue;
+                
+            return 0;
+        }
+
+        public bool GetDataAsBool(string attributeName)
+        {
+            if (!entryData.TryGetValue(attributeName, out var value))
+                return false;
+                
+            if (value is bool boolValue)
+                return boolValue;
+                
+            if (bool.TryParse(value.ToString(), out var parsedValue))
+                return parsedValue;
+                
+            return false;
+        }
+
+        public float GetDataAsFloat(string attributeName)
+        {
+            if (!entryData.TryGetValue(attributeName, out var value))
+                return 0f;
+                
+            if (value is float floatValue)
+                return floatValue;
+                
+            if (value is double doubleValue)
+                return (float)doubleValue;
+                
+            if (value is int intValue)
+                return intValue;
+                
+            if (float.TryParse(value.ToString(), out var parsedValue))
+                return parsedValue;
+                
+            return 0f;
+        }
+
+        public TEnum GetDataAsEnum<TEnum>(string attributeName) where TEnum : struct, Enum
+        {
+            if (!entryData.TryGetValue(attributeName, out var value))
+                return default(TEnum);
+                
+            if (value is TEnum enumValue)
+                return enumValue;
+                
+            if (value is int intValue)
+            {
+                if (Enum.IsDefined(typeof(TEnum), intValue))
+                    return (TEnum)(object)intValue;
+            }
+                
+            if (Enum.TryParse<TEnum>(value.ToString(), out var parsedValue))
+                return parsedValue;
+                
+            return default(TEnum);
+        }
+
+        public bool TryGetDataAsEnum<TEnum>(string attributeName, out TEnum result) where TEnum : struct, Enum
+        {
+            if (!entryData.TryGetValue(attributeName, out var value))
+            {
+                result = default(TEnum);
+                return false;
+            }
+                
+            if (value is TEnum enumValue)
+            {
+                result = enumValue;
+                return true;
+            }
+                
+            if (value is int intValue)
+            {
+                if (Enum.IsDefined(typeof(TEnum), intValue))
+                {
+                    result = (TEnum)(object)intValue;
+                    return true;
+                }
+            }
+                
+            if (Enum.TryParse<TEnum>(value.ToString(), out var parsedValue))
+            {
+                result = parsedValue;
+                return true;
+            }
+                
+            result = default(TEnum);
+            return false;
+        }
+
+        public bool TryGetDataAsInt(string attributeName, out int result)
+        {
+            if (!entryData.TryGetValue(attributeName, out var value))
+            {
+                result = 0;
+                return false;
+            }
+                
+            if (value is int intValue)
+            {
+                result = intValue;
+                return true;
+            }
+                
+            if (value is long longValue)
+            {
+                result = (int)longValue;
+                return true;
+            }
+                
+            if (int.TryParse(value.ToString(), out var parsedValue))
+            {
+                result = parsedValue;
+                return true;
+            }
+                
+            result = 0;
+            return false;
+        }
+
+        public bool TryGetDataAsFloat(string attributeName, out float result)
+        {
+            if (!entryData.TryGetValue(attributeName, out var value))
+            {
+                result = 0f;
+                return false;
+            }
+                
+            if (value is float floatValue)
+            {
+                result = floatValue;
+                return true;
+            }
+                
+            if (value is double doubleValue)
+            {
+                result = (float)doubleValue;
+                return true;
+            }
+                
+            if (value is int intValue)
+            {
+                result = intValue;
+                return true;
+            }
+                
+            if (float.TryParse(value.ToString(), out var parsedValue))
+            {
+                result = parsedValue;
+                return true;
+            }
+                
+            result = 0f;
+            return false;
+        }
+
+        public bool TryGetDataAsBool(string attributeName, out bool result)
+        {
+            if (!entryData.TryGetValue(attributeName, out var value))
+            {
+                result = false;
+                return false;
+            }
+                
+            if (value is bool boolValue)
+            {
+                result = boolValue;
+                return true;
+            }
+                
+            if (bool.TryParse(value.ToString(), out var parsedValue))
+            {
+                result = parsedValue;
+                return true;
+            }
+                
+            result = false;
+            return false;
+        }
+
         public bool TryGetDataAsString(string entryKey, out string data)
         {
             if (entryData.TryGetValue(entryKey, out var rawData))
