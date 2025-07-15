@@ -42,27 +42,6 @@ jobs:
             Library-${{ matrix.targetPlatform }}-
             Library-
 
-      # Activate Unity License (for Unity Personal)
-      - name: Request Unity Activation File
-        if: env.UNITY_LICENSE == ''
-        uses: game-ci/unity-request-activation-file@v2
-        id: getManualLicenseFile
-        with:
-          unityVersion: 2020.3.21f1
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          
-      - name: Activate Unity License
-        if: env.UNITY_LICENSE == ''
-        uses: game-ci/unity-activate-license@v2
-        with:
-          unityVersion: 2020.3.21f1
-          unityLicenseRequestFile: ${{ steps.getManualLicenseFile.outputs.filePath }}
-          unityEmail: ${{ secrets.UNITY_EMAIL }}
-          unityPassword: ${{ secrets.UNITY_PASSWORD }}
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-
       # Setup Unity Hub and Unity Editor
       - name: Setup Unity
         uses: game-ci/unity-builder@v4
@@ -106,27 +85,6 @@ jobs:
           restore-keys: |
             Library-Test-
             Library-
-
-      # Activate Unity License (for Unity Personal)
-      - name: Request Unity Activation File
-        if: env.UNITY_LICENSE == ''
-        uses: game-ci/unity-request-activation-file@v2
-        id: getManualLicenseFile
-        with:
-          unityVersion: 2020.3.21f1
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          
-      - name: Activate Unity License
-        if: env.UNITY_LICENSE == ''
-        uses: game-ci/unity-activate-license@v2
-        with:
-          unityVersion: 2020.3.21f1
-          unityLicenseRequestFile: ${{ steps.getManualLicenseFile.outputs.filePath }}
-          unityEmail: ${{ secrets.UNITY_EMAIL }}
-          unityPassword: ${{ secrets.UNITY_PASSWORD }}
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
 
       # Run Unity tests
       - name: Run Unity Tests
@@ -232,27 +190,6 @@ jobs:
           restore-keys: |
             Library-Compilation-
             Library-
-
-      # Activate Unity License (for Unity Personal)
-      - name: Request Unity Activation File
-        if: env.UNITY_LICENSE == ''
-        uses: game-ci/unity-request-activation-file@v2
-        id: getManualLicenseFile
-        with:
-          unityVersion: 2020.3.21f1
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          
-      - name: Activate Unity License
-        if: env.UNITY_LICENSE == ''
-        uses: game-ci/unity-activate-license@v2
-        with:
-          unityVersion: 2020.3.21f1
-          unityLicenseRequestFile: ${{ steps.getManualLicenseFile.outputs.filePath }}
-          unityEmail: ${{ secrets.UNITY_EMAIL }}
-          unityPassword: ${{ secrets.UNITY_PASSWORD }}
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
 
       # Check Unity project compilation
       - name: Check Unity Compilation
