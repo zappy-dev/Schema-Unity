@@ -3,6 +3,8 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Schema.Core.Serialization;
+using Schema.Core.IO;
+using Schema.Core.Data;
 using System.Collections.Generic;
 
 namespace Schema.Core.Storage
@@ -12,10 +14,10 @@ namespace Schema.Core.Storage
     /// </summary>
     public class AsyncFileStorage : IAsyncStorage
     {
-        private readonly IStorageFormat _storageFormat;
+        private readonly IStorageFormat<DataScheme> _storageFormat;
         private readonly IFileSystem _fileSystem;
         
-        public AsyncFileStorage(IStorageFormat storageFormat = null, IFileSystem fileSystem = null)
+        public AsyncFileStorage(IStorageFormat<DataScheme> storageFormat = null, IFileSystem fileSystem = null)
         {
             _storageFormat = storageFormat ?? Storage.DefaultManifestStorageFormat;
             _fileSystem = fileSystem ?? Storage.FileSystem;
