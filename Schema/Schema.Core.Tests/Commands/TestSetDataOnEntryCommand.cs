@@ -59,6 +59,44 @@ namespace Schema.Core.Tests.Commands
         }
 
         [Test]
+        public async Task CommandHistory_ExecuteUndoRedo_WorkCorrectly()
+        {
+            var history = new CommandHistory();
+            var cmd = new SetDataOnEntryCommand(_scheme, _entry, AttributeName, "Eve");
+
+            // Execute
+            var exec = await history.ExecuteAsync(cmd);
+            Assert.IsTrue(exec.IsSuccess);
+            Assert.That(history.Count, Is.EqualTo(1));
+            Assert.That(history.CanUndo, Is.True);
+            Assert.That(_entry.GetDataAsString(AttributeName), Is.EqualTo("Eve"));
+
+            // Undo
+            var undo = await history.UndoAsync();
+            Assert.IsTrue(undo.IsSuccess);
+            Assert.That(_entry.GetDataAsString(AttributeName), Is.EqualTo("Alice"));
+            Assert.That(history.CanRedo, Is.True);
+
+            // Redo
+            var redo = await history.RedoAsync();
+            Assert.IsTrue(redo.IsSuccess);
+            Assert.That(_entry.GetDataAsString(AttributeName), Is.EqualTo("Eve"));
+        }
+
+        [Test]
+        public async Task ExecuteAsync_Cancellation_ReturnsCancelled()
+        {
+            var cts = new CancellationTokenSource();
+            await cts.CancelAsync(); // immediately cancel
+            var cmd = new SetDataOnEntryCommand(_scheme, _entry, AttributeName, "Zoe");
+
+            var result = await cmd.ExecuteAsync(cts.Token);
+            Assert.IsTrue(result.IsCancelled);
+            // Value should remain unchanged
+            Assert.That(_entry.GetDataAsString(AttributeName), Is.EqualTo("Alice"));
+        }
+
+        [Test]
         public async Task UndoAsync_WithoutExecute_FailsGracefully()
         {
             var cmd = new SetDataOnEntryCommand(_scheme, _entry, AttributeName, "Delta");

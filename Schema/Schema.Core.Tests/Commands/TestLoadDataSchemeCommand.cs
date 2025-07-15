@@ -1,14 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Moq;
-using NUnit.Framework;
 using Schema.Core.Commands;
 using Schema.Core.Data;
 using Schema.Core.Logging;
-using Schema.Core.Storage;
 using Schema.Core.Tests.Ext;
 
 namespace Schema.Core.Tests.Commands
@@ -16,7 +9,6 @@ namespace Schema.Core.Tests.Commands
     [TestFixture]
     public class TestLoadDataSchemeCommand
     {
-        private Mock<IAsyncStorage> _mockStorage;
         private Mock<IProgress<CommandProgress>> _mockProgress;
         private DataScheme _testScheme;
         private string _schemeName;
@@ -29,7 +21,6 @@ namespace Schema.Core.Tests.Commands
             _testScheme = new DataScheme(_schemeName);
             _testScheme.AddAttribute(new AttributeDefinition("FieldA", DataType.Text)).AssertPassed();
             _testScheme.AddEntry(new DataEntry { { "FieldA", "Value1" } });
-            _mockStorage = new Mock<IAsyncStorage>();
             _mockProgress = new Mock<IProgress<CommandProgress>>();
         }
 
@@ -37,7 +28,7 @@ namespace Schema.Core.Tests.Commands
         public async Task ExecuteAsync_SuccessfulLoad_AddsScheme()
         {
             // Arrange
-            var command = new LoadDataSchemeCommand(_testScheme, overwriteExisting: true, storage: _mockStorage.Object);
+            var command = new LoadDataSchemeCommand(_testScheme, overwriteExisting: true);
 
             // Act
             var result = await command.ExecuteAsync(CancellationToken.None);
@@ -54,7 +45,7 @@ namespace Schema.Core.Tests.Commands
         {
             // Arrange
             var badScheme = new DataScheme("");
-            var command = new LoadDataSchemeCommand(badScheme, overwriteExisting: true, storage: _mockStorage.Object);
+            var command = new LoadDataSchemeCommand(badScheme, overwriteExisting: true);
 
             // Act
             var result = await command.ExecuteAsync(CancellationToken.None);
@@ -70,7 +61,7 @@ namespace Schema.Core.Tests.Commands
             // Arrange
             Schema.LoadDataScheme(_testScheme, true);
             var duplicateScheme = new DataScheme(_schemeName);
-            var command = new LoadDataSchemeCommand(duplicateScheme, overwriteExisting: false, storage: _mockStorage.Object);
+            var command = new LoadDataSchemeCommand(duplicateScheme, overwriteExisting: false);
 
             // Act
             var result = await command.ExecuteAsync(CancellationToken.None);
@@ -85,7 +76,7 @@ namespace Schema.Core.Tests.Commands
         {
             Logger.Level = Logger.LogLevel.VERBOSE;
             // Arrange
-            var command = new LoadDataSchemeCommand(_testScheme, overwriteExisting: true, storage: _mockStorage.Object);
+            var command = new LoadDataSchemeCommand(_testScheme, overwriteExisting: true);
             await command.ExecuteAsync(CancellationToken.None);
             Assert.That(Schema.DoesSchemeExist(_schemeName), Is.True);
 
@@ -101,7 +92,7 @@ namespace Schema.Core.Tests.Commands
         public async Task UndoAsync_WithoutExecution_Fails()
         {
             // Arrange
-            var command = new LoadDataSchemeCommand(_testScheme, overwriteExisting: true, storage: _mockStorage.Object);
+            var command = new LoadDataSchemeCommand(_testScheme, overwriteExisting: true);
 
             // Act
             var undoResult = await command.UndoAsync(CancellationToken.None);

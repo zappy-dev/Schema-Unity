@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schema.Core.Data;
 using Schema.Core.Logging;
-using Schema.Core.Storage;
 
 namespace Schema.Core.Commands
 {
@@ -18,8 +17,7 @@ namespace Schema.Core.Commands
         private readonly bool _overwriteExisting;
         private readonly string _importFilePath;
         private readonly IProgress<CommandProgress> _progress;
-        private readonly IAsyncStorage _storage;
-        
+
         // State for undo operations
         private DataScheme _previousScheme;
         private bool _schemeExistedBefore;
@@ -31,14 +29,12 @@ namespace Schema.Core.Commands
             DataScheme scheme, 
             bool overwriteExisting, 
             string importFilePath = null,
-            IProgress<CommandProgress> progress = null,
-            IAsyncStorage storage = null)
+            IProgress<CommandProgress> progress = null)
         {
             _scheme = scheme ?? throw new ArgumentNullException(nameof(scheme));
             _overwriteExisting = overwriteExisting;
             _importFilePath = importFilePath;
             _progress = progress;
-            _storage = storage ?? new AsyncFileStorage();
         }
         
         protected override async Task<CommandResult<DataScheme>> ExecuteInternalAsync(CancellationToken cancellationToken)
