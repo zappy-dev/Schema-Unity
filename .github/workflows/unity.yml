@@ -1,0 +1,243 @@
+name: Unity Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'SchemaPlayground/**'
+      - '.github/workflows/unity.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'SchemaPlayground/**'
+      - '.github/workflows/unity.yml'
+
+jobs:
+  build-unity:
+    name: Build Unity Project
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        targetPlatform:
+          - StandaloneOSX # Mac
+          - StandaloneWindows64 # Windows
+          - StandaloneLinux64 # Linux
+    
+    steps:
+      # Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      # Cache Unity Library folder
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: SchemaPlayground/Library
+          key: Library-${{ matrix.targetPlatform }}-${{ hashFiles('SchemaPlayground/Packages/manifest.json') }}
+          restore-keys: |
+            Library-${{ matrix.targetPlatform }}-
+            Library-
+
+      # Setup Unity Hub and Unity Editor
+      - name: Setup Unity
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: SchemaPlayground
+          targetPlatform: ${{ matrix.targetPlatform }}
+          unityVersion: 2020.3.21f1
+          buildName: Schema-${{ matrix.targetPlatform }}
+          buildsPath: build
+          
+      # Upload build artifacts
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Schema-Build-${{ matrix.targetPlatform }}
+          path: build
+          retention-days: 7
+
+  test-unity:
+    name: Test Unity Project
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      # Cache Unity Library folder
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: SchemaPlayground/Library
+          key: Library-Test-${{ hashFiles('SchemaPlayground/Packages/manifest.json') }}
+          restore-keys: |
+            Library-Test-
+            Library-
+
+      # Run Unity tests
+      - name: Run Unity Tests
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: SchemaPlayground
+          unityVersion: 2020.3.21f1
+          testMode: all
+          artifactsPath: test-results
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: Unity Test Results
+          
+      # Upload test results
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Unity-Test-Results
+          path: test-results
+          retention-days: 7
+
+  validate-package:
+    name: Validate Unity Package
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Validate package.json structure
+      - name: Validate Package Manifest
+        run: |
+          echo "Validating package.json structure..."
+          if ! jq empty SchemaPlayground/Packages/dev.czarzappy.schema.unity/package.json 2>/dev/null; then
+            echo "❌ Invalid JSON in package.json"
+            exit 1
+          fi
+          
+          # Check required fields
+          REQUIRED_FIELDS=("name" "version" "displayName" "description" "unity")
+          for field in "${REQUIRED_FIELDS[@]}"; do
+            if ! jq -e ".$field" SchemaPlayground/Packages/dev.czarzappy.schema.unity/package.json > /dev/null; then
+              echo "❌ Missing required field: $field"
+              exit 1
+            fi
+          done
+          
+          echo "✅ Package manifest validation passed"
+
+      # Check for assembly definition files
+      - name: Validate Assembly Definitions
+        run: |
+          echo "Checking for assembly definition files..."
+          find SchemaPlayground/Packages/dev.czarzappy.schema.unity -name "*.asmdef" -type f | while read asmdef; do
+            echo "Found: $asmdef"
+            if ! jq empty "$asmdef" 2>/dev/null; then
+              echo "❌ Invalid JSON in $asmdef"
+              exit 1
+            fi
+          done
+          echo "✅ Assembly definition validation passed"
+
+      # Check Unity version compatibility
+      - name: Check Unity Version Compatibility
+        run: |
+          REQUIRED_UNITY=$(jq -r '.unity' SchemaPlayground/Packages/dev.czarzappy.schema.unity/package.json)
+          PROJECT_UNITY=$(grep "m_EditorVersion:" SchemaPlayground/ProjectSettings/ProjectVersion.txt | cut -d' ' -f2)
+          
+          echo "Package requires Unity: $REQUIRED_UNITY"
+          echo "Project uses Unity: $PROJECT_UNITY"
+          
+          if [[ "$PROJECT_UNITY" != "$REQUIRED_UNITY"* ]]; then
+            echo "⚠️  Warning: Unity version mismatch detected"
+          else
+            echo "✅ Unity version compatibility check passed"
+          fi
+
+  compilation-check:
+    name: Compilation Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      # Cache Unity Library folder
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: SchemaPlayground/Library
+          key: Library-Compilation-${{ hashFiles('SchemaPlayground/Packages/manifest.json') }}
+          restore-keys: |
+            Library-Compilation-
+            Library-
+
+      # Check Unity project compilation
+      - name: Check Unity Compilation
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: SchemaPlayground
+          targetPlatform: StandaloneLinux64
+          unityVersion: 2020.3.21f1
+          buildName: CompilationCheck
+          buildsPath: build
+          buildMethod: UnityBuilderAction.BuildScript.Build
+          customParameters: -quit -batchmode -nographics -logFile /dev/stdout
+
+      # Check for compilation errors in logs
+      - name: Check for Compilation Errors
+        run: |
+          if [ -f "unity.log" ]; then
+            if grep -q "error CS" unity.log; then
+              echo "❌ Compilation errors found:"
+              grep "error CS" unity.log
+              exit 1
+            else
+              echo "✅ No compilation errors found"
+            fi
+          fi
+
+  summary:
+    name: Unity Build Summary
+    runs-on: ubuntu-latest
+    needs: [build-unity, test-unity, validate-package, compilation-check]
+    if: always()
+    
+    steps:
+      - name: Build Summary
+        run: |
+          echo "## Unity Build Summary 🎮" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Unity | ${{ needs.build-unity.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Unity | ${{ needs.test-unity.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Validate Package | ${{ needs.validate-package.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Compilation Check | ${{ needs.compilation-check.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Unity Version:** 2020.3.21f1" >> $GITHUB_STEP_SUMMARY
+          echo "**Project:** SchemaPlayground" >> $GITHUB_STEP_SUMMARY
+          echo "**Package:** dev.czarzappy.schema.unity" >> $GITHUB_STEP_SUMMARY
