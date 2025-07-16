@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using System.Text;
 
-namespace Schema.Core
+namespace Schema.Core.Logging
 {
     public static class Logger
     {
@@ -91,11 +91,5 @@ namespace Schema.Core
         {
             Log(message, LogLevel.ERROR, context);
         }
-    }
-
-    public interface ILogger
-    {
-        Logger.LogLevel LogLevel { get; set; }
-        void Log(Logger.LogLevel logLevel, string message);
     }
 }

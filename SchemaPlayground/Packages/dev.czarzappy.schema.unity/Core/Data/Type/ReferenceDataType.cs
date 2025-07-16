@@ -47,7 +47,7 @@ namespace Schema.Core.Data
 
             if (!refSchema.GetIdentifierAttribute().Try(out var identifier))
             {
-                return Fail("Reference Scheme has no Attribute marked as Identifier.");
+                return Fail($"Referenced Scheme {refSchema} with no Identifier Attribute.");
             }
 
             if (identifier.AttributeName != ReferenceAttributeName)

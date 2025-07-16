@@ -1,3 +1,5 @@
+using Schema.Core.Logging;
+
 namespace Schema.Core.Tests;
 
 public class TestLogger : ILogger

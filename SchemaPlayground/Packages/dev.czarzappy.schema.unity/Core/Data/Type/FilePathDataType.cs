@@ -31,7 +31,7 @@ namespace Schema.Core.Data
                 return CheckIf(allowEmptyPath, errorMessage: "File path is empty", successMessage: "File path is set");
             }
             
-            return CheckIf(Storage.FileSystem.FileExists(filePath), 
+            return CheckIf(Serialization.Storage.FileSystem.FileExists(filePath), 
                 errorMessage: $"File '{value}' does not exist",
                 successMessage: $"File '{filePath}' exists");
         }
@@ -40,7 +40,7 @@ namespace Schema.Core.Data
         {
             var data = value as string;
             
-            return SchemaResult<object>.CheckIf(Storage.FileSystem.FileExists(data), 
+            return SchemaResult<object>.CheckIf(Serialization.Storage.FileSystem.FileExists(data), 
                 result: data,
                 errorMessage: $"File '{value}' is not a file path",
                 successMessage: $"File '{value}' exists", 

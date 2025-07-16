@@ -1,7 +1,7 @@
 using UnityEditor;
 using System;
 using UnityEngine;
-using Logger = Schema.Core.Logger;
+using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Unity.Editor
 {

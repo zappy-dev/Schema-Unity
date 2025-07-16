@@ -55,6 +55,27 @@ Schema-Unity/
 - Place your JSON/CSV data files in `SchemaPlayground/Content/`.
 - Extend or customize schema definitions in `Schema/Core/Data/`.
 
+## CI/CD & Build Verification
+
+This project includes comprehensive CI/CD workflows to ensure code quality:
+
+### .NET Core CI
+- **File**: `.github/workflows/dotnet.yml`
+- **Purpose**: Tests the core Schema library
+- **Coverage**: Runs unit tests with code coverage reporting
+- **Triggers**: Push/PR to main branch
+
+### Unity Build CI
+- **File**: `.github/workflows/unity.yml`
+- **Purpose**: Verifies Unity project compilation and testing
+- **Features**: Multi-platform builds, Unity tests, package validation
+- **Quick Start**: See [UNITY_CI_QUICK_START.md](UNITY_CI_QUICK_START.md) for easy setup
+- **Detailed Setup**: See [UNITY_CI_SETUP.md](UNITY_CI_SETUP.md) for complete configuration
+
+### Status Badges
+![.NET Build](https://github.com/yourusername/Schema-Unity/workflows/.NET%20Core%20CI/badge.svg)
+![Unity Build](https://github.com/yourusername/Schema-Unity/workflows/Unity%20Build/badge.svg)
+
 ## Contributing
 
 Contributions are welcome! To contribute:
