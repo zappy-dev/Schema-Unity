@@ -108,7 +108,7 @@ jobs:
           unityVersion: 2020.3.21f1
           buildName: CompilationCheck
           buildsPath: build
-          customParameters: -quit -batchmode -nographics -logFile /dev/stdout
+          customParameters: -batchmode -nographics -logFile /dev/stdout
 
       # Check for compilation errors in logs
       - name: Check for Compilation Errors
