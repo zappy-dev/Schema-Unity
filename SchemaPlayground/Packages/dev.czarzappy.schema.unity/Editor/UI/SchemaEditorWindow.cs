@@ -594,6 +594,9 @@ namespace Schema.Unity.Editor
                 return;
             }
             
+            // Load filters for the current schema (if not already loaded)
+            LoadAttributeFilters(scheme.SchemeName);
+            
             int attributeCount = scheme.AttributeCount;
             int entryCount = scheme.EntryCount;
                 
@@ -659,6 +662,28 @@ namespace Schema.Unity.Editor
                 
                 var sortOrder = GetSortOrderForScheme(scheme);
                 var entries = scheme.GetEntries(sortOrder);
+                
+                // Apply attribute filters
+                if (attributeFilters.Count > 0)
+                {
+                    entries = entries.Where(entry =>
+                    {
+                        foreach (var filter in attributeFilters)
+                        {
+                            var attributeRes = scheme.GetAttribute(filter.Key);
+                            if (!attributeRes.Try(out var attribute))
+                                return false;
+                            if (!entry.GetData(attribute).Try(out var value) || value == null)
+                                return false;
+                            var filterStr = filter.Value.ToLower();
+                            if (string.IsNullOrEmpty(filterStr))
+                                continue;
+                            if (!value.ToString().ToLower().Contains(filterStr))
+                                return false;
+                        }
+                        return true;
+                    }).ToList();
+                }
                 
                 // render table body, scheme data entries
                 int entryIdx = 0;
@@ -911,73 +936,112 @@ namespace Schema.Unity.Editor
 
         private void RenderTableHeader(int attributeCount, DataScheme scheme)
         {
-            using (new GUILayout.HorizontalScope())
+            using (new GUILayout.VerticalScope())
             {
-                EditorGUILayout.LabelField("#", RightAlignedLabelStyle, 
-                    GUILayout.Width(SETTINGS_WIDTH),
-                    GUILayout.ExpandWidth(false));
-                
-                // render column attribute headings
-                for (var attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
+                // Header row
+                using (new GUILayout.HorizontalScope())
                 {
-                    var attribute = scheme.GetAttribute(attributeIdx);
-                        
-                    // column settings gear
-                    string attributeLabel = attribute.AttributeName;
-                    if (attribute.IsIdentifier)
-                    {
-                        attributeLabel = $"{attribute.AttributeName} - ID";
-                    }
-                    else if (attribute.DataType is ReferenceDataType)
-                    {
-                        attributeLabel = $"{attribute.AttributeName} - Ref";
-                    }
+                    EditorGUILayout.LabelField("#", RightAlignedLabelStyle,
+                        GUILayout.Width(SETTINGS_WIDTH),
+                        GUILayout.ExpandWidth(false));
 
-                    var sortOrder = GetSortOrderForScheme(scheme);
-                    Texture attributeIcon = null;
-                    if (sortOrder.AttributeName == attribute.AttributeName)
+                    // render column attribute headings
+                    for (var attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                     {
-                        switch (sortOrder.Order)
+                        var attribute = scheme.GetAttribute(attributeIdx);
+
+                        // column settings gear
+                        string attributeLabel = attribute.AttributeName;
+                        if (attribute.IsIdentifier)
                         {
-                            case SortOrder.Ascending:
-                                attributeIcon = EditorIcon.UpArrow;
-                                break;
-                            case SortOrder.Descending:
-                                attributeIcon = EditorIcon.DownArrow;
-                                break;
+                            attributeLabel = $"{attribute.AttributeName} - ID";
+                        }
+                        else if (attribute.DataType is ReferenceDataType)
+                        {
+                            attributeLabel = $"{attribute.AttributeName} - Ref";
+                        }
+
+                        var sortOrder = GetSortOrderForScheme(scheme);
+                        Texture attributeIcon = null;
+                        if (sortOrder.AttributeName == attribute.AttributeName)
+                        {
+                            switch (sortOrder.Order)
+                            {
+                                case SortOrder.Ascending:
+                                    attributeIcon = EditorIcon.UpArrow;
+                                    break;
+                                case SortOrder.Descending:
+                                    attributeIcon = EditorIcon.DownArrow;
+                                    break;
+                            }
+                        }
+
+                        var attributeContent = new GUIContent(attributeLabel,
+                            attributeIcon,
+                            attribute.AttributeToolTip);
+                        if (DropdownButton(attributeContent, attribute.ColumnWidth))
+                        {
+                            RenderAttributeColumnOptions(attributeIdx, scheme, attribute, attributeCount);
                         }
                     }
-                    
-                    var attributeContent = new GUIContent(attributeLabel,
-                        attributeIcon,
-                        attribute.AttributeToolTip);
-                    if (DropdownButton(attributeContent, attribute.ColumnWidth))
+
+                    // add new attribute form
+                    newAttributeName = GUILayout.TextField(newAttributeName, GUILayout.ExpandWidth(false),
+                        GUILayout.MinWidth(100));
+                    using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newAttributeName)))
                     {
-                        RenderAttributeColumnOptions(attributeIdx, scheme, attribute, attributeCount);
+                        if (AddButton("Add Attribute"))
+                        {
+                            Debug.Log($"Added new attribute to '{scheme.SchemeName}'.`");
+                            LatestResponse = scheme.AddAttribute(new AttributeDefinition
+                            {
+                                AttributeName = newAttributeName,
+                                DataType = DataType.Text,
+                                DefaultValue = string.Empty,
+                                IsIdentifier = false,
+                                ColumnWidth = AttributeDefinition.DefaultColumnWidth,
+                            });
+                            if (LatestResponse.Passed)
+                            {
+                                LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
+                            }
+
+                            newAttributeName =
+                                string.Empty; // clear out attribute name field since it's unlikely someone wants to make another attribute with the same name
+                        }
                     }
                 }
 
-                // add new attribute form
-                newAttributeName = GUILayout.TextField(newAttributeName, GUILayout.ExpandWidth(false), GUILayout.MinWidth(100));
-                using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newAttributeName)))
+                // Filter row
+                using (new GUILayout.HorizontalScope())
                 {
-                    if (AddButton("Add Attribute"))
+                    EditorGUILayout.LabelField("", RightAlignedLabelStyle,
+                        GUILayout.Width(SETTINGS_WIDTH),
+                        GUILayout.ExpandWidth(false));
+                    // GUILayout.Space(SETTINGS_WIDTH); // for the row number column
+                    for (var attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                     {
-                        Debug.Log($"Added new attribute to '{scheme.SchemeName}'.`");
-                        LatestResponse = scheme.AddAttribute(new AttributeDefinition
+                        var attribute = scheme.GetAttribute(attributeIdx);
+                        string filterValue = attributeFilters.TryGetValue(attribute.AttributeName, out var val)
+                            ? val
+                            : string.Empty;
+                        string newFilterValue =
+                            GUILayout.TextField(filterValue, GUILayout.Width(attribute.ColumnWidth));
+                        if (newFilterValue != filterValue)
                         {
-                            AttributeName = newAttributeName,
-                            DataType = DataType.Text,
-                            DefaultValue = string.Empty,
-                            IsIdentifier = false,
-                            ColumnWidth = AttributeDefinition.DefaultColumnWidth,
-                        });
-                        if (LatestResponse.Passed) 
-                        {
-                            LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
+                            if (string.IsNullOrWhiteSpace(newFilterValue))
+                            {
+                                attributeFilters.Remove(attribute.AttributeName);
+                            }
+                            else
+                            {
+                                attributeFilters[attribute.AttributeName] = newFilterValue;
+                            }
+
+                            SaveAttributeFilters(scheme.SchemeName);
                         }
-                        newAttributeName = string.Empty; // clear out attribute name field since it's unlikely someone wants to make another attribute with the same name
                     }
+                    GUILayout.Space(100); // for the add attribute field
                 }
             }
         }
