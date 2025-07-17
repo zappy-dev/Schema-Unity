@@ -1,8 +1,8 @@
 #define SCHEMA_DEBUG
 using System;
 using UnityEngine;
-using ILogger = Schema.Core.ILogger;
-using Logger = Schema.Core.Logger;
+using ILogger = Schema.Core.Logging.ILogger;
+using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Unity.Editor
 {

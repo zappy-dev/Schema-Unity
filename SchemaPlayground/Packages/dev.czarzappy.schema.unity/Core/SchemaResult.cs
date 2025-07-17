@@ -1,4 +1,5 @@
 using System;
+using Schema.Core.Logging;
 
 namespace Schema.Core
 {

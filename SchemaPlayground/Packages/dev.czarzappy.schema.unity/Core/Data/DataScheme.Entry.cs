@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Schema.Core.Logging;
 
 namespace Schema.Core.Data
 {

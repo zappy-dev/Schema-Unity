@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Newtonsoft.Json;
 using Schema.Core.Ext;
+using Schema.Core.Logging;
 
 namespace Schema.Core.Data
 {

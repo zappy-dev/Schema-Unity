@@ -1,5 +1,5 @@
 using UnityEditor;
-using Logger = Schema.Core.Logger;
+using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Unity.Editor
 {
