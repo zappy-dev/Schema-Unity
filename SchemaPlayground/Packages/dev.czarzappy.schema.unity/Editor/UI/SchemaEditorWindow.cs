@@ -1077,7 +1077,7 @@ namespace Schema.Unity.Editor
             rowOptionsMenu.AddSeparator("");
             rowOptionsMenu.AddItem(new GUIContent("Delete Entry"), false, () =>
             {
-                if (EditorUtility.DisplayDialog("Schema", "Are you s you want to delete this entry?", "Yes, delete this entry", "No, cancel"))
+                if (EditorUtility.DisplayDialog("Schema", "Are you sure you want to delete this entry?", "Yes, delete this entry", "No, cancel"))
                 {
                     LatestResponse = scheme.DeleteEntry(entry);
                     SaveDataScheme(scheme, alsoSaveManifest: false);

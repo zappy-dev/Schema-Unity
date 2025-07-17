@@ -34,7 +34,6 @@ namespace Schema.Unity.Editor
                 float buttonWidth = width > 0 ? width : 150f;
                 if (SchemaLayout.DropdownButton(displayValue, buttonWidth, style))
                 {
-                    Debug.Log("Boop");
                     var menu = new GenericMenu();
                     foreach (var value in values)
                     {
