@@ -65,9 +65,13 @@ namespace Schema.Core.Data
                 
             if (value is int intValue)
                 return intValue;
-                
+
             if (value is long longValue)
-                return (int)longValue;
+            {
+                if (longValue >= int.MinValue && longValue <= int.MaxValue)
+                    return (int)longValue;
+                return 0;
+            }
                 
             if (int.TryParse(value.ToString(), out var parsedValue))
                 return parsedValue;
@@ -178,8 +182,13 @@ namespace Schema.Core.Data
                 
             if (value is long longValue)
             {
-                result = (int)longValue;
-                return true;
+                if (longValue >= int.MinValue && longValue <= int.MaxValue)
+                {
+                    result = (int)longValue;
+                    return true;
+                }
+                result = 0;
+                return false;
             }
                 
             if (int.TryParse(value.ToString(), out var parsedValue))

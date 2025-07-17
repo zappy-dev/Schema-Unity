@@ -162,7 +162,8 @@ namespace Schema.Core.Data
             }
             data.RemoveAt(entryIdx);
             data.Insert(targetIndex, element);
-            
+
+            isDirty = true;
             return SchemaResult.Pass($"Moved {element} from {entryIdx} to {targetIndex}", this);
         }
         
