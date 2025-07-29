@@ -45,20 +45,28 @@ namespace Schema.Unity.Editor
             _cellOddStyle.SetBackgroundColor(cellOddBackgroundColor);
         }
 
-        public static bool SettingsButton(string text = "", float width = SETTINGS_WIDTH) => EditorGUILayout.DropdownButton(
-            new GUIContent(text, EditorIcon.Gear.image),
-            FocusType.Keyboard, GUILayout.MaxWidth(width));
+        public static bool SettingsButton(string text = "", float width = SETTINGS_WIDTH)
+        {
+            SingleLayoutOption[0] = GUILayout.MaxWidth(width);
+            return EditorGUILayout.DropdownButton(
+                new GUIContent(text, EditorIcon.Gear.image),
+                FocusType.Keyboard, SingleLayoutOption);
+        }
 
 
         public static bool DropdownButton(string text = "", float width = SETTINGS_WIDTH, GUIStyle style = null) =>
             DropdownButton(new GUIContent(text), width, style);
+
+        public static GUILayoutOption[] SingleLayoutOption = new GUILayoutOption[1];
         
         public static bool DropdownButton(GUIContent content, float width = SETTINGS_WIDTH, GUIStyle style = null)
         {
+            
+            SingleLayoutOption[0] = GUILayout.Width(width);
             var buttonStyle = style ?? _defaultDropdownButtonStyle;
             return EditorGUILayout.DropdownButton(
                 content,
-                FocusType.Keyboard, buttonStyle, GUILayout.Width(width));
+                FocusType.Keyboard, buttonStyle, SingleLayoutOption);
         }
         
         public static CellStyle GetRowCellStyle(int rowIdx)

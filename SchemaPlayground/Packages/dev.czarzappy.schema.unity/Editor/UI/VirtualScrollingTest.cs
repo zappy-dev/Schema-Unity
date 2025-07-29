@@ -1,0 +1,108 @@
+using UnityEditor;
+using UnityEngine;
+using Schema.Core;
+using Schema.Core.Data;
+using static Schema.Core.Schema;
+
+namespace Schema.Unity.Editor
+{
+    /// <summary>
+    /// Test utility for generating large datasets to verify virtual scrolling performance
+    /// </summary>
+    public static class VirtualScrollingTest
+    {
+        [MenuItem("Tools/Schema/Generate Test Data (50 entries)")]
+        public static void GenerateTestData50()
+        {
+            GenerateTestData(50);
+        }
+        [MenuItem("Tools/Schema/Generate Test Data (100 entries)")]
+        public static void GenerateTestData100()
+        {
+            GenerateTestData(100);
+        }
+        [MenuItem("Tools/Schema/Generate Test Data (500 entries)")]
+        public static void GenerateTestData500()
+        {
+            GenerateTestData(500);
+        }
+        [MenuItem("Tools/Schema/Generate Test Data (1000 entries)")]
+        public static void GenerateTestData1000()
+        {
+            GenerateTestData(1000);
+        }
+        
+        [MenuItem("Tools/Schema/Generate Test Data (5000 entries)")]
+        public static void GenerateTestData5000()
+        {
+            GenerateTestData(5000);
+        }
+        
+        [MenuItem("Tools/Schema/Generate Test Data (10000 entries)")]
+        public static void GenerateTestData10000()
+        {
+            GenerateTestData(10000);
+        }
+        
+        private static void GenerateTestData(int entryCount)
+        {
+            // Create a test scheme with multiple data types
+            var testScheme = new DataScheme($"VirtualScrollingTest_{entryCount}");
+            
+            // Add various attribute types
+            testScheme.AddAttribute(new AttributeDefinition("ID", DataType.Integer, isIdentifier: true));
+            testScheme.AddAttribute(new AttributeDefinition("Name", DataType.Text));
+            testScheme.AddAttribute(new AttributeDefinition("Description", DataType.Text));
+            testScheme.AddAttribute(new AttributeDefinition("IsActive", new BooleanDataType()));
+            testScheme.AddAttribute(new AttributeDefinition("CreatedDate", new DateTimeDataType()));
+            testScheme.AddAttribute(new AttributeDefinition("Value", DataType.Integer));
+            
+            // Generate test entries
+            for (int i = 0; i < entryCount; i++)
+            {
+                var entry = testScheme.CreateNewEmptyEntry();
+                entry.SetData("ID", i + 1);
+                entry.SetData("Name", $"Test Entry {i + 1:D4}");
+                entry.SetData("Description", $"This is a test description for entry {i + 1}. It contains some text to make it longer and more realistic.");
+                entry.SetData("IsActive", i % 3 == 0); // Every third entry is active
+                entry.SetData("CreatedDate", System.DateTime.Now.AddDays(-i));
+                entry.SetData("Value", Random.Range(1, 1000));
+            }
+            
+            // Save the scheme
+            LoadDataScheme(testScheme, overwriteExisting: true, registerManifestEntry: true, importFilePath: testScheme.SchemeName);
+            var result = SaveDataScheme(testScheme, alsoSaveManifest: true);
+            
+            if (result.Passed)
+            {
+                Debug.Log($"Successfully generated test data with {entryCount} entries in scheme '{testScheme.SchemeName}'");
+                Debug.Log($"Virtual scrolling should be active for this dataset (threshold: 100 entries)");
+            }
+            else
+            {
+                Debug.LogError($"Failed to generate test data: {result.Message}");
+            }
+        }
+        
+        [MenuItem("Tools/Schema/Clear Test Data")]
+        public static void ClearTestData()
+        {
+            if (GetScheme("VirtualScrollingTest").Try(out var testScheme))
+            {
+                var result = UnloadScheme("VirtualScrollingTest");
+                if (result.Passed)
+                {
+                    Debug.Log("Successfully cleared test data");
+                }
+                else
+                {
+                    Debug.LogError($"Failed to clear test data: {result.Message}");
+                }
+            }
+            else
+            {
+                Debug.Log("No test data found to clear");
+            }
+        }
+    }
+} 
