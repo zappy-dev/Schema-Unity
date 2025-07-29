@@ -54,6 +54,11 @@ namespace Schema.Unity.Editor
         /// </summary>
         public bool IsVirtualScrollingActive { get; private set; }
         
+        /// <summary>
+        /// Gets the number of cells that were drawn in the last render
+        /// </summary>
+        public int CellsDrawn { get; private set; }
+        
         #endregion
         
         #region Constructor
@@ -126,22 +131,45 @@ namespace Schema.Unity.Editor
             float scrollY = scrollPosition.y;
             float viewportHeight = viewportRect.height;
             
+            // Debug logging for scroll calculation
+            Debug.Log($"VirtualTableView: Received - scrollY={scrollY:F1}, viewportHeight={viewportHeight:F1}, totalRows={totalRows}, rowHeight={_rowHeight:F1}");
+            Debug.Log($"VirtualTableView: Viewport rect received - {viewportRect}");
+            
             // Calculate start index with buffer
-            int startIndex = Math.Max(0, Mathf.FloorToInt((scrollY - _bufferHeight - 60) / _rowHeight));
+            // Remove the hardcoded 60-pixel offset that was causing scroll position mismatch
+            int startIndex = Math.Max(0, Mathf.FloorToInt((scrollY - _bufferHeight) / _rowHeight));
+            
+            // Calculate how many rows can actually fit in the viewport
+            int rowsThatCanFit = Mathf.CeilToInt(viewportHeight / _rowHeight);
+            Debug.Log($"VirtualTableView: viewportHeight={viewportHeight:F1}, rowHeight={_rowHeight:F1}, rowsThatCanFit={rowsThatCanFit}");
             
             // Calculate end index with buffer
-            // int endIndex = Math.Min(totalRows, Mathf.CeilToInt((scrollY + viewportHeight - _bufferHeight - 60) / _rowHeight));
-            int endIndex = Math.Min(totalRows, Mathf.CeilToInt((scrollY + _bufferHeight + 180) / _rowHeight) + 20);
-            // int endIndex = Math.Min(totalRows, startIndex + 20);
+            int endIndex = Math.Min(totalRows, Mathf.CeilToInt((scrollY + viewportHeight + _bufferHeight) / _rowHeight));
             
-            // Ensure we always render at least a few rows
-            // if (endIndex - startIndex < 10)
-            // {
-            //     endIndex = Math.Min(totalRows, startIndex + 10);
-            // }
+            Debug.Log($"VirtualTableView: startIndex={startIndex}, endIndex={endIndex}, calculated range={startIndex}-{endIndex}");
             
-            _visibleStartIndex = startIndex;
-            _visibleEndIndex = endIndex;
+            // Ensure we render enough rows to fill the viewport, but never more than what fits
+            int minRowsToRender = Math.Min(rowsThatCanFit, totalRows - startIndex);
+            int calculatedRange = endIndex - startIndex;
+            
+            Debug.Log($"VirtualTableView: minRowsToRender={minRowsToRender}, calculatedRange={calculatedRange}");
+            
+            // If we're not rendering enough rows to fill the viewport, expand the range
+            if (calculatedRange < minRowsToRender)
+            {
+                endIndex = Math.Min(totalRows, startIndex + minRowsToRender);
+                Debug.Log($"VirtualTableView: Expanded range to fill viewport: {startIndex}-{endIndex}");
+            }
+            // If we're rendering more rows than can fit, limit the range
+            else if (calculatedRange > rowsThatCanFit)
+            {
+                endIndex = Math.Min(totalRows, startIndex + rowsThatCanFit);
+                Debug.Log($"VirtualTableView: Limited range to fit viewport: {startIndex}-{endIndex}");
+            }
+            
+            // Final safety checks to ensure we never exceed totalRows
+            _visibleStartIndex = Math.Max(0, Math.Min(startIndex, totalRows));
+            _visibleEndIndex = Math.Max(_visibleStartIndex, Math.Min(endIndex, totalRows));
             
             return (_visibleStartIndex, _visibleEndIndex);
         }
@@ -196,6 +224,15 @@ namespace Schema.Unity.Editor
         }
         
         /// <summary>
+        /// Updates the cell count for the last render
+        /// </summary>
+        /// <param name="cellCount">Number of cells that were drawn</param>
+        public void UpdateCellCount(int cellCount)
+        {
+            CellsDrawn = cellCount;
+        }
+        
+        /// <summary>
         /// Clears the cache to force recalculation
         /// </summary>
         public void ClearCache()
@@ -209,6 +246,7 @@ namespace Schema.Unity.Editor
             _visibleStartIndex = 0;
             _visibleEndIndex = 0;
             _totalContentHeight = 0f;
+            CellsDrawn = 0;
         }
         
         #endregion

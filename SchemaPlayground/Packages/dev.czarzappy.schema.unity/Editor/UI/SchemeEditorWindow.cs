@@ -424,19 +424,65 @@ namespace Schema.Unity.Editor
                 EditorGUILayout.Toggle("Is Load In Progress?", IsManifestLoadInProgress);
                 EditorGUILayout.IntField("Num available schemes", AllSchemes.Count());
                 
-                // Virtual scrolling debug info
+                // Virtual scrolling debug info (compact)
                 if (_virtualTableView != null)
                 {
                     EditorGUILayout.Space();
-                    EditorGUILayout.LabelField("Virtual Scrolling Info:", EditorStyles.boldLabel);
-                    EditorGUILayout.Toggle("Virtual Scrolling Active", _virtualTableView.IsVirtualScrollingActive);
-                    if (_virtualTableView.IsVirtualScrollingActive)
+                    EditorGUILayout.LabelField("Virtual Scrolling Debug:", EditorStyles.boldLabel);
+                    
+                    using (new EditorGUILayout.HorizontalScope())
                     {
-                        var range = _virtualTableView.VisibleRange;
-                        EditorGUILayout.LabelField($"Visible Range: {range.start} - {range.end}");
-                        EditorGUILayout.LabelField($"Total Content Height: {_virtualTableView.TotalContentHeight:F1}");
-                        EditorGUILayout.LabelField($"Scroll Position: {tableViewScrollPosition}");
-                        EditorGUILayout.LabelField($"Viewport Height: {lastScrollViewRect.height:F1}");
+                        // Left column - Core info
+                        using (new EditorGUILayout.VerticalScope())
+                        {
+                            EditorGUILayout.Toggle("Virtual Scrolling Active", _virtualTableView.IsVirtualScrollingActive);
+                            if (_virtualTableView.IsVirtualScrollingActive)
+                            {
+                                var range = _virtualTableView.VisibleRange;
+                                EditorGUILayout.LabelField($"Range: {range.start}-{range.end}");
+                                EditorGUILayout.LabelField($"Scroll: {tableViewScrollPosition.y:F0}");
+                                EditorGUILayout.LabelField($"Cells Drawn: {_virtualTableView.CellsDrawn}");
+                                
+                                if (selectedSchemeName != null && GetScheme(selectedSchemeName).Try(out var scheme))
+                                {
+                                    var allEntries = scheme.GetEntries().ToList();
+                                    int totalCells = allEntries.Count * scheme.AttributeCount;
+                                    EditorGUILayout.LabelField($"Total Cells: {totalCells}");
+                                    EditorGUILayout.LabelField($"Efficiency: {(_virtualTableView.CellsDrawn * 100f / Math.Max(1, totalCells)):F1}%");
+                                    
+                                    float expectedScrollY = range.start * (_virtualTableView.TotalContentHeight / Math.Max(1, allEntries.Count));
+                                    EditorGUILayout.LabelField($"Delta: {tableViewScrollPosition.y - expectedScrollY:F0}");
+                                    EditorGUILayout.LabelField($"Progress: {(tableViewScrollPosition.y / Math.Max(1, _virtualTableView.TotalContentHeight)) * 100:F0}%");
+                                }
+                            }
+                        }
+                        
+                        // Right column - Warnings and errors
+                        using (new EditorGUILayout.VerticalScope())
+                        {
+                            if (selectedSchemeName != null && GetScheme(selectedSchemeName).Try(out var scheme))
+                            {
+                                var allEntries = scheme.GetEntries().ToList();
+                                var visibleRange = _virtualTableView.VisibleRange;
+                                
+                                EditorGUILayout.LabelField($"Entries: {allEntries.Count}");
+                                
+                                if (visibleRange.end > allEntries.Count)
+                                {
+                                    EditorGUILayout.LabelField($"⚠️ OVERFLOW: {visibleRange.end}>{allEntries.Count}", EditorStyles.boldLabel);
+                                }
+                                
+                                if (visibleRange.start >= visibleRange.end)
+                                {
+                                    EditorGUILayout.LabelField($"⚠️ INVALID: {visibleRange.start}>={visibleRange.end}", EditorStyles.boldLabel);
+                                }
+                                
+                                if (Math.Abs(tableViewScrollPosition.y - (visibleRange.start * (_virtualTableView.TotalContentHeight / Math.Max(1, allEntries.Count)))) > 50)
+                                {
+                                    EditorGUILayout.LabelField($"⚠️ SCROLL MISMATCH", EditorStyles.boldLabel);
+                                }
+                            }
+                        }
                     }
                 }
                 
