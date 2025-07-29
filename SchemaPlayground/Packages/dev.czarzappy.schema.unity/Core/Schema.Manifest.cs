@@ -95,13 +95,10 @@ namespace Schema.Core
         /// </summary>
         private static bool IsTemplateManifestLoaded
         {
-            get
-            {
-                return isTemplateManifestLoaded;
-            }
+            get => isTemplateManifestLoaded;
             set
             {
-                Logger.LogVerbose($"IsTemplateManifestLoaded: {value}");
+                Logger.LogDbgVerbose($"IsTemplateManifestLoaded: {value}");
                 isTemplateManifestLoaded = value;
             }
         }
@@ -187,7 +184,7 @@ namespace Schema.Core
         /// <returns>A <see cref="SchemaResult{DataEntry}"/> indicating success or failure, and the manifest entry if successful.</returns>
         internal static SchemaResult<ManifestEntry> GetManifestEntryForScheme(string schemeName)
         {
-            var res = SchemaResult<ManifestEntry>.New(Context.Manifest);
+            var res = SchemaResult<ManifestEntry>.New(schemeName);
             
             if (!IsInitialized)
             {
@@ -207,8 +204,8 @@ namespace Schema.Core
                 bool success = manifestScheme.TryGetEntryForSchemeName(schemeName, out var schemeManifestEntry);
                     
                 return res.CheckIf(success, schemeManifestEntry, 
-                    errorMessage: $"Failed to get manifest entry for scheme '{schemeName}'", 
-                    successMessage: $"Found manifest entry for scheme '{schemeName}'");
+                    errorMessage: "Failed to get manifest entry for scheme", 
+                    successMessage: "Found manifest entry for scheme");
 
             }
         }
