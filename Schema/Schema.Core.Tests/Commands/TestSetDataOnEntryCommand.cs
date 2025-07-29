@@ -18,7 +18,7 @@ namespace Schema.Core.Tests.Commands
             _scheme = new DataScheme("People");
             _scheme.AddAttribute(new AttributeDefinition(AttributeName, DataType.Text, ""))
                    .AssertPassed();
-            _entry = _scheme.CreateNewEntry(); // create an empty entry
+            _entry = _scheme.CreateNewEmptyEntry(); // create an empty entry
             _scheme.SetDataOnEntry(_entry, AttributeName, "Alice").AssertPassed();
             // Load scheme into global context so identifier checks work as expected
             Schema.LoadDataScheme(_scheme, overwriteExisting: true);

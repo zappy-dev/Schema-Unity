@@ -6,6 +6,7 @@ namespace Schema.Core.Data
     [Serializable]
     public class AttributeDefinition : Defaultable, ICloneable
     {
+        protected override string Context => nameof(AttributeDefinition);
         public const int DefaultColumnWidth = 150;
         
         public string AttributeName { get; set; }

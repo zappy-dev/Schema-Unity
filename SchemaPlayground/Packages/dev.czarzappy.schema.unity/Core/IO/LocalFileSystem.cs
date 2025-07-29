@@ -46,6 +46,12 @@ namespace Schema.Core.IO
             {
                 throw new ArgumentNullException(nameof(directoryPath));
             }
+
+            // Directory already exists, move on
+            if (DirectoryExists(directoryPath))
+            {
+                return;
+            }
             
             Directory.CreateDirectory(directoryPath);
         }

@@ -5,6 +5,7 @@ namespace Schema.Core.Data
     [Serializable]
     public class TextDataType : DataType
     {
+        protected override string Context => nameof(TextDataType);
         public override string TypeName => "String"; // TODO: Rename to Text for general interpretability
 
         public TextDataType() : base(string.Empty)
@@ -19,8 +20,8 @@ namespace Schema.Core.Data
         
         public override SchemaResult CheckIfValidData(object value)
         {
-            return CheckIf(value is string, errorMessage: $"Value '{value}' is not text",
-                successMessage: $"Value '{value}' is text");
+            return CheckIf(value is string, errorMessage: "Value is not text",
+                successMessage: "Value is text");
         }
 
         public override SchemaResult<object> ConvertData(object value)

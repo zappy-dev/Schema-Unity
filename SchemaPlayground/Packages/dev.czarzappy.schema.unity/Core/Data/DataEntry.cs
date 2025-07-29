@@ -11,6 +11,8 @@ namespace Schema.Core.Data
     [Serializable]
     public class DataEntry : IEnumerable<KeyValuePair<string, object>>
     {
+        public string Context => nameof(DataEntry);
+        
         [JsonProperty("EntryData")] 
         private Dictionary<string, object> entryData { get; set; } = new Dictionary<string, object>();
 
@@ -43,13 +45,24 @@ namespace Schema.Core.Data
 
             return data != null;
         }
+        
+        /// <summary>
+        /// High-performance version that returns the value directly without SchemaResult.
+        /// Returns null if the attribute is not found.
+        /// </summary>
+        /// <param name="attribute">The attribute to get data for.</param>
+        /// <returns>The value if found, null otherwise.</returns>
+        public object GetDataDirect(AttributeDefinition attribute)
+        {
+            return entryData.TryGetValue(attribute.AttributeName, out var value) ? value : null;
+        }
 
         public SchemaResult<object> GetData(AttributeDefinition attribute)
         {
             if (!entryData.TryGetValue(attribute.AttributeName, out var value))
-                return SchemaResult<object>.Fail($"No data found for {attribute}", this);
+                return SchemaResult<object>.Fail("No data found for attribute", Context);
 
-            return SchemaResult<object>.Pass(value, successMessage: $"Found value for {attribute}", this);
+            return SchemaResult<object>.Pass(value, successMessage: "Found value for attribute", Context);
 
         }
 
@@ -297,7 +310,7 @@ namespace Schema.Core.Data
             }
             
             entryData[attributeName] = value;
-            return Pass($"Setting '{attributeName}' to '{value}'");
+            return Pass("Setting attribute value");
         }
 
         public void MigrateData(string prevAttributeName, string newAttributeName)

@@ -10,8 +10,8 @@ namespace Schema.Core.Data
         public override SchemaResult CheckIfValidData(object value)
         {
             return CheckIf(value is DateTime, 
-                errorMessage: $"'{value} ({value.GetType()})' is not a DateTime",
-                successMessage: $"'{value}' is a DateTime");
+                errorMessage: "Value is not a DateTime",
+                successMessage: "Value is a DateTime");
 
         }
 
@@ -21,8 +21,8 @@ namespace Schema.Core.Data
             
             bool result = System.DateTime.TryParse(data, out var date);
             return SchemaResult<object>.CheckIf(result, date,
-                errorMessage: $"Unable to convert {data} to {this}",
-                successMessage: $"Converted {data} into {this}", 
+                errorMessage: "Unable to convert value",
+                successMessage: "Converted value into DateTime", 
                 context: this);
         }
 
@@ -35,5 +35,7 @@ namespace Schema.Core.Data
         {
             
         }
+
+        protected override string Context => nameof(DateTimeDataType);
     }
 }

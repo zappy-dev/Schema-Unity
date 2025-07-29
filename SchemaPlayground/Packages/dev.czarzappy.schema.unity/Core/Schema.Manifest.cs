@@ -1,5 +1,7 @@
-using System.Collections.Generic;
+using System;
 using Schema.Core.Data;
+using Schema.Core.Logging;
+using Schema.Core.Schemes;
 
 namespace Schema.Core
 {
@@ -9,21 +11,44 @@ namespace Schema.Core
     /// </summary>
     public partial class Schema
     {
-        #region Manifest Schema Definition
-        /// <summary>
-        /// The name of the manifest scheme.
-        /// </summary>
-        public const string MANIFEST_SCHEME_NAME = "Manifest";
-        /// <summary>
-        /// The attribute name for the file path in the manifest.
-        /// </summary>
-        public const string MANIFEST_ATTRIBUTE_FILEPATH = "FilePath";
-        /// <summary>
-        /// The attribute name for the scheme name in the manifest.
-        /// </summary>
-        public const string MANIFEST_ATTRIBUTE_SCHEME_NAME = "SchemeName";
-        #endregion
+        private static ManifestScheme loadedManifestScheme;
+        private static ManifestScheme nextManifestScheme;
+        public static ManifestScheme LoadedManifestScheme => loadedManifestScheme;
+        public static bool IsManifestLoadInProgress => nextManifestScheme != null;
 
+        private static string manifestImportPath;
+
+        /// <summary>
+        /// The absolute file path from where the Manifest scheme was loaded from.
+        /// This should only exist when a Manifest scheme was loaded into memory.
+        /// </summary>
+        public static string ManifestImportPath
+        {
+            get => manifestImportPath;
+            set
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    throw new InvalidOperationException("Manifest import path cannot be null or empty.");
+                }
+
+                if (!string.IsNullOrWhiteSpace(manifestImportPath))
+                {
+                    throw new InvalidOperationException($"Attempt to set Manifest import path is already set to {manifestImportPath}");
+                }
+                
+                manifestImportPath = value;
+            }
+        }
+
+        public static string ContentLoadPath
+        {
+            get
+            {
+                string manifestDir = System.IO.Path.GetDirectoryName(ManifestImportPath);
+                return manifestDir;
+            }
+        }
         // private static DataScheme ManifestScheme
         // {
         //     get
@@ -42,7 +67,7 @@ namespace Schema.Core
         /// <summary>
         /// Gets the manifest's own entry from the manifest scheme, or null if not initialized.
         /// </summary>
-        private static DataEntry ManifestSelfEntry
+        public static ManifestEntry ManifestSelfEntry
         {
             get
             {
@@ -55,20 +80,32 @@ namespace Schema.Core
                 {
                     return null;
                 }
-                
-                if (!manifestScheme.TryGetEntry(e =>
-                            MANIFEST_SCHEME_NAME.Equals(e.GetDataAsString(MANIFEST_ATTRIBUTE_SCHEME_NAME)),
-                        out var manifestSelfEntry))
-                {
-                    return null;
-                }
-                
-                return manifestSelfEntry;
+
+                return manifestScheme.SelfEntry;
             }
         }
+        
         #endregion
 
         #region Template Manifest Operations
+
+        private static bool isTemplateManifestLoaded = false;
+        /// <summary>
+        /// Flag for figuring out whether we're using the template default manifest or a loaded manifest
+        /// </summary>
+        private static bool IsTemplateManifestLoaded
+        {
+            get
+            {
+                return isTemplateManifestLoaded;
+            }
+            set
+            {
+                Logger.LogVerbose($"IsTemplateManifestLoaded: {value}");
+                isTemplateManifestLoaded = value;
+            }
+        }
+        
         /// <summary>
         /// Initializes the template manifest scheme and loads it into the schema system.
         /// </summary>
@@ -77,42 +114,15 @@ namespace Schema.Core
         {
             lock (manifestOperationLock)
             {
-                var templateManifestScheme = BuildTemplateManifestSchema();
-                return LoadDataScheme(templateManifestScheme, overwriteExisting: true);
-            }
-        }
+                var templateManifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema();
+                var result =  LoadDataScheme(templateManifestScheme._, overwriteExisting: true);
+                if (result.Passed)
+                {
+                    IsTemplateManifestLoaded = true;
+                }
 
-        /// <summary>
-        /// Builds a template manifest schema with default attributes and a self-entry.
-        /// </summary>
-        /// <returns>A <see cref="DataScheme"/> representing the template manifest schema.</returns>
-        public static DataScheme BuildTemplateManifestSchema()
-        {
-            var templateManifestScheme = new DataScheme(MANIFEST_SCHEME_NAME);
-            templateManifestScheme.AddAttribute(new AttributeDefinition
-            {
-                AttributeName = MANIFEST_ATTRIBUTE_SCHEME_NAME,
-                DataType = DataType.Text,
-                DefaultValue = DataType.Text.DefaultValue,
-                IsIdentifier = true,
-                ColumnWidth = AttributeDefinition.DefaultColumnWidth
-            });
-            templateManifestScheme.AddAttribute(new AttributeDefinition
-            {
-                AttributeName = MANIFEST_ATTRIBUTE_FILEPATH,
-                DataType = new FilePathDataType(allowEmptyPath:true),
-                DefaultValue = DataType.Text.DefaultValue,
-                IsIdentifier = false,
-                ColumnWidth = AttributeDefinition.DefaultColumnWidth,
-            });
-            
-            var manifestSelfEntry = new DataEntry(new Dictionary<string, object>
-            {
-                { MANIFEST_ATTRIBUTE_SCHEME_NAME, MANIFEST_SCHEME_NAME },
-                { MANIFEST_ATTRIBUTE_FILEPATH, "" },
-            });
-            templateManifestScheme.AddEntry(manifestSelfEntry);
-            return templateManifestScheme;
+                return result;
+            }
         }
         #endregion
 
@@ -120,15 +130,37 @@ namespace Schema.Core
         /// Gets the manifest scheme if loaded and initialized.
         /// </summary>
         /// <returns>A <see cref="SchemaResult{DataScheme}"/> indicating success or failure, and the manifest scheme if successful.</returns>
-        public static SchemaResult<DataScheme> GetManifestScheme()
+        public static SchemaResult<ManifestScheme> GetManifestScheme()
         {
+            var res = SchemaResult<ManifestScheme>.New(Context.Manifest);
+            
             if (!IsInitialized)
             {
-                return SchemaResult<DataScheme>.Fail("Attempting to access Manifest before initialization.", Context.Manifest);
+                return res.Fail("Attempting to access Manifest before initialization.");
             }
 
-            bool isLoaded = GetScheme(MANIFEST_SCHEME_NAME).Try(out var scheme);
-            return SchemaResult<DataScheme>.CheckIf(isLoaded, scheme, "No manifest loaded!", "Manifest scheme is loaded", Context.Manifest);
+            // if we are currently in the process of loading a new manifest, use that manifest instead
+            if (IsManifestLoadInProgress)
+            {
+                return res.Pass(nextManifestScheme, "Using next manifest in load");
+            }
+
+            if (loadedManifestScheme != null)
+            {
+                return res.Pass(loadedManifestScheme, "Manifest scheme is already loaded");
+            }
+
+            var dataSchemeRes = GetScheme(Manifest.MANIFEST_SCHEME_NAME);
+
+            if (dataSchemeRes.Failed)
+            {
+                return dataSchemeRes.CastError<ManifestScheme>();
+            }
+
+            var manifestScheme = new ManifestScheme(dataSchemeRes.Result);
+            loadedManifestScheme = manifestScheme;
+            
+            return res.Pass(manifestScheme, "Manifest scheme is loaded");
         }
 
         /// <summary>
@@ -136,11 +168,13 @@ namespace Schema.Core
         /// </summary>
         /// <param name="scheme">The data scheme to look up in the manifest.</param>
         /// <returns>A <see cref="SchemaResult{DataEntry}"/> indicating success or failure, and the manifest entry if successful.</returns>
-        public static SchemaResult<DataEntry> GetManifestEntryForScheme(DataScheme scheme)
+        public static SchemaResult<ManifestEntry> GetManifestEntryForScheme(DataScheme scheme)
         {
+            var res = SchemaResult<ManifestEntry>.New(Context.Manifest);
+            
             if (!IsInitialized || scheme is null)
             {
-                return SchemaResult<DataEntry>.Fail(errorMessage: "Manifest scheme is not initialized", Context.Manifest);
+                return res.Fail(errorMessage: "Manifest scheme is not initialized");
             }
             
             return GetManifestEntryForScheme(scheme.SchemeName);
@@ -151,33 +185,31 @@ namespace Schema.Core
         /// </summary>
         /// <param name="schemeName">The name of the scheme to look up in the manifest.</param>
         /// <returns>A <see cref="SchemaResult{DataEntry}"/> indicating success or failure, and the manifest entry if successful.</returns>
-        internal static SchemaResult<DataEntry> GetManifestEntryForScheme(string schemeName)
+        internal static SchemaResult<ManifestEntry> GetManifestEntryForScheme(string schemeName)
         {
+            var res = SchemaResult<ManifestEntry>.New(Context.Manifest);
+            
             if (!IsInitialized)
             {
-                return SchemaResult<DataEntry>.Fail("Manifest scheme is not initialized", Context.Manifest);
+                return res.Fail("Manifest scheme is not initialized");
             }
 
             if (string.IsNullOrWhiteSpace(schemeName))
             {
-                return SchemaResult<DataEntry>.Fail("Invalid scheme name", Context.Manifest);
+                return res.Fail("Invalid scheme name");
             }
 
             lock (manifestOperationLock)
             {
-                if (GetManifestScheme().Try(out var manifestScheme))
-                {
-                    bool success = manifestScheme.TryGetEntry(e => string.Equals(schemeName, e.GetDataAsString(MANIFEST_ATTRIBUTE_SCHEME_NAME)),
-                        out var schemeManifestEntry);
+                if (!GetManifestScheme().Try(out var manifestScheme))
+                    return res.Fail(errorMessage: "Manifest Scheme not found");
+                
+                bool success = manifestScheme.TryGetEntryForSchemeName(schemeName, out var schemeManifestEntry);
                     
-                    return SchemaResult<DataEntry>.CheckIf(success, schemeManifestEntry, 
-                        errorMessage: $"Failed to get manifest entry for scheme '{schemeName}'", 
-                        successMessage: $"Found manifest entry for scheme '{schemeName}'", context: Context.Manifest);
-                }
-                else
-                {
-                    return SchemaResult<DataEntry>.Fail(errorMessage: "Manifest Scheme not found", Context.Manifest);
-                }
+                return res.CheckIf(success, schemeManifestEntry, 
+                    errorMessage: $"Failed to get manifest entry for scheme '{schemeName}'", 
+                    successMessage: $"Found manifest entry for scheme '{schemeName}'");
+
             }
         }
     }

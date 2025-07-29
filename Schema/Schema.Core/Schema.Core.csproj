@@ -5,12 +5,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Content Include="..\..\SchemaPlayground\Packages\dev.czarzappy.schema.unity\Core\README.md">
-        <Link>Core\README.md</Link>
-      </Content>
-    </ItemGroup>
-
-    <ItemGroup>
       <Compile Include="..\..\SchemaPlayground\Packages\dev.czarzappy.schema.unity\Core\**\*.cs">
         <Link>%(RecursiveDir)%(FileName)%(Extension)</Link>
       </Compile>

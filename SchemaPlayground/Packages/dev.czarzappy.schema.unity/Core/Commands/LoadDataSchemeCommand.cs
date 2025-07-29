@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schema.Core.Data;
 using Schema.Core.Logging;
+using Schema.Core.Schemes;
 
 namespace Schema.Core.Commands
 {
@@ -250,16 +251,35 @@ namespace Schema.Core.Commands
                 if (Schema.GetManifestScheme().Try(out var manifestScheme))
                 {
                     // Add or update manifest entry
-                    var manifestEntry = manifestScheme.AllEntries.FirstOrDefault(e => 
-                        e.GetDataAsString(Schema.MANIFEST_ATTRIBUTE_SCHEME_NAME) == scheme.SchemeName);
-                    
-                    if (manifestEntry == null)
+                    if (!manifestScheme.TryGetEntryForSchemeName(scheme.SchemeName, out var manifestEntry))
                     {
-                        manifestEntry = manifestScheme.CreateNewEntry();
-                        manifestScheme.SetDataOnEntry(manifestEntry, Schema.MANIFEST_ATTRIBUTE_SCHEME_NAME, scheme.SchemeName);
+                        manifestScheme.AddManifestEntry(scheme.SchemeName).Try(out manifestEntry);
                     }
                     
-                    manifestScheme.SetDataOnEntry(manifestEntry, Schema.MANIFEST_ATTRIBUTE_FILEPATH, importFilePath);
+                    // Get the FilePath attribute definition to access its DataType
+                    if (manifestScheme._.GetAttribute(nameof(ManifestEntry.FilePath)).Try(out var filePathAttr) &&
+                        filePathAttr.DataType is FilePathDataType filePathDataType)
+                    {
+                        // Let the FilePathDataType handle the path conversion
+                        var convertResult = filePathDataType.ConvertData(importFilePath);
+                        if (convertResult.Try(out var convertedPath))
+                        {
+                            manifestEntry.FilePath = convertedPath as string;
+                            // manifestScheme._.SetDataOnEntry(manifestEntry, nameof(ManifestEntry.FilePath), convertedPath);
+                        }
+                        else
+                        {
+                            // Fallback to direct path if conversion fails
+                            manifestEntry.FilePath = importFilePath;
+                            // manifestScheme._.SetDataOnEntry(manifestEntry, nameof(ManifestEntry.FilePath), importFilePath);
+                        }
+                    }
+                    else
+                    {
+                        // Fallback if we can't get the attribute or it's not a FilePathDataType
+                        manifestEntry.FilePath = importFilePath;
+                    }
+                    
                     manifestScheme.IsDirty = true;
                 }
             }, cancellationToken);
@@ -273,10 +293,7 @@ namespace Schema.Core.Commands
             {
                 if (Schema.GetManifestScheme().Try(out var manifestScheme))
                 {
-                    var manifestEntry = manifestScheme.AllEntries.FirstOrDefault(e => 
-                        e.GetDataAsString(Schema.MANIFEST_ATTRIBUTE_SCHEME_NAME) == schemeName);
-                    
-                    if (manifestEntry != null)
+                    if (manifestScheme.TryGetEntryForSchemeName(schemeName, out var manifestEntry))
                     {
                         manifestScheme.DeleteEntry(manifestEntry);
                         manifestScheme.IsDirty = true;

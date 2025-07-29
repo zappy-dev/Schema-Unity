@@ -18,7 +18,7 @@ namespace Schema.Core.Data
         /// <summary>
         /// Built-in file path data type.
         /// </summary>
-        public static readonly DataType FilePath = new FilePathDataType();
+        public static readonly DataType FilePath = new FilePathDataType(allowEmptyPath: true, useRelativePaths: true);
         /// <summary>
         /// Built-in integer data type.
         /// </summary>
@@ -130,7 +130,7 @@ namespace Schema.Core.Data
             if (fromType == toType)
             {
                 return SchemaResult<object>.Pass(entryData,
-                    successMessage: $"Conversion no-op for matching type {fromType}", Schema.Context.DataConversion);
+                    successMessage: "Conversion no-op for matching type", Schema.Context.DataConversion);
             }
 
             if (fromType.Equals(Text) || isUnknownType)
@@ -140,7 +140,7 @@ namespace Schema.Core.Data
                 if (string.IsNullOrWhiteSpace(data))
                 {
                     return SchemaResult<object>.Pass(toType.CloneDefaultValue(),
-                        successMessage: $"Converted empty data to default value", Schema.Context.DataConversion);
+                        successMessage: "Converted empty data to default value", Schema.Context.DataConversion);
                 }
 
                 return toType.ConvertData(data);

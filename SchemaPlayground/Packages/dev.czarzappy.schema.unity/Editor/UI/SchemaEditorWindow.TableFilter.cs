@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Schema.Unity.Editor
 {
-    public partial class SchemaEditorWindow
+    internal partial class SchemaEditorWindow
     {
         // Add this field to store filter values for each attribute
         private Dictionary<string, string> attributeFilters = new Dictionary<string, string>();

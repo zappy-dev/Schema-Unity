@@ -6,6 +6,7 @@ namespace Schema.Core.Data
     [Serializable]
     public class ReferenceDataType : DataType
     {
+        protected override string Context => nameof(ReferenceDataType);
         public const string TypeNamePrefix = "Reference";
         
         public string ReferenceSchemeName { get; set; }
@@ -49,24 +50,24 @@ namespace Schema.Core.Data
             
             if (!Schema.GetScheme(ReferenceSchemeName).Try(out var refSchema))
             {
-                return Fail($"Could not load Reference Scheme named '{ReferenceSchemeName}'");
+                return Fail("Could not load Reference Scheme");
             }
 
             if (!refSchema.GetIdentifierAttribute().Try(out var identifier))
             {
-                return Fail($"Referenced Scheme {refSchema} with no Identifier Attribute.");
+                return Fail("Reference Scheme does not contain Identifier Attribute.");
             }
 
             if (identifier.AttributeName != ReferenceAttributeName)
             {
-                return Fail($"Reference Scheme identifier {identifier} attribute does not match {ReferenceAttributeName}");
+                return Fail("Reference Scheme Identifier Attribute does not match");
             }
 
             bool identifierExist = refSchema.GetIdentifierValues().Any(v => v.Equals(value));
 
             return CheckIf(identifierExist, 
-                errorMessage: $"Value '{value}' does not exist as an identifier in {this}",
-                successMessage: $"Value '{value}' exists as an identifier in {this}");
+                errorMessage: "Value does not exist as an identifier",
+                successMessage: "Value exists as an identifier");
         }
 
         public override SchemaResult<object> ConvertData(object value)

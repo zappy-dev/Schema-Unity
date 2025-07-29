@@ -5,6 +5,7 @@ namespace Schema.Core.Data
     [Serializable]
     public class IntegerDataType : DataType
     {
+        protected override string Context => nameof(IntegerDataType);
         public override string TypeName => "Integer";
 
         public IntegerDataType(int defaultValue = 0) : base(defaultValue)
@@ -15,8 +16,8 @@ namespace Schema.Core.Data
         public override SchemaResult CheckIfValidData(object value)
         {
             return CheckIf(value is int, 
-                errorMessage: $"Value '{value}' is not an integer.",
-                successMessage: $"Value '{value}' is an integer.");
+                errorMessage: "Value is not an integer.",
+                successMessage: "Value is an integer.");
         }
 
         public override SchemaResult<object> ConvertData(object fromData)

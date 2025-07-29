@@ -11,7 +11,7 @@ namespace Schema.Core.Data
         
         #region Entry Mutations
         
-        public DataEntry CreateNewEntry()
+        public DataEntry CreateNewEmptyEntry()
         {
             var entry = new DataEntry();
             foreach (var attribute in attributes)

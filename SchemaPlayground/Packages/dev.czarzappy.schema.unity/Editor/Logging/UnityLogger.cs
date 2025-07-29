@@ -29,7 +29,7 @@ namespace Schema.Unity.Editor
                 case Logger.LogLevel.INFO:
                     Debug.Log(message);
                     break;
-                case Logger.LogLevel.WARNING:
+                case Logger.LogLevel.WARN:
                     Debug.LogWarning(message);
                     break;
                 case Logger.LogLevel.ERROR:

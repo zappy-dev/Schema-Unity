@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Serialization;
@@ -16,11 +17,13 @@ using Random = System.Random;
 using Schema.Core.Commands;
 using System.Threading;
 using System.Threading.Tasks;
+using Schema.Core.IO;
+using Schema.Core.Schemes;
 
 namespace Schema.Unity.Editor
 {
     [Serializable]
-    public partial class SchemaEditorWindow : EditorWindow
+    internal partial class SchemaEditorWindow : EditorWindow
     {
         #region Static Fields and Constants
 
@@ -61,8 +64,6 @@ namespace Schema.Unity.Editor
         private string selectedSchemeName = string.Empty;
         [NonSerialized]
         private string newAttributeName = string.Empty;
-
-        private string manifestFilePath = string.Empty;
         private string tooltipOfTheDay = string.Empty;
         
         [SerializeField]
@@ -90,6 +91,13 @@ namespace Schema.Unity.Editor
         // Undo/Redo UI toggle
         private bool _showUndoRedoPanel = true;
         
+        // Virtual scrolling support
+        private VirtualTableView _virtualTableView;
+        
+        // Performance monitoring
+        private TablePerformanceMonitor _performanceMonitor;
+        private Rect lastScrollViewRect = Rect.zero;
+
         #endregion
 
         #region Unity Lifecycle Methods
@@ -110,11 +118,18 @@ namespace Schema.Unity.Editor
             _commandHistory.CommandExecuted += (_, __) => Repaint();
             _commandHistory.CommandUndone += (_, __) => Repaint();
             _commandHistory.CommandRedone += (_, __) => Repaint();
+            
+            // Initialize virtual scrolling
+            _virtualTableView = new VirtualTableView();
+            
+            // Initialize performance monitoring
+            _performanceMonitor = new TablePerformanceMonitor();
         }
 
         private void InitializeSafely()
         {
             if (isInitialized) return;
+            EditorApplication.update -= InitializeSafely;
             LogDbgVerbose("InitializeSafely", this);
             
             // return;
@@ -125,7 +140,10 @@ namespace Schema.Unity.Editor
             _defaultContentPath = Path.Combine(Path.GetFullPath(Application.dataPath + "/.."), "Content");
             _defaultManifestLoadPath = GetContentPath("Manifest.json");
 
-            manifestFilePath = _defaultManifestLoadPath;
+            // if (!IsInitialized)
+            // {
+                ManifestImportPath = _defaultManifestLoadPath;
+            // }
             // return;
             LatestResponse = OnLoadManifest("On Editor Startup");
             if (LatestResponse.Passed)
@@ -144,7 +162,6 @@ namespace Schema.Unity.Editor
                 OnSelectScheme(storedSelectedSchema, "Restoring from Editor Preferences");
             }
 
-            EditorApplication.update -= InitializeSafely;
             isInitialized = true;
         }
 
@@ -163,8 +180,8 @@ namespace Schema.Unity.Editor
             {
                 manifestWatcher = new FileSystemWatcher 
                 {
-                    Path = Path.GetDirectoryName(manifestFilePath),
-                    Filter = Path.GetFileName(manifestFilePath),
+                    Path = Path.GetDirectoryName(ManifestImportPath),
+                    Filter = Path.GetFileName(ManifestImportPath),
                     NotifyFilter = NotifyFilters.LastWrite
                 };
                 manifestWatcher.Changed += OnManifestFileChanged;
@@ -234,6 +251,7 @@ namespace Schema.Unity.Editor
                 var command = new LoadDataSchemeCommand(
                     newSchema,
                     overwriteExisting: overwriteExisting,
+                    importFilePath: importFilePath,
                     progress: progress);
 
                 var result = await _commandHistory.ExecuteAsync(command, _cancellationTokenSource.Token);
@@ -278,6 +296,9 @@ namespace Schema.Unity.Editor
             selectedSchemaIndex = prevSelectedIndex;
             EditorPrefs.SetString(EDITORPREFS_KEY_SELECTEDSCHEME, schemeName);
             newAttributeName = string.Empty;
+            
+            // Clear virtual scrolling cache when switching schemes
+            _virtualTableView?.ClearCache();
         }
 
         private SchemaResult OnLoadManifest(string context)
@@ -285,7 +306,7 @@ namespace Schema.Unity.Editor
             LogDbgVerbose($"Loading Manifest", context);
             // TODO: Figure out why progress reporting is making the Unity Editor unhappy
             // using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
-            LatestManifestLoadResponse = LoadManifestFromPath(manifestFilePath);
+            LatestManifestLoadResponse = LoadManifestFromPath(ManifestImportPath);
             LatestResponse = CheckIf(LatestManifestLoadResponse.Passed, LatestManifestLoadResponse.Message);
             return LatestResponse;
         }
@@ -317,8 +338,10 @@ namespace Schema.Unity.Editor
 
         private string GetTooltipMessage()
         {
-            if (!GetScheme("Tooltips").Try(out var tooltips)) 
+            if (!GetScheme("Tooltips").Try(out var tooltipDataScheme)) 
                 return "Could not find Tooltips scheme";
+
+            var tooltips = new TooltipsScheme(tooltipDataScheme);
             
             int entriesCount = tooltips.EntryCount;
             if (entriesCount == 0)
@@ -328,10 +351,7 @@ namespace Schema.Unity.Editor
 
             Random random = new Random();
             var randomIdx = random.Next(entriesCount);
-            if (!tooltips.GetEntry(randomIdx).TryGetDataAsString("Message", out var message))
-                return $"No message found for tooltip entry {randomIdx}";
-            
-            return message;
+            return tooltips.GetEntry(randomIdx).Message;
         }
         
         private void OnGUI()
@@ -351,7 +371,7 @@ namespace Schema.Unity.Editor
             InitializeStyles();
             debugIdx = 0;
             GUILayout.Label("Scheme Editor", EditorStyles.largeLabel, 
-                GUILayout.ExpandWidth(true));
+                ExpandWidthOptions);
 
             // NEW: Undo/Redo controls and progress display
             DrawUndoRedoPanel();
@@ -363,7 +383,7 @@ namespace Schema.Unity.Editor
                 if (GUILayout.Button("Start Empty Project"))
                 {
                     // TODO: Handle this better? move to Schema Core?
-                    LatestResponse = SaveManifest(_defaultManifestLoadPath);
+                    LatestResponse = SaveManifest();
                     LatestManifestLoadResponse = SchemaResult<ManifestLoadStatus>.CheckIf(LatestResponse.Passed, 
                         ManifestLoadStatus.FULLY_LOADED, 
                         LatestResponse.Message,
@@ -401,6 +421,27 @@ namespace Schema.Unity.Editor
             using (new EditorGUI.DisabledScope())
             {
                 EditorGUILayout.Toggle("Is Schema Initialized?", IsInitialized);
+                EditorGUILayout.Toggle("Is Load In Progress?", IsManifestLoadInProgress);
+                EditorGUILayout.IntField("Num available schemes", AllSchemes.Count());
+                
+                // Virtual scrolling debug info
+                if (_virtualTableView != null)
+                {
+                    EditorGUILayout.Space();
+                    EditorGUILayout.LabelField("Virtual Scrolling Info:", EditorStyles.boldLabel);
+                    EditorGUILayout.Toggle("Virtual Scrolling Active", _virtualTableView.IsVirtualScrollingActive);
+                    if (_virtualTableView.IsVirtualScrollingActive)
+                    {
+                        var range = _virtualTableView.VisibleRange;
+                        EditorGUILayout.LabelField($"Visible Range: {range.start} - {range.end}");
+                        EditorGUILayout.LabelField($"Total Content Height: {_virtualTableView.TotalContentHeight:F1}");
+                        EditorGUILayout.LabelField($"Scroll Position: {tableViewScrollPosition}");
+                        EditorGUILayout.LabelField($"Viewport Height: {lastScrollViewRect.height:F1}");
+                    }
+                }
+                
+                // Performance monitoring info
+                // _performanceMonitor?.RenderDebugInfo();
             }
             
             using (new EditorGUILayout.HorizontalScope())
@@ -409,7 +450,8 @@ namespace Schema.Unity.Editor
                 
                 using (new EditorGUI.DisabledScope())
                 {
-                    GUILayout.TextField(manifestFilePath);
+                    EditorGUILayout.TextField("Manifest Import Path", ManifestImportPath);
+                    EditorGUILayout.IntField("Loaded Manifest Scheme Hash", RuntimeHelpers.GetHashCode(LoadedManifestScheme._));
                 }
 
                 if (GUILayout.Button("Load"))
@@ -418,10 +460,9 @@ namespace Schema.Unity.Editor
                 }
 
                 // save schemes to manifest
-                if (GUILayout.Button("Save"))
+                if (GUILayout.Button("Save Manifest"))
                 {
-                    Debug.Log($"Saving manifest to {manifestFilePath}");
-                    LatestResponse = SaveManifest(manifestFilePath);
+                    LatestResponse = SaveManifest();
                 }
             }
 
@@ -510,20 +551,28 @@ namespace Schema.Unity.Editor
         {
             using (new EditorGUILayout.VerticalScope(GUILayout.Width(400)))
             {
-                GUILayout.Label($"Schema Explorer ({AllSchemes.Count()} count):", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
+                GUILayout.Label($"Schema Explorer ({AllSchemes.Count()} count):", EditorStyles.boldLabel, DoNotExpandWidthOptions);
                 
                 // New Schema creation form
-                using (new EditorGUILayout.HorizontalScope(GUILayout.ExpandWidth(false)))
+                using (new EditorGUILayout.HorizontalScope(DoNotExpandWidthOptions))
                 {
                     // Input field to add a new scheme
-                    newSchemeName = EditorGUILayout.TextField( newSchemeName, GUILayout.ExpandWidth(false));
+                    newSchemeName = EditorGUILayout.TextField( newSchemeName, DoNotExpandWidthOptions);
 
                     using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newSchemeName)))
                     {
                         if (AddButton("Create New Schema"))
                         {
                             var newSchema = new DataScheme(newSchemeName);
-                            AddSchemaAsync(newSchema, importFilePath: GetContentPath($"{newSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}"));
+                            
+                            // Create a relative path for the new schema file
+                            string fileName = $"{newSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}";
+                            string relativePath = fileName; // Default to just the filename (relative to Content folder)
+                            
+                            // Get the full path for actual file creation
+                            string fullPath = GetContentPath(fileName);
+                            
+                            AddSchemaAsync(newSchema, importFilePath: relativePath);
                             newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name
                         }
                     }
@@ -533,7 +582,7 @@ namespace Schema.Unity.Editor
                     
                 // render import options
                 if (EditorGUILayout.DropdownButton(new GUIContent("Import"), 
-                        FocusType.Keyboard, GUILayout.ExpandWidth(false)))
+                        FocusType.Keyboard, DoNotExpandWidthOptions))
                 {
                     GenericMenu menu = new GenericMenu();
 
@@ -590,9 +639,16 @@ namespace Schema.Unity.Editor
 
             if (!GetScheme(selectedSchemeName).Try(out var scheme))
             {
-                EditorGUILayout.HelpBox($"Schema '{selectedSchemeName}' does not exist.", MessageType.Warning);
+                EditorGUILayout.HelpBox("Schema does not exist.", MessageType.Warning);
                 return;
             }
+            
+            // Start performance monitoring
+            _performanceMonitor?.BeginRender();
+            
+            // Load core data
+            var sortOrder = GetSortOrderForScheme(scheme);
+            var allEntries = scheme.GetEntries(sortOrder).ToList();
             
             // Load filters for the current schema (if not already loaded)
             LoadAttributeFilters(scheme.SchemeName);
@@ -601,278 +657,383 @@ namespace Schema.Unity.Editor
             int entryCount = scheme.EntryCount;
                 
             // mapping entries to control IDs for focus/navigation management
-            int[] tableCellControlIds = new int[attributeCount * entryCount];
+            // For virtual scrolling, we only need control IDs for visible entries
+            int visibleEntryCount = _virtualTableView.IsVirtualScrollingActive ? 
+                Math.Min(entryCount, 50) : entryCount; // Limit to reasonable number for virtual scrolling
+            int[] tableCellControlIds = new int[attributeCount * visibleEntryCount];
 
             using (new GUILayout.VerticalScope())
             {
-                GUILayout.Label($"Table View - {scheme.SchemeName} - {entryCount} {(entryCount == 1 ? "entry" : "entries")}", EditorStyles.boldLabel);
+                GUILayout.Label(
+                    $"Table View - {scheme.SchemeName} - {entryCount} {(entryCount == 1 ? "entry" : "entries")}",
+                    EditorStyles.boldLabel);
+
+                if (showDebugView)
+                {
+                    GUILayout.Label($"{RuntimeHelpers.GetHashCode(scheme)}");
+                }
+                
+                // Display real-time GC status
+                if (_performanceMonitor != null)
+                {
+                    var (totalMemory, allocatedMemory, gen0, gen1, gen2) = _performanceMonitor.GetCurrentGcStatus();
+                    using (new EditorGUI.DisabledScope())
+                    {
+                        EditorGUILayout.LabelField($"GC Status: {_performanceMonitor.FormatBytes(totalMemory)} total, Gen0:{gen0} Gen1:{gen1} Gen2:{gen2}", EditorStyles.miniLabel);
+                    }
+                }
 
                 using (new GUILayout.HorizontalScope())
                 {
-                    EditorGUILayout.LabelField("Storage Path", GUILayout.ExpandWidth(false));
+                    EditorGUILayout.LabelField("Storage Path", DoNotExpandWidthOptions);
                     using (new EditorGUI.DisabledScope())
                     {
                         string storagePath = "No storage path found for this Schema.";
-                        if (GetManifestEntryForScheme(scheme).Try(out var schemeManifest) && 
-                            schemeManifest.TryGetDataAsString(MANIFEST_ATTRIBUTE_FILEPATH, out storagePath))
+                        if (GetManifestEntryForScheme(scheme).Try(out var schemeManifestEntry))
                         {
+                            storagePath = schemeManifestEntry.FilePath;
+                            storagePath = PathUtility.MakeAbsolutePath(storagePath, ContentLoadPath);
                         }
-                        
+
                         EditorGUILayout.TextField(storagePath);
                     }
-                    
-                    var dirtyPostfix = scheme.IsDirty ? "*" : string.Empty;
-                    
-                    if (GUILayout.Button($"Save{dirtyPostfix}", GUILayout.ExpandWidth(true)))
+
+                    var saveButtonText = scheme.IsDirty ? "Save*" : "save";
+
+                    if (GUILayout.Button(saveButtonText, ExpandWidthOptions))
                     {
                         LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
                     }
-                    
+
                     // TODO: Open raw schema files
-                    // if (GUILayout.Button("Open", GUILayout.ExpandWidth(true)) &&
+                    // if (GUILayout.Button("Open", ExpandWidthOptions) &&
                     //     GetManifestEntryForScheme(scheme).Try(out var manifestEntry))
                     // {
                     //     var storagePath = manifestEntry.GetDataAsString(MANIFEST_ATTRIBUTE_FILEPATH);
                     //     Application.OpenURL(storagePath);
                     // }
-                    
+
                     // render export options
-                    if (EditorGUILayout.DropdownButton(new GUIContent("Export"), 
-                            FocusType.Keyboard, GUILayout.ExpandWidth(false)))
+                    if (EditorGUILayout.DropdownButton(new GUIContent("Export"),
+                            FocusType.Keyboard, DoNotExpandWidthOptions))
                     {
                         GenericMenu menu = new GenericMenu();
 
                         foreach (var storageFormat in Storage.AllFormats)
                         {
-                            menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), false, () =>
-                            {
-                                storageFormat.Export(scheme);
-                            });
+                            menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), false,
+                                () => { storageFormat.Export(scheme); });
                         }
-                        
+
                         menu.ShowAsContext();
                     }
                 }
                 
-                
-                tableViewScrollPosition = GUILayout.BeginScrollView(tableViewScrollPosition, alwaysShowHorizontal: true, alwaysShowVertical: true);
-                
-                // TODO: Figure out how to freeze the table header so it doesn't scroll
-                RenderTableHeader(attributeCount, scheme);
-                
-                var sortOrder = GetSortOrderForScheme(scheme);
-                var entries = scheme.GetEntries(sortOrder);
-                
-                // Apply attribute filters
-                if (attributeFilters.Count > 0)
+                using (var scrollView = new EditorGUILayout.ScrollViewScope(tableViewScrollPosition, alwaysShowHorizontal: true,
+                           alwaysShowVertical: true))
                 {
-                    entries = entries.Where(entry =>
+                    // Update scroll position from the scope
+                    tableViewScrollPosition = scrollView.scrollPosition;
+                    
+                    // Calculate viewport rect for virtual scrolling
+                    // We'll use the window height minus some space for headers and controls
+                    // float viewportHeight = position.height - 200f; // Approximate space for headers, etc.
+                    // lastScrollViewRect = new Rect(0, 0, position.width, viewportHeight);
+
+                    // TODO: Figure out how to freeze the table header so it doesn't scroll
+                    RenderTableHeader(attributeCount, scheme);
+
+                    // Apply attribute filters
+                    if (attributeFilters.Count > 0)
                     {
-                        foreach (var filter in attributeFilters)
+                        allEntries = allEntries.Where(entry =>
                         {
-                            var attributeRes = scheme.GetAttribute(filter.Key);
-                            if (!attributeRes.Try(out var attribute))
-                                return false;
-                            if (!entry.GetData(attribute).Try(out var value) || value == null)
-                                return false;
-                            var filterStr = filter.Value.ToLower();
-                            if (string.IsNullOrEmpty(filterStr))
-                                continue;
-                            if (!value.ToString().ToLower().Contains(filterStr))
-                                return false;
-                        }
-                        return true;
-                    }).ToList();
-                }
-                
-                // render table body, scheme data entries
-                int entryIdx = 0;
-                foreach (var entry in entries)
-                {
-                    using (new GUILayout.HorizontalScope())
-                    {
-                        var cellStyle = GetRowCellStyle(entryIdx);
-                        
-                        // render entry values
-                        using (new BackgroundColorScope(cellStyle.BackgroundColor))
-                        {
-                            // row settings gear
-                            // make row count human 1-based
-                            if (DropdownButton($"{entryIdx + 1}", style: cellStyle.DropdownStyle))
+                            foreach (var filter in attributeFilters)
                             {
-                                RenderEntryRowOptions(entryIdx, entryCount, scheme, entry);
+                                var attributeRes = scheme.GetAttribute(filter.Key);
+                                if (!attributeRes.Try(out var attribute))
+                                    return false;
+                                var value = entry.GetDataDirect(attribute);
+                                if (value == null)
+                                    return false;
+                                var filterStr = filter.Value.ToLower();
+                                if (string.IsNullOrEmpty(filterStr))
+                                    continue;
+                                if (!value.ToString().ToLower().Contains(filterStr))
+                                    return false;
                             }
-                            
-                            for (int attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
+
+                            return true;
+                        }).ToList();
+                    }
+
+                    // Calculate visible range for virtual scrolling
+                    var visibleRange = _virtualTableView.CalculateVisibleRange(
+                        tableViewScrollPosition,
+                        lastScrollViewRect,
+                        allEntries.Count,
+                        scheme.SchemeName,
+                        sortOrder,
+                        attributeFilters);
+
+                    // Render top spacer for virtual scrolling
+                    _virtualTableView.RenderSpacers(visibleRange.start, allEntries.Count);
+                    
+                    // Prepare render styling data 
+                    var attributeStyleOptions = new GUILayoutOption[1];
+
+                    // Get only the visible entries
+                    var visibleEntries = _virtualTableView.GetVisibleEntries(allEntries, visibleRange);
+                    EditorGUILayout.LabelField($"Num entries: {visibleEntries.Count()}");
+
+                    // render table body, scheme data entries (only visible ones)
+                    int entryIdx = visibleRange.start;
+                    foreach (var entry in visibleEntries)
+                    {
+                        using (new GUILayout.HorizontalScope())
+                        {
+                            var cellStyle = GetRowCellStyle(entryIdx);
+
+                            // render entry values
+                            using (new BackgroundColorScope(cellStyle.BackgroundColor))
                             {
-                                var attribute = scheme.GetAttribute(attributeIdx);
-                                var attributeName = attribute.AttributeName;
-                                // handle setting
-                                object entryValue;
-                                bool didSetLoad = false;
-                                if (!entry.GetData(attribute).Try(out entryValue))
+                                // row settings gear
+                                // make row count human 1-based
+                                // TODO: remove string generation every frame
+                                if (DropdownButton((entryIdx + 1).ToString(), style: cellStyle.DropdownStyle))
                                 {
-                                    LogDbgWarning($"Setting {attribute} data for {entry}");
-                                    // for some reason this data wasn't set yet
-                                    entryValue = attribute.CloneDefaultValue();
-                                    didSetLoad = true;
+                                    RenderEntryRowOptions(entryIdx, entryCount, scheme, entry);
                                 }
-                                else
+
+                                // Hot Path
+                                for (int attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                                 {
-                                    if (attribute.DataType.CheckIfValidData(entryValue).Failed)
+                                    var attribute = scheme.GetAttribute(attributeIdx);
+                                    var attributeName = attribute.AttributeName;
+                                    // handle setting
+                                    object entryValue = entry.GetDataDirect(attribute);
+                                    bool didSetLoad = false;
+                                    if (entryValue == null)
                                     {
-                                        if (DataType.ConvertData(entryValue, DataType.Default, attribute.DataType)
-                                            .Try(out var convertedValue))
+                                        LogDbgWarning($"Setting {attribute} data for {entry}");
+                                        // for some reason this data wasn't set yet
+                                        entryValue = attribute.CloneDefaultValue();
+                                        didSetLoad = true;
+                                    }
+                                    else
+                                    {
+                                        if (attribute.DataType.CheckIfValidData(entryValue).Failed)
                                         {
-                                            entryValue = convertedValue;
-                                            didSetLoad = true;
+                                            if (DataType.ConvertData(entryValue, DataType.Default, attribute.DataType)
+                                                .Try(out var convertedValue))
+                                            {
+                                                entryValue = convertedValue;
+                                                didSetLoad = true;
+                                            }
+                                            else
+                                            {
+                                                entryValue = attribute.CloneDefaultValue();
+                                                didSetLoad = true;
+                                            }
+                                        }
+                                    }
+
+                                    if (didSetLoad)
+                                    {
+                                        _ = ExecuteSetDataOnEntryAsync(scheme, entry, attributeName, entryValue);
+                                    }
+
+                                    attributeStyleOptions[0] = GUILayout.Width(attribute.ColumnWidth);
+                                    using (var changed = new EditorGUI.ChangeCheckScope())
+                                    {
+                                        if (attribute.DataType == DataType.Integer)
+                                        {
+                                            entryValue = EditorGUILayout.IntField(Convert.ToInt32(entryValue),
+                                                cellStyle.FieldStyle,
+                                                attributeStyleOptions);
+                                        }
+                                        else if (attribute.DataType is BooleanDataType)
+                                        {
+                                            bool boolValue = false;
+                                            if (entryValue is bool b)
+                                                boolValue = b;
+                                            else if (entryValue is string s && bool.TryParse(s, out var parsed))
+                                                boolValue = parsed;
+                                            else if (entryValue is int i)
+                                                boolValue = i != 0;
+                                            entryValue = EditorGUILayout.Toggle(boolValue, attributeStyleOptions);
+                                        }
+                                        else if (attribute.DataType == DataType.FilePath)
+                                        {
+                                            string filePath = entryValue.ToString();
+                                            var filePreview = Path.GetFileName(filePath);
+                                            if (string.IsNullOrEmpty(filePreview))
+                                            {
+                                                filePreview = "...";
+                                            }
+
+                                            var fileContent = new GUIContent(filePreview, tooltip: filePath);
+                                            if (GUILayout.Button(fileContent, cellStyle.ButtonStyle, attributeStyleOptions))
+                                            {
+                                                var selectedFilePath =
+                                                    EditorUtility.OpenFilePanel($"{scheme.SchemeName} - {attributeName}",
+                                                        "", "");
+                                                if (!string.IsNullOrEmpty(selectedFilePath))
+                                                {
+                                                    entryValue = selectedFilePath;
+                                                }
+                                            }
+                                        }
+                                        else if (attribute.DataType is ReferenceDataType refDataType)
+                                        {
+                                            // Render Reference Data Type options
+                                            var gotoButtonWidth = 20;
+                                            var refDropdownWidth = attribute.ColumnWidth - gotoButtonWidth;
+                                            var currentValue = entryValue == null ? "..." : entryValue.ToString();
+                                            if (DropdownButton(currentValue, refDropdownWidth, cellStyle.DropdownStyle))
+                                            {
+                                                var referenceEntryOptions = new GenericMenu();
+
+                                                if (GetScheme(refDataType.ReferenceSchemeName)
+                                                    .Try(out var refSchema))
+                                                {
+                                                    foreach (var identifierValue in refSchema.GetIdentifierValues())
+                                                    {
+                                                        referenceEntryOptions.AddItem(
+                                                            new GUIContent(identifierValue.ToString()),
+                                                            on: identifierValue.Equals(currentValue),
+                                                            () =>
+                                                            {
+                                                                _ = ExecuteSetDataOnEntryAsync(scheme, entry, attributeName,
+                                                                    identifierValue);
+                                                            });
+                                                    }
+                                                }
+
+                                                referenceEntryOptions.ShowAsContext();
+                                            }
+
+                                            if (GUILayout.Button("O", GUILayout.Width(gotoButtonWidth)))
+                                            {
+                                                FocusOnEntry(refDataType.ReferenceSchemeName,
+                                                    refDataType.ReferenceAttributeName, currentValue);
+                                                GUI.FocusControl(null);
+                                            }
+                                        }
+                                        else if (attribute.DataType is DateTimeDataType)
+                                        {
+                                            // Optimized handling for DateTime to reduce GC allocations
+                                            const string dateTimeFormat = "yyyy-MM-dd HH:mm:ss";
+                                            
+                                            DateTime dateTimeValue = entryValue is DateTime dt ? dt : DateTime.Now;
+                                            string dateTimeString = dateTimeValue.ToString(dateTimeFormat);
+                                            string result = EditorGUILayout.TextField(dateTimeString, cellStyle.FieldStyle, attributeStyleOptions);
+                                            
+                                            // Only parse if the string actually changed
+                                            if (result != dateTimeString && DateTime.TryParse(result, out DateTime parsedDateTime))
+                                            {
+                                                entryValue = parsedDateTime;
+                                            }
+                                            else
+                                            {
+                                                entryValue = dateTimeValue;
+                                            }
                                         }
                                         else
                                         {
-                                            entryValue = attribute.CloneDefaultValue();
-                                            didSetLoad = true;
+                                            entryValue = FastTextField(entryValue, cellStyle.FieldStyle, attributeStyleOptions);
                                         }
-                                    }
-                                }
 
-                                if (didSetLoad)
-                                {
-                                    _ = ExecuteSetDataOnEntryAsync(scheme, entry, attributeName, entryValue);
-                                }
-
-                                var attributeFieldWidth = GUILayout.Width(attribute.ColumnWidth);
-                                using (var changed = new EditorGUI.ChangeCheckScope())
-                                {
-                                    if (attribute.DataType == DataType.Integer)
-                                    {
-                                        entryValue = EditorGUILayout.IntField(Convert.ToInt32(entryValue), cellStyle.FieldStyle,
-                                            attributeFieldWidth);
-                                    }
-                                    else if (attribute.DataType is BooleanDataType)
-                                    {
-                                        bool boolValue = false;
-                                        if (entryValue is bool b)
-                                            boolValue = b;
-                                        else if (entryValue is string s && bool.TryParse(s, out var parsed))
-                                            boolValue = parsed;
-                                        else if (entryValue is int i)
-                                            boolValue = i != 0;
-                                        entryValue = EditorGUILayout.Toggle(boolValue, attributeFieldWidth);
-                                    }
-                                    else if (attribute.DataType == DataType.FilePath)
-                                    {
-                                        string filePath = entryValue.ToString();
-                                        var filePreview = Path.GetFileName(filePath);
-                                        if (string.IsNullOrEmpty(filePreview))
+                                        int lastControlId = GUIUtility.GetControlID(FocusType.Passive);
+                                        // For virtual scrolling, we need to map the global entry index to local visible index
+                                        int localEntryIdx = _virtualTableView.IsVirtualScrollingActive
+                                            ? entryIdx - visibleRange.start
+                                            : entryIdx;
+                                        if (localEntryIdx >= 0 && localEntryIdx < visibleEntryCount)
                                         {
-                                            filePreview = "...";
+                                            tableCellControlIds[localEntryIdx * attributeCount + attributeIdx] =
+                                                lastControlId;
                                         }
-                                        var fileContent = new GUIContent(filePreview, tooltip: filePath);
-                                        if (GUILayout.Button(fileContent, cellStyle.ButtonStyle, attributeFieldWidth))
+
+                                        if (changed.changed)
                                         {
-                                            var selectedFilePath = EditorUtility.OpenFilePanel($"{scheme.SchemeName} - {attributeName}", "", "");
-                                            if (!string.IsNullOrEmpty(selectedFilePath))
+                                            bool shouldUpdateEntry = false;
+                                            if (attribute.IsIdentifier)
                                             {
-                                                entryValue = selectedFilePath;
-                                            }
-                                        }
-                                    }
-                                    else if (attribute.DataType is ReferenceDataType refDataType)
-                                    {
-                                        // Render Reference Data Type options
-                                        var gotoButtonWidth = 20;
-                                        var refDropdownWidth = attribute.ColumnWidth - gotoButtonWidth;
-                                        var currentValue = entryValue == null ? "..." : entryValue.ToString();
-                                        if (DropdownButton(currentValue, refDropdownWidth, cellStyle.DropdownStyle))
-                                        {
-                                            var referenceEntryOptions = new GenericMenu();
-
-                                            if (GetScheme(refDataType.ReferenceSchemeName)
-                                                .Try(out var refSchema))
-                                            {
-                                                foreach (var identifierValue in refSchema.GetIdentifierValues())
+                                                if (scheme.GetIdentifierValues()
+                                                    .Any(otherAttributeName =>
+                                                        otherAttributeName.Equals(entryValue)))
                                                 {
-                                                    referenceEntryOptions.AddItem(new GUIContent(identifierValue.ToString()),
-                                                        on: identifierValue.Equals(currentValue), () =>
-                                                        {
-                                                            _ = ExecuteSetDataOnEntryAsync(scheme, entry, attributeName, identifierValue);
-                                                        });
+                                                    EditorUtility.DisplayDialog("Schema",
+                                                        $"Attribute '{attribute.AttributeName}' with value '{entryValue}' already exists.",
+                                                        "OK");
                                                 }
-                                            }
-                                            referenceEntryOptions.ShowAsContext();
-                                        }
-                                        
-                                        if (GUILayout.Button("O", GUILayout.Width(gotoButtonWidth)))
-                                        {
-                                            FocusOnEntry(refDataType.ReferenceSchemeName, refDataType.ReferenceAttributeName, currentValue);
-                                            GUI.FocusControl(null);
-                                        }
-                                    }
-                                    else {
-                                        entryValue = EditorGUILayout.TextField(entryValue == null ? string.Empty : entryValue.ToString(), cellStyle.FieldStyle, attributeFieldWidth);
-                                    }
-                                    int lastControlId = GUIUtility.GetControlID(FocusType.Passive);
-                                    tableCellControlIds[entryIdx * attributeCount + attributeIdx] = lastControlId;
-
-                                    if (changed.changed)
-                                    {
-                                        bool shouldUpdateEntry = false;
-                                        if (attribute.IsIdentifier)
-                                        {
-                                            if (scheme.GetIdentifierValues()
-                                                .Any(otherAttributeName =>
-                                                    otherAttributeName.Equals(entryValue)))
-                                            {
-                                                EditorUtility.DisplayDialog("Schema", $"Attribute '{attribute.AttributeName}' with value '{entryValue}' already exists.", "OK");
+                                                else
+                                                {
+                                                    shouldUpdateEntry = true;
+                                                    Debug.Log(
+                                                        $"Setting unique attribute '{attribute.AttributeName}' to '{scheme.SchemeName}', value '{entryValue}'.");
+                                                }
                                             }
                                             else
                                             {
                                                 shouldUpdateEntry = true;
-                                                Debug.Log($"Setting unique attribute '{attribute.AttributeName}' to '{scheme.SchemeName}', value '{entryValue}'.");
+                                                Debug.Log(
+                                                    $"Setting attribute '{attribute.AttributeName}' to '{scheme.SchemeName}'.");
                                             }
-                                        }
-                                        else
-                                        {
-                                            shouldUpdateEntry = true;
-                                            Debug.Log($"Setting attribute '{attribute.AttributeName}' to '{scheme.SchemeName}'.");
-                                        }
 
-                                        if (shouldUpdateEntry)
-                                        {
-                                            if (attribute.IsIdentifier)
+                                            if (shouldUpdateEntry)
                                             {
-                                                UpdateIdentifierValue(scheme.SchemeName, 
-                                                    attributeName,
-                                                    entry.GetData(attributeName), entryValue);
+                                                if (attribute.IsIdentifier)
+                                                {
+                                                    UpdateIdentifierValue(scheme.SchemeName,
+                                                        attributeName,
+                                                        entry.GetData(attributeName), entryValue);
+                                                }
+                                                else
+                                                {
+                                                    _ = ExecuteSetDataOnEntryAsync(scheme, entry, attributeName,
+                                                        entryValue);
+                                                }
+
+                                                // This operation can dirty multiple data schemes, save any affected
+                                                LatestResponse = Save();
                                             }
-                                            else
-                                            {
-                                                _ = ExecuteSetDataOnEntryAsync(scheme, entry, attributeName, entryValue);
-                                            }
-                                            
-                                            // This operation can dirty multiple data schemes, save any affected
-                                            LatestResponse = Save();
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                    
-                    entryIdx++;
-                }
 
-                GUILayout.EndScrollView();
+                                            entryIdx++;
+                }
                 
-                // add new entry form
+                // Render bottom spacer for virtual scrolling
+                _virtualTableView.RenderBottomSpacer(visibleRange.end, allEntries.Count);
+
+                // GUILayout.EndScrollView();
+            }
+
+                lastScrollViewRect = GUILayoutUtility.GetLastRect();
+                
+            // add new entry form
                 if (scheme.AttributeCount > 0)
                 {
                     if (AddButton("Create New Entry", expandWidth: true, height: 50f))
                     {
-                        scheme.CreateNewEntry();
+                        scheme.CreateNewEmptyEntry();
                         Debug.Log($"Added entry to '{scheme.SchemeName}'.");
                     }
                 }
+            }
+            
+            // End performance monitoring
+            _performanceMonitor?.EndRender();
+            
+            // Display GC warning if allocations are high
+            if (_performanceMonitor != null && _performanceMonitor.AverageAllocatedBytes > 1024 * 1024) // > 1MB average
+            {
+                EditorGUILayout.HelpBox($"High GC pressure detected: {_performanceMonitor.FormatBytes((long)_performanceMonitor.AverageAllocatedBytes)} average allocation per render", MessageType.Warning);
             }
             
             // handle arrow key navigation of table
@@ -882,6 +1043,14 @@ namespace Schema.Unity.Editor
             {
                 // IDK why this is off-by-one
                 int focusedIndex = Array.IndexOf(tableCellControlIds, GUIUtility.keyboardControl + 1);
+                
+                // For virtual scrolling, we need to convert local index back to global index
+                if (_virtualTableView.IsVirtualScrollingActive && focusedIndex != -1)
+                {
+                    int localEntryIdx = focusedIndex / attributeCount;
+                    int localAttributeIdx = focusedIndex % attributeCount;
+                    focusedIndex = (_virtualTableView.VisibleRange.start + localEntryIdx) * attributeCount + localAttributeIdx;
+                }
                 
                 if (focusedIndex != -1)
                 {
@@ -896,7 +1065,7 @@ namespace Schema.Unity.Editor
                             }
                             break;
                         case KeyCode.DownArrow:
-                            if (focusedIndex + attributeCount < tableCellControlIds.Length)
+                            if (focusedIndex + attributeCount < allEntries.Count * attributeCount)
                             {
                                 nextFocusedIndex = focusedIndex + attributeCount;
                             }
@@ -910,7 +1079,7 @@ namespace Schema.Unity.Editor
                         case KeyCode.Return:
                         case KeyCode.KeypadEnter:
                             // try to go right if possible
-                            if (focusedIndex + 1 < tableCellControlIds.Length)
+                            if (focusedIndex + 1 < allEntries.Count * attributeCount)
                             {
                                 nextFocusedIndex = focusedIndex + 1;
                             }
@@ -926,9 +1095,37 @@ namespace Schema.Unity.Editor
 
                     if (nextFocusedIndex != -1)
                     {
-                        // IDK why this is off-by-one
-                        GUIUtility.keyboardControl = tableCellControlIds[nextFocusedIndex] - 1;
-                        ev.Use(); // make sure to consume event if we used it
+                        // For virtual scrolling, we need to convert global index to local index
+                        if (_virtualTableView.IsVirtualScrollingActive)
+                        {
+                            int globalEntryIdx = nextFocusedIndex / attributeCount;
+                            int globalAttributeIdx = nextFocusedIndex % attributeCount;
+                            
+                            // Check if the target entry is in the visible range
+                            if (globalEntryIdx >= _virtualTableView.VisibleRange.start && globalEntryIdx < _virtualTableView.VisibleRange.end)
+                            {
+                                int localEntryIdx = globalEntryIdx - _virtualTableView.VisibleRange.start;
+                                int localIndex = localEntryIdx * attributeCount + globalAttributeIdx;
+                                if (localIndex >= 0 && localIndex < tableCellControlIds.Length)
+                                {
+                                    GUIUtility.keyboardControl = tableCellControlIds[localIndex] - 1;
+                                    ev.Use();
+                                }
+                            }
+                            else
+                            {
+                                // Target is outside visible range, scroll to it
+                                float targetY = globalEntryIdx * _virtualTableView.TotalContentHeight / allEntries.Count;
+                                tableViewScrollPosition.y = targetY;
+                                ev.Use();
+                            }
+                        }
+                        else
+                        {
+                            // IDK why this is off-by-one
+                            GUIUtility.keyboardControl = tableCellControlIds[nextFocusedIndex] - 1;
+                            ev.Use(); // make sure to consume event if we used it
+                        }
                     }
                 }
             }
@@ -986,8 +1183,7 @@ namespace Schema.Unity.Editor
                     }
 
                     // add new attribute form
-                    newAttributeName = GUILayout.TextField(newAttributeName, GUILayout.ExpandWidth(false),
-                        GUILayout.MinWidth(100));
+                    newAttributeName = GUILayout.TextField(newAttributeName, GUILayout.MinWidth(100), GUILayout.ExpandWidth(false));
                     using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newAttributeName)))
                     {
                         if (AddButton("Add Attribute"))
@@ -1204,32 +1400,6 @@ namespace Schema.Unity.Editor
             r.width +=6;
             EditorGUI.DrawRect(r, color);
         }
-
-        #region Utilities
-
-        void Mark()
-        {
-            EditorGUILayout.LabelField($"Mark{debugIdx++}", GUILayout.ExpandWidth(false), GUILayout.Width(50));
-        }
-        
-        private void DrawVerticalLine(float thickness = 2)
-        {
-            Rect rect = EditorGUILayout.GetControlRect(GUILayout.Width(thickness), GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(false));
-            EditorGUI.DrawRect(rect, Color.white);
-        }
-
-        public static bool AddButton(string text, bool expandWidth = false, float? height = null) => 
-            Button(text, EditorIcon.PLUS_ICON_NAME, expandWidth: expandWidth, height: height);
-
-        public static bool Button(string text, string iconName, bool expandWidth = false, float? height = null) =>
-            Button(text, iconName, GUILayout.ExpandWidth(expandWidth),
-                height != null ? GUILayout.Height(height.Value) : GUILayout.ExpandHeight(false));
-        
-        
-        public static bool Button(string text, string iconName, params GUILayoutOption[] options) =>
-            GUILayout.Button(new GUIContent(text, EditorGUIUtility.IconContent(iconName).image), options);
-        
-        #endregion
         
         #endregion
 

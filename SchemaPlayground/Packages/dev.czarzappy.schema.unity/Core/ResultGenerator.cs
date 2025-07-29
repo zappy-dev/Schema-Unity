@@ -2,11 +2,12 @@ namespace Schema.Core
 {
     public abstract class ResultGenerator
     {
+        protected abstract string Context { get; }
         internal SchemaResult Fail(string errorMessage) => 
-            new SchemaResult(status: SchemaResult.RequestStatus.Failed, message: errorMessage, context: this.ToString());
+            new SchemaResult(status: RequestStatus.Failed, message: errorMessage, context: Context);
 
         internal SchemaResult Pass(string message = null) =>
-            new SchemaResult(status: SchemaResult.RequestStatus.Passed, message: message, context: this.ToString());
+            new SchemaResult(status: RequestStatus.Passed, message: message, context: Context);
 
         internal SchemaResult CheckIf(bool conditional, string errorMessage, string successMessage)
         {

@@ -104,7 +104,9 @@ namespace Schema.Core.Serialization
                     var enumerator = potentialDataTypes.GetEnumerator();
                     while (enumerator.MoveNext())
                     {
-                        if (!enumerator.Current.ConvertData(rawData).Try(out var convertedData))
+                        var testType = enumerator.Current;
+                        if (!testType.ConvertData(rawData).Try(out var convertedData) ||
+                            !testType.CheckIfValidData(convertedData).Passed)
                         {
                             potentialDataTypes.Remove(enumerator.Current);
                         }

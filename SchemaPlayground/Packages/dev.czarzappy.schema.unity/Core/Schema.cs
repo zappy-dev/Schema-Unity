@@ -21,19 +21,6 @@ namespace Schema.Core
             public const string System = "System";
         }
 
-        public static string ManifestLoadPath
-        {
-            get
-            {
-                if (!IsInitialized)
-                {
-                    return null;
-                }
-
-                return ManifestSelfEntry.GetDataAsString(MANIFEST_ATTRIBUTE_FILEPATH);
-            }
-        }
-
         private static readonly Dictionary<string, DataScheme> LoadedSchemes = new Dictionary<string, DataScheme>();
         
         /// <summary>
@@ -56,11 +43,8 @@ namespace Schema.Core
                     {
                         return Enumerable.Empty<string>();
                     }
-                    
-                    return manifestScheme.GetValuesForAttribute(MANIFEST_ATTRIBUTE_SCHEME_NAME)
-                        .Select(a => a?.ToString())
-                        .Where(a => !string.IsNullOrWhiteSpace(a))
-                        ;
+
+                    return manifestScheme.GetAllSchemeNames();
                 }
             }
         }
@@ -96,6 +80,9 @@ namespace Schema.Core
         {
             IsInitialized = false;
             LoadedSchemes.Clear();
+            manifestImportPath = String.Empty;
+            nextManifestScheme = null;
+            loadedManifestScheme = null;
 
             var initResult = InitializeTemplateManifestScheme();
             IsInitialized = initResult.Passed;

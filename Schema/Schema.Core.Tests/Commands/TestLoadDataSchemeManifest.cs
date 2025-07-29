@@ -37,7 +37,7 @@ public class TestLoadDataSchemeManifest
         // Verify manifest entry added
         var manifestEntryResult = Schema.GetManifestEntryForScheme(SchemeName);
         Assert.IsTrue(manifestEntryResult.Passed, manifestEntryResult.Message);
-        Assert.That(manifestEntryResult.Result.GetDataAsString(Schema.MANIFEST_ATTRIBUTE_FILEPATH), Is.EqualTo(filePath));
+        Assert.That(manifestEntryResult.Result.FilePath, Is.EqualTo(filePath));
     }
 
     [Test]
@@ -57,6 +57,6 @@ public class TestLoadDataSchemeManifest
 
         var manifestEntryResult = Schema.GetManifestEntryForScheme(SchemeName);
         Assert.IsTrue(manifestEntryResult.Passed, manifestEntryResult.Message);
-        Assert.That(manifestEntryResult.Result.GetDataAsString(Schema.MANIFEST_ATTRIBUTE_FILEPATH), Is.EqualTo(filePath2));
+        Assert.That(manifestEntryResult.Result.FilePath, Is.EqualTo(filePath2));
     }
 } 

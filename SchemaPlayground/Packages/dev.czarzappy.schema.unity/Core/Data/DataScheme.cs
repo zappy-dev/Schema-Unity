@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using Newtonsoft.Json;
 using Schema.Core.Ext;
@@ -13,6 +14,7 @@ namespace Schema.Core.Data
     [Serializable]
     public partial class DataScheme : ResultGenerator
     {
+        protected override string Context => nameof(DataScheme);
         #region Fields and Properties
         
         [JsonProperty("SchemeName")]
@@ -38,7 +40,7 @@ namespace Schema.Core.Data
         public int AttributeCount => attributes?.Count ?? 0;
         
         [JsonIgnore]
-        public bool IsManifest => Schema.MANIFEST_SCHEME_NAME.Equals(SchemeName);
+        public bool IsManifest => Manifest.MANIFEST_SCHEME_NAME.Equals(SchemeName);
         
         [JsonIgnore]
         public bool HasIdentifierAttribute
@@ -107,22 +109,38 @@ namespace Schema.Core.Data
         public string ToString(bool verbose)
         {
             StringBuilder stringBuilder = new StringBuilder();
-            var isDirty = IsDirty ? "!" : "";
-            stringBuilder.Append($"DataScheme '{SchemeName}' ({isDirty}), {AttributeCount} attributes, {AllEntries.Count()} entries");
+            Write(stringBuilder, verbose);
+            return stringBuilder.ToString();
+        }
+        
+        public void Write(StringBuilder stringBuilder, bool verbose)
+        {
+            var isDirty = IsDirty ? "*" : "";
+            stringBuilder.Append($"DataScheme '{SchemeName}' [{AttributeCount}x{AllEntries.Count()}]{isDirty} ({RuntimeHelpers.GetHashCode(this)})");
             if (verbose)
             {
-                stringBuilder.AppendLine("==== Attributes ====");
+                
+                // var handle = GCHandle.Alloc(this, GCHandleType.Pinned);
+                //
+                // try
+                // {
+                //     IntPtr address = handle.AddrOfPinnedObject();
+                // }
+                // finally
+                // {
+                //     handle.Free();                           // ALWAYS free the handle
+                // }
+                stringBuilder.AppendLine();
                 foreach (var attribute in attributes)
                 {
-                    stringBuilder.AppendLine($"\t{attribute}");
+                    stringBuilder.Append($"{attribute.AttributeName},");
                 }
-                stringBuilder.AppendLine("==== Entries ====");
+                stringBuilder.AppendLine();
                 foreach (var entry in entries)
                 {
-                    stringBuilder.AppendLine($"\t{entry}");
+                    stringBuilder.AppendLine($"{entry}");
                 }
             }
-            return stringBuilder.ToString();
         }
         
         #region Utilities
