@@ -1,5 +1,7 @@
+using System;
 using UnityEditor;
 using System.Collections.Generic;
+using Schema.Core.Data;
 
 namespace Schema.Unity.Editor
 {
@@ -7,6 +9,7 @@ namespace Schema.Unity.Editor
     {
         // Add this field to store filter values for each attribute
         private Dictionary<string, string> attributeFilters = new Dictionary<string, string>();
+        private event Action OnAttributeFiltersUpdated;
 
         private string GetFilterPrefsKey(string schemeName) => $"SchemaEditorWindow.AttributeFilters.{schemeName}";
 
@@ -29,6 +32,39 @@ namespace Schema.Unity.Editor
             {
                 attributeFilters = new Dictionary<string, string>();
             }
+        }
+
+        private void UpdateAttributeFilter(string attributeName, string newFilterValue)
+        {
+            if (string.IsNullOrWhiteSpace(newFilterValue))
+            {
+                attributeFilters.Remove(attributeName);
+            }
+            else
+            {
+                attributeFilters[attributeName] = newFilterValue;
+            }
+
+            OnAttributeFiltersUpdated?.Invoke();
+        }
+
+        private List<(AttributeDefinition attributeDefinition, string needle)> GetAttributeFiltersForScheme(DataScheme scheme)
+        {
+            var compiledFilters = new List<(AttributeDefinition attribute, string needle)>();
+            foreach (var kvp in attributeFilters)
+            {
+                if (string.IsNullOrWhiteSpace(kvp.Value))
+                    continue;
+                            
+                var attributeRes = scheme.GetAttribute(kvp.Key);
+                if (!attributeRes.Try(out var attribute))
+                    continue;
+
+                var sanitizedNeedle = kvp.Value.Trim().ToLower();
+                compiledFilters.Add((attribute, sanitizedNeedle));
+            }
+
+            return compiledFilters;
         }
     }
 }

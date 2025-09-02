@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Schema.Core.Data;
+using Schema.Core.DataStructures;
 using Schema.Core.IO;
 using Schema.Core.Serialization;
 using Unity.Profiling;
@@ -85,7 +86,63 @@ namespace Schema.Unity.Editor
         
         private readonly TableLayout _tableLayout = new TableLayout();
 
+        [NonSerialized] private string selectedSchemeLoadPath = null;
+
         #endregion
+
+        private List<DataEntry> allEntries;
+        private void RefreshTableEntriesForSelectedScheme()
+        {
+            if (string.IsNullOrEmpty(selectedSchemeName) ||
+                !GetScheme(selectedSchemeName).Try(out var scheme))
+            {
+                allEntries = Enumerable.Empty<DataEntry>().ToList();
+                return;
+            }
+            
+            var sortOrder = GetSortOrderForScheme(scheme);
+            var realAllEntries = scheme.GetEntries(sortOrder);
+            
+            var compiledFilters = GetAttributeFiltersForScheme(scheme);
+            if (compiledFilters.Count <= 0)
+            {
+                allEntries = realAllEntries.ToList();
+            }
+            else
+            {
+                allEntries = realAllEntries.Where(entry =>
+                {
+                    // ensure low GC
+                    foreach (var filter in compiledFilters)
+                    {
+                        var (attribute, needle) = filter;
+                        var value = entry.GetDataDirect(attribute);
+                        if (value == null)
+                            return false;
+                        // expensive to compare everything to strings
+                        // make faster for numeric comparisons?
+                        if (value is string s)
+                        {
+                            if (s.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0)
+                            {
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            var str = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+                            if (string.IsNullOrEmpty(str) ||
+                                str.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0)
+                            {
+                                return false;
+                            }
+                        }
+                    }
+
+                    return true;
+                }).ToList();
+            }
+        }
         
         private void RenderTableView()
         {
@@ -103,24 +160,26 @@ namespace Schema.Unity.Editor
             
             // Load core data
             var sortOrder = GetSortOrderForScheme(scheme);
-            var allEntries = scheme.GetEntries(sortOrder).ToList();
+            // allEntries = scheme.GetEntries(sortOrder).ToList();
             
             // Load filters for the current schema (if not already loaded)
             LoadAttributeFilters(scheme.SchemeName);
             
             int attributeCount = scheme.AttributeCount;
-            int entryCount = scheme.EntryCount;
+            int availableEntryCount = allEntries.Count;
+            int totalEntryCount = scheme.EntryCount;
                 
             // mapping entries to control IDs for focus/navigation management
             // For virtual scrolling, we only need control IDs for visible entries
             int visibleEntryCount = _virtualTableView.IsVirtualScrollingActive ? 
-                Math.Min(entryCount, 50) : entryCount; // Limit to reasonable number for virtual scrolling
+                Math.Min(totalEntryCount, 50) : totalEntryCount; // Limit to reasonable number for virtual scrolling
             int[] tableCellControlIds = new int[attributeCount * visibleEntryCount];
 
             using (new GUILayout.VerticalScope())
             {
+                
                 GUILayout.Label(
-                    $"Table View - {scheme.SchemeName} - {entryCount} {(entryCount == 1 ? "entry" : "entries")}",
+                    $"Table View - {scheme.SchemeName} - {availableEntryCount}/{totalEntryCount} {(totalEntryCount == 1 ? "entry" : "entries")}",
                     EditorStyles.boldLabel);
 
                 if (showDebugView)
@@ -133,14 +192,13 @@ namespace Schema.Unity.Editor
                     EditorGUILayout.LabelField("Storage Path", DoNotExpandWidthOptions);
                     using (new EditorGUI.DisabledScope())
                     {
-                        string storagePath = "No storage path found for this Schema.";
-                        if (GetManifestEntryForScheme(scheme).Try(out var schemeManifestEntry))
+                        if (string.IsNullOrEmpty(selectedSchemeLoadPath) && GetManifestEntryForScheme(scheme).Try(out var schemeManifestEntry))
                         {
-                            storagePath = schemeManifestEntry.FilePath;
-                            storagePath = PathUtility.MakeAbsolutePath(storagePath, ContentLoadPath);
+                            selectedSchemeLoadPath = schemeManifestEntry.FilePath;
+                            selectedSchemeLoadPath = PathUtility.MakeAbsolutePath(selectedSchemeLoadPath, ContentLoadPath);
                         }
 
-                        EditorGUILayout.TextField(storagePath);
+                        EditorGUILayout.TextField(selectedSchemeLoadPath);
                     }
 
                     var saveButtonText = scheme.IsDirty ? "Save*" : "Save";
@@ -148,6 +206,11 @@ namespace Schema.Unity.Editor
                     if (GUILayout.Button(saveButtonText, ExpandWidthOptions))
                     {
                         LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
+                    }
+
+                    if (GUILayout.Button("Open", ExpandWidthOptions))
+                    {
+                        EditorUtility.RevealInFinder(selectedSchemeLoadPath);
                     }
 
                     // TODO: Open raw schema files
@@ -174,76 +237,26 @@ namespace Schema.Unity.Editor
                     }
                 }
 
-                using (var scrollView1 = new EditorGUILayout.ScrollViewScope(tableViewHeaderHorizontalScrollPosition,
+                using (var tableScrollView = new EditorGUILayout.ScrollViewScope(tableViewHeaderHorizontalScrollPosition,
                            alwaysShowHorizontal: true,
                            alwaysShowVertical: false))
                 {
-                    tableViewHeaderHorizontalScrollPosition = scrollView1.scrollPosition;
+                    tableViewHeaderHorizontalScrollPosition = tableScrollView.scrollPosition;
                     
                     // Freeze table header to top of the viewport
                     RenderTableHeader(attributeCount, scheme);
-                    using (var scrollView = new EditorGUILayout.ScrollViewScope(tableViewBodyVerticalScrollPosition,
+                    
+                    using (var tableBodyScrollView = new EditorGUILayout.ScrollViewScope(tableViewBodyVerticalScrollPosition,
                                alwaysShowHorizontal: false,
                                alwaysShowVertical: true))
                     {
                         // Update scroll position from the scope
-                        tableViewBodyVerticalScrollPosition = scrollView.scrollPosition;
+                        tableViewBodyVerticalScrollPosition = tableBodyScrollView.scrollPosition;
 
                         LogDbgVerbose(
                             $"TableView: Will pass to VirtualTableView - viewportHeight={lastScrollViewRect.height:F1}");
 
                         _tableBodyMarker.Begin();
-                        _tableBodyFilterEntriesMarker.Begin();
-                        var compiledFilters = new List<(AttributeDefinition attribute, string needle)>();
-                        foreach (var kvp in attributeFilters)
-                        {
-                            if (string.IsNullOrWhiteSpace(kvp.Value))
-                                continue;
-                            
-                            var attributeRes = scheme.GetAttribute(kvp.Key);
-                            if (!attributeRes.Try(out var attribute))
-                                continue;
-
-                            var sanitizedNeedle = kvp.Value.Trim().ToLower();
-                            compiledFilters.Add((attribute, sanitizedNeedle));
-                        }
-                        
-                        // Apply attribute filters
-                        if (compiledFilters.Count > 0)
-                        {
-                            allEntries = allEntries.Where(entry =>
-                            {
-                                // ensure low GC
-                                foreach (var filter in compiledFilters)
-                                {
-                                    var (attribute, needle) = filter;
-                                    var value = entry.GetDataDirect(attribute);
-                                    if (value == null)
-                                        return false;
-                                    // expensive to compare everything to strings
-                                    // make faster for numeric comparisons?
-                                    if (value is string s)
-                                    {
-                                        if (s.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0)
-                                        {
-                                            return false;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        var str = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
-                                        if (string.IsNullOrEmpty(str) ||
-                                            str.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0)
-                                        {
-                                            return false;
-                                        }
-                                    }
-                                }
-
-                                return true;
-                            }).ToList();
-                        }
-                        _tableBodyFilterEntriesMarker.End();
 
                         // Calculate visible range for virtual scrolling
                         var visibleRange = _virtualTableView.CalculateVisibleRange(
@@ -261,12 +274,6 @@ namespace Schema.Unity.Editor
                                 $"Visible range end ({visibleRange.end}) exceeds total entries ({allEntries.Count}). Clamping to valid range.");
                             visibleRange = (visibleRange.start, Math.Min(visibleRange.end, allEntries.Count));
                         }
-
-                        // Get only the visible entries
-                        var visibleEntries = _virtualTableView.GetVisibleEntries(allEntries, visibleRange);
-                        EditorGUILayout.LabelField($"Num entries: {visibleEntries.Count()}");
-
-                        // render table body, scheme data entries (only visible ones) using rect-based rendering
 
                         // Debug logging for rendering
                         LogDbgVerbose(
@@ -528,15 +535,7 @@ namespace Schema.Unity.Editor
                             // On attribute filter change
                             if (newFilterValue != filterValue)
                             {
-                                if (string.IsNullOrWhiteSpace(newFilterValue))
-                                {
-                                    attributeFilters.Remove(attribute.AttributeName);
-                                }
-                                else
-                                {
-                                    attributeFilters[attribute.AttributeName] = newFilterValue;
-                                }
-
+                                UpdateAttributeFilter(attribute.AttributeName, newFilterValue);
                                 SaveAttributeFilters(scheme.SchemeName);
                             }
                         }
@@ -782,7 +781,8 @@ namespace Schema.Unity.Editor
         /// </summary>
         private void RenderIntegerCell(Rect cellRect, int value, CellStyle cellStyle, Action<int> onValueChanged)
         {
-            var newValue = EditorGUI.IntField(cellRect, value, cellStyle.FieldStyle);
+            // var newValue = EditorGUI.IntField(cellRect, value, cellStyle.FieldStyle);
+            var newValue = SchemaGUI.IntField(cellRect, value, cellStyle.FieldStyle);
             if (newValue != value)
             {
                 onValueChanged?.Invoke(newValue);
@@ -873,13 +873,19 @@ namespace Schema.Unity.Editor
             }
         }
         
+        private static readonly LRUCache<DateTime, string> DateTimeCache = new LRUCache<DateTime, string>(1024);
+        
         /// <summary>
         /// Renders a date time cell
         /// </summary>
         private void RenderDateTimeCell(Rect cellRect, DateTime value, CellStyle cellStyle, Action<DateTime> onValueChanged)
         {
             const string dateTimeFormat = "yyyy-MM-dd HH:mm:ss";
-            var dateTimeString = value.ToString(dateTimeFormat);
+            if (!DateTimeCache.TryGet(value, out var dateTimeString))
+            {
+                dateTimeString = value.ToString(dateTimeFormat);
+                DateTimeCache.Put(value, dateTimeString);
+            }
             var result = EditorGUI.TextField(cellRect, dateTimeString, cellStyle.FieldStyle);
             
             if (result != dateTimeString && DateTime.TryParse(result, out DateTime parsedDateTime))

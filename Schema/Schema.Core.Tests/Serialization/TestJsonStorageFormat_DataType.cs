@@ -8,7 +8,7 @@ using Schema.Core.Tests.Ext;
 namespace Schema.Core.Tests.Serialization;
 
 [TestFixture]
-public class TestJsonStorageFormat
+public class TestJsonStorageFormat_DataType
 {
     private JsonStorageFormat<DataType> dataTypeStorageFormat;
     

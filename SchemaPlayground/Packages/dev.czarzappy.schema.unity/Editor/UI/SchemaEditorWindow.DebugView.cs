@@ -99,6 +99,11 @@ namespace Schema.Unity.Editor
                     OnLoadManifest("On User Load");
                 }
 
+                if (GUILayout.Button("Open", ExpandWidthOptions))
+                {
+                    EditorUtility.RevealInFinder(ManifestImportPath);
+                }
+
                 // save schemes to manifest
                 if (GUILayout.Button("Save Manifest"))
                 {

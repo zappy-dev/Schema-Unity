@@ -64,6 +64,25 @@ namespace Schema.Unity.Editor
         private string newSchemeName = string.Empty;
         [NonSerialized]
         private string selectedSchemeName = string.Empty;
+
+        private string SelectedSchemeName
+        {
+            get => selectedSchemeName;
+            set
+            {
+                if (selectedSchemeName == value)
+                {
+                    return;
+                }
+
+                selectedSchemeName = value;
+                
+                OnSelectedSchemeChanged?.Invoke();
+            }
+        }
+
+        private event Action OnSelectedSchemeChanged;
+        
         [NonSerialized]
         private string newAttributeName = string.Empty;
         private string tooltipOfTheDay = string.Empty;
@@ -120,6 +139,9 @@ namespace Schema.Unity.Editor
             
             // Initialize virtual scrolling
             _virtualTableView = new VirtualTableView();
+
+            OnAttributeFiltersUpdated += RefreshTableEntriesForSelectedScheme;
+            OnSelectedSchemeChanged += RefreshTableEntriesForSelectedScheme;
         }
 
         private void InitializeSafely()
@@ -130,7 +152,7 @@ namespace Schema.Unity.Editor
             
             // return;
             selectedSchemaIndex = -1;
-            selectedSchemeName = string.Empty;
+            SelectedSchemeName = string.Empty;
             newAttributeName = string.Empty;
 
             _defaultContentPath = Path.Combine(Path.GetFullPath(Application.dataPath + "/.."), "Content");
@@ -288,7 +310,7 @@ namespace Schema.Unity.Editor
             }
             
             Log($"Opening Schema '{schemeName}' for editing, {context}...");
-            selectedSchemeName = schemeName;
+            SelectedSchemeName = schemeName;
             selectedSchemaIndex = prevSelectedIndex;
             EditorPrefs.SetString(EDITORPREFS_KEY_SELECTEDSCHEME, schemeName);
             newAttributeName = string.Empty;

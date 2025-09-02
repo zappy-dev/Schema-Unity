@@ -26,22 +26,34 @@ namespace Schema.Unity.Editor
         {
             GenerateTestData(500);
         }
-        [MenuItem("Tools/Schema/Generate Test Data (1000 entries)")]
+        [MenuItem("Tools/Schema/Generate Test Data (1,000 entries)")]
         public static void GenerateTestData1000()
         {
-            GenerateTestData(1000);
+            GenerateTestData(1_000);
         }
         
-        [MenuItem("Tools/Schema/Generate Test Data (5000 entries)")]
+        [MenuItem("Tools/Schema/Generate Test Data (5,000 entries)")]
         public static void GenerateTestData5000()
         {
-            GenerateTestData(5000);
+            GenerateTestData(5_000);
         }
         
-        [MenuItem("Tools/Schema/Generate Test Data (10000 entries)")]
+        [MenuItem("Tools/Schema/Generate Test Data (10,000 entries)")]
         public static void GenerateTestData10000()
         {
-            GenerateTestData(10000);
+            GenerateTestData(10_000);
+        }
+        
+        [MenuItem("Tools/Schema/Generate Test Data (50,000 entries)")]
+        public static void GenerateTestData50000()
+        {
+            GenerateTestData(50_000);
+        }
+        
+        [MenuItem("Tools/Schema/Generate Test Data (100,000 entries)")]
+        public static void GenerateTestData100000()
+        {
+            GenerateTestData(100_000);
         }
         
         private static void GenerateTestData(int entryCount)
