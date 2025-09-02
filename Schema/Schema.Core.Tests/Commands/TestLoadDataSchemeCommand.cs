@@ -19,7 +19,7 @@ namespace Schema.Core.Tests.Commands
             Schema.Reset();
             _schemeName = "TestScheme";
             _testScheme = new DataScheme(_schemeName);
-            _testScheme.AddAttribute(new AttributeDefinition("FieldA", DataType.Text)).AssertPassed();
+            _testScheme.AddAttribute("FieldA", DataType.Text).AssertPassed();
             _testScheme.AddEntry(new DataEntry { { "FieldA", "Value1" } });
             _mockProgress = new Mock<IProgress<CommandProgress>>();
         }

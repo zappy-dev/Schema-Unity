@@ -27,8 +27,8 @@ public class TestFilePathDataType
         var fileType = new FilePathDataType(allowEmptyPath: true, useRelativePaths: true,
             basePath: "/Users/zappy/src/Schema-Unity/SchemaPlayground/Content");
 
-        fileType.CheckIfValidData(absolutePath).AssertFailed();
-        fileType.ConvertData(absolutePath).TryAssert(out var result);
+        fileType.CheckIfValidData(absolutePath, TestFixtureSetup.SchemaTestContext).AssertFailed();
+        fileType.ConvertData(absolutePath, TestFixtureSetup.SchemaTestContext).TryAssert(out var result);
         
         Assert.That(result, Is.EqualTo("TODOs.json"));
     }

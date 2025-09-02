@@ -16,7 +16,7 @@ namespace Schema.Core.Tests.Commands
         { 
             Schema.Reset();
             _scheme = new DataScheme("People");
-            _scheme.AddAttribute(new AttributeDefinition(AttributeName, DataType.Text, ""))
+            _scheme.AddAttribute(AttributeName, DataType.Text, "")
                    .AssertPassed();
             _entry = _scheme.CreateNewEmptyEntry(); // create an empty entry
             _scheme.SetDataOnEntry(_entry, AttributeName, "Alice").AssertPassed();

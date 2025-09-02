@@ -39,6 +39,8 @@ public class TestJsonStorageFormat
         {
             var realExpectedJsonString =
                 altExpectedJsonString != null ? altExpectedJsonString : expectedJsonString;
+
+            realExpectedJsonString = realExpectedJsonString.ReplaceLineEndings();
             Assert.That(jsonString, Is.EqualTo(realExpectedJsonString));
         }
     }

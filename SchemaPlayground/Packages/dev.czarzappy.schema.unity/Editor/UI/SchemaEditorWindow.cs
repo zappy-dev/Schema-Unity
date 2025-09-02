@@ -95,9 +95,6 @@ namespace Schema.Unity.Editor
         
         // Virtual scrolling support
         private VirtualTableView _virtualTableView;
-        
-        // Performance monitoring
-        private TablePerformanceMonitor _performanceMonitor;
         private Rect lastScrollViewRect = Rect.zero;
 
         #endregion
@@ -123,9 +120,6 @@ namespace Schema.Unity.Editor
             
             // Initialize virtual scrolling
             _virtualTableView = new VirtualTableView();
-            
-            // Initialize performance monitoring
-            _performanceMonitor = new TablePerformanceMonitor();
         }
 
         private void InitializeSafely()

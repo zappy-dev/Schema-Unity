@@ -101,9 +101,6 @@ namespace Schema.Unity.Editor
                 return;
             }
             
-            // Start performance monitoring
-            _performanceMonitor?.BeginRender();
-            
             // Load core data
             var sortOrder = GetSortOrderForScheme(scheme);
             var allEntries = scheme.GetEntries(sortOrder).ToList();
@@ -129,17 +126,6 @@ namespace Schema.Unity.Editor
                 if (showDebugView)
                 {
                     GUILayout.Label($"{RuntimeHelpers.GetHashCode(scheme)}");
-                }
-                
-                // Display real-time GC status
-                if (_performanceMonitor != null)
-                {
-                    var (totalMemory, allocatedMemory, gen0, gen1, gen2) = _performanceMonitor.GetCurrentGcStatus();
-                    using (new EditorGUI.DisabledScope())
-                    {
-                        EditorGUILayout.LabelField($"GC Status: {_performanceMonitor.FormatBytes(totalMemory)} total, Gen0:{gen0} Gen1:{gen1} Gen2:{gen2}", EditorStyles.miniLabel);
-                        EditorGUILayout.LabelField($"Last Scroll View Rect: {lastScrollViewRect})", EditorStyles.miniLabel);;
-                    }
                 }
 
                 using (new GUILayout.HorizontalScope())
@@ -346,15 +332,6 @@ namespace Schema.Unity.Editor
                         LogDbgVerbose($"Added entry to '{scheme.SchemeName}'.");
                     }
                 }
-            }
-            
-            // End performance monitoring
-            _performanceMonitor?.EndRender();
-            
-            // Display GC warning if allocations are high
-            if (_performanceMonitor != null && _performanceMonitor.AverageAllocatedBytes > 1024 * 1024) // > 1MB average
-            {
-                EditorGUILayout.HelpBox($"High GC pressure detected: {_performanceMonitor.FormatBytes((long)_performanceMonitor.AverageAllocatedBytes)} average allocation per render", MessageType.Warning);
             }
             
             // handle arrow key navigation of table

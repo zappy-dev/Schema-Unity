@@ -105,7 +105,7 @@ namespace Schema.Core
                     if (!loadSchemeRes.Try(out var loadedScheme))
                     {
                         success = false;
-                        Logger.LogError(loadSchemeRes.Message);
+                        Logger.LogError(loadSchemeRes.Message, loadSchemeRes.Context);
                         sb.AppendLine(loadSchemeRes.Message);
                         continue;
                     }
@@ -141,7 +141,7 @@ namespace Schema.Core
                     if (loadScheme.Failed)
                     {
                         success = false;
-                        Logger.LogError(loadScheme.Message);
+                        Logger.LogError(loadScheme.Message, loadScheme.Context);
                         sb.AppendLine(loadScheme.Message);
                     }
                 }

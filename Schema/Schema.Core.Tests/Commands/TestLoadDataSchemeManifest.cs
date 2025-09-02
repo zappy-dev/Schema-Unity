@@ -13,7 +13,7 @@ public class TestLoadDataSchemeManifest
     private DataScheme CreateScheme(string value)
     {
         var scheme = new DataScheme(SchemeName);
-        scheme.AddAttribute(new AttributeDefinition(AttrName, DataType.Text)).AssertPassed();
+        scheme.AddAttribute(AttrName, DataType.Text).AssertPassed();
         scheme.AddEntry(new DataEntry { { AttrName, value } });
         return scheme;
     }

@@ -10,13 +10,18 @@ namespace Schema.Core.Data
 
         #region Attribute Mutations
 
-        public SchemaResult AddAttribute( 
+        public SchemaResult<AttributeDefinition> AddAttribute( 
             string attributeName, DataType dataType, 
             string attributeToolTip = null,
             object defaultValue = null,
             bool isIdentifier = false)
         {
-            return AddAttribute(new AttributeDefinition(this,  attributeName, dataType, attributeToolTip, defaultValue,  isIdentifier));
+            var newAttribute = new AttributeDefinition(this, attributeName, dataType, attributeToolTip, defaultValue,
+                isIdentifier);
+
+            var result = AddAttribute(newAttribute);
+            
+            return CheckIf(result.Passed, newAttribute, result.Message, "Created new attribute", Context);
         }
         
         public SchemaResult AddAttribute(AttributeDefinition newAttribute)

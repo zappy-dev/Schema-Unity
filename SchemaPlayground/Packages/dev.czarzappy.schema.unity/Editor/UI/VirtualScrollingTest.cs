@@ -62,12 +62,12 @@ namespace Schema.Unity.Editor
             for (int i = 0; i < entryCount; i++)
             {
                 var entry = testScheme.CreateNewEmptyEntry();
-                entry.SetData("ID", i + 1);
-                entry.SetData("Name", $"Test Entry {i + 1:D4}");
-                entry.SetData("Description", $"This is a test description for entry {i + 1}. It contains some text to make it longer and more realistic.");
-                entry.SetData("IsActive", i % 3 == 0); // Every third entry is active
-                entry.SetData("CreatedDate", System.DateTime.Now.AddDays(-i));
-                entry.SetData("Value", Random.Range(1, 1000));
+                testScheme.SetDataOnEntry(entry, "ID", i + 1);
+                testScheme.SetDataOnEntry(entry,"Name", $"Test Entry {i + 1:D4}");
+                testScheme.SetDataOnEntry(entry,"Description", $"This is a test description for entry {i + 1}. It contains some text to make it longer and more realistic.");
+                testScheme.SetDataOnEntry(entry,"IsActive", i % 3 == 0); // Every third entry is active
+                testScheme.SetDataOnEntry(entry,"CreatedDate", System.DateTime.Now.AddDays(-i));
+                testScheme.SetDataOnEntry(entry,"Value", Random.Range(1, 1000));
             }
             // HACK - setting idAttribute to an identifier after creating entries
             idAttribute.IsIdentifier = true;

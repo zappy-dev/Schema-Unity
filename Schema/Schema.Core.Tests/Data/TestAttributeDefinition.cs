@@ -20,17 +20,17 @@ public class TestAttributeDefinition
     {
         get
         {
-            yield return new AttributeDefinition("Foo", DataType.Text);
-            yield return new AttributeDefinition("Foo", DataType.Integer);
-            yield return new AttributeDefinition("Foo", DataType.DateTime);
-            yield return new AttributeDefinition("Foo", DataType.FilePath);
+            yield return new AttributeDefinition(null, "Foo", DataType.Text);
+            yield return new AttributeDefinition(null, "Foo", DataType.Integer);
+            yield return new AttributeDefinition(null, "Foo", DataType.DateTime);
+            yield return new AttributeDefinition(null, "Foo", DataType.FilePath);
         }
     }
 
     [Test, TestCaseSource(nameof(CopyTestCases))]
     public void Test_Copy(AttributeDefinition copyFrom)
     {
-        var definition = new AttributeDefinition("Foo", DataType.Text);
+        var definition = new AttributeDefinition(null, "Foo", DataType.Text);
         definition.Copy(copyFrom);
         Assert.That(definition, Is.EqualTo(copyFrom));
         Assert.That(definition.GetHashCode(), Is.EqualTo(copyFrom.GetHashCode()));
@@ -46,8 +46,8 @@ public class TestAttributeDefinition
     {
         get
         {
-            yield return new TestCaseData(new AttributeDefinition("Foo", DataType.Text));
-            yield return new TestCaseData(new AttributeDefinition("Foo", DataType.Text, isIdentifier: true));
+            yield return new TestCaseData(new AttributeDefinition(null, "Foo", DataType.Text));
+            yield return new TestCaseData(new AttributeDefinition(null, "Foo", DataType.Text, isIdentifier: true));
         }
     }
 }

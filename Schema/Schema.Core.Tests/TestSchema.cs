@@ -177,8 +177,14 @@ public class TestSchema
             yield return new TestCaseData(null);
             yield return new TestCaseData(new ManifestEntry(null, new DataEntry()));
             yield return new TestCaseData(new ManifestEntry(null, new DataEntry(new Dictionary<string, object>())));
-            yield return new TestCaseData(ManifestDataEntryFactory.Build(null, "Invalid"));
-            yield return new TestCaseData(ManifestDataEntryFactory.Build(null, ""));
+            yield return new TestCaseData(new ManifestEntry(null, new DataEntry(new Dictionary<string, object>
+            {
+                { nameof(ManifestEntry.SchemeName), "Invalid" }
+            })));
+            yield return new TestCaseData(new ManifestEntry(null, new DataEntry(new Dictionary<string, object>
+            {
+                { nameof(ManifestEntry.SchemeName), "" }
+            })));
         }
     }
 
