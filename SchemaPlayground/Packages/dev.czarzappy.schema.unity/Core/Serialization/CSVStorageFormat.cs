@@ -97,6 +97,12 @@ namespace Schema.Core.Serialization
             // determine the best data type for a column
             for (var attrIdx = 0; attrIdx < attrCount; attrIdx++)
             {
+                var attrCtx = new SchemaContext
+                {
+                    SchemeName = schemeName,
+                    AttributeName = attributes[attrIdx].AttributeName,
+                };
+                
                 var potentialDataTypes = new HashSet<DataType>(DataType.BuiltInTypes);
                 foreach (var dataEntry in rawDataEntries)
                 {
@@ -105,8 +111,8 @@ namespace Schema.Core.Serialization
                     while (enumerator.MoveNext())
                     {
                         var testType = enumerator.Current;
-                        if (!testType.ConvertData(rawData).Try(out var convertedData) ||
-                            !testType.CheckIfValidData(convertedData).Passed)
+                        if (!testType.ConvertData(rawData, attrCtx).Try(out var convertedData) ||
+                            !testType.CheckIfValidData(convertedData, attrCtx).Passed)
                         {
                             potentialDataTypes.Remove(enumerator.Current);
                         }
@@ -149,11 +155,17 @@ namespace Schema.Core.Serialization
                 var entry = new DataEntry();
                 for (var attrIdx = 0; attrIdx < attrCount; attrIdx++)
                 {
+                    var attrCtx = new SchemaContext
+                    {
+                        SchemeName = schemeName,
+                        AttributeName = attributes[attrIdx].AttributeName,
+                    };
+                    
                     var rawData = rawDataEntry[attrIdx];
                     var dataType = attributes[attrIdx].DataType;
                     var attributeName = attributes[attrIdx].AttributeName;
 
-                    if (!dataType.ConvertData(rawData).Try(out var convertedData))
+                    if (!dataType.ConvertData(rawData, attrCtx).Try(out var convertedData))
                     {
                         return SchemaResult<DataScheme>.Fail($"Could not convert entry {rawDataEntry} to type {dataType}", context: this);
                     }

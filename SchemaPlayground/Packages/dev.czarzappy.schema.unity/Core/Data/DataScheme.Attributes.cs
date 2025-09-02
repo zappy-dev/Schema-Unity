@@ -10,8 +10,18 @@ namespace Schema.Core.Data
 
         #region Attribute Mutations
 
+        public SchemaResult AddAttribute( 
+            string attributeName, DataType dataType, 
+            string attributeToolTip = null,
+            object defaultValue = null,
+            bool isIdentifier = false)
+        {
+            return AddAttribute(new AttributeDefinition(this,  attributeName, dataType, attributeToolTip, defaultValue,  isIdentifier));
+        }
+        
         public SchemaResult AddAttribute(AttributeDefinition newAttribute)
         {
+            // Validate
             if (newAttribute == null)
             {
                 return SchemaResult.Fail("Attribute cannot be null", this);
@@ -34,6 +44,8 @@ namespace Schema.Core.Data
                 return SchemaResult.Fail("Attribute data type cannot be null.", this);
             }
             
+            // Commit
+            newAttribute._scheme = this;
             attributes.Add(newAttribute);
             IsDirty = true;
 
@@ -60,7 +72,7 @@ namespace Schema.Core.Data
                 {
                     var entryData = entry.GetData(attribute).Result;
 
-                    if (!DataType.ConvertData(entryData, attribute.DataType, newType).Try(out convertedData))
+                    if (!DataType.ConvertData(entryData, attribute.DataType, newType, attribute.Context).Try(out convertedData))
                     {
                         return SchemaResult.Fail($"Cannot convert attribute {attributeName} to type {newType}", this);
                     }

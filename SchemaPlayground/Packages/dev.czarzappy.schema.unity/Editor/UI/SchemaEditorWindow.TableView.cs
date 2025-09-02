@@ -21,10 +21,19 @@ namespace Schema.Unity.Editor
         
         private static readonly ProfilerMarker _tableHeaderMarker = new ProfilerMarker("Schema.Unity.TableView.TableHeader");
         private static readonly ProfilerMarker _tableBodyMarker = new ProfilerMarker("Schema.Unity.TableView.TableBody");
+        private static readonly ProfilerMarker _tableBodyFilterEntriesMarker = new ProfilerMarker("Schema.Unity.TableView.TableBody.FilterEntries");
         private static readonly ProfilerMarker _dataConvertMarker = new ProfilerMarker("Schema.Unity.TableView.ConvertData");
         private static readonly ProfilerMarker _dataCellMarker = new ProfilerMarker("Schema.Unity.TableView.DataCell");
 
         #endregion
+
+        #region Fields and Properties
+        
+        private Vector2 tableViewBodyVerticalScrollPosition;
+        private Vector2 tableViewHeaderHorizontalScrollPosition;
+
+        #endregion
+        
         
         #region Table Layout Infrastructure
         
@@ -75,7 +84,7 @@ namespace Schema.Unity.Editor
         }
         
         private readonly TableLayout _tableLayout = new TableLayout();
-        
+
         #endregion
         
         private void RenderTableView()
@@ -129,6 +138,7 @@ namespace Schema.Unity.Editor
                     using (new EditorGUI.DisabledScope())
                     {
                         EditorGUILayout.LabelField($"GC Status: {_performanceMonitor.FormatBytes(totalMemory)} total, Gen0:{gen0} Gen1:{gen1} Gen2:{gen2}", EditorStyles.miniLabel);
+                        EditorGUILayout.LabelField($"Last Scroll View Rect: {lastScrollViewRect})", EditorStyles.miniLabel);;
                     }
                 }
 
@@ -147,7 +157,7 @@ namespace Schema.Unity.Editor
                         EditorGUILayout.TextField(storagePath);
                     }
 
-                    var saveButtonText = scheme.IsDirty ? "Save*" : "save";
+                    var saveButtonText = scheme.IsDirty ? "Save*" : "Save";
 
                     if (GUILayout.Button(saveButtonText, ExpandWidthOptions))
                     {
@@ -177,130 +187,154 @@ namespace Schema.Unity.Editor
                         menu.ShowAsContext();
                     }
                 }
-                
-                using (var scrollView = new EditorGUILayout.ScrollViewScope(tableViewScrollPosition, alwaysShowHorizontal: true,
-                           alwaysShowVertical: true))
+
+                using (var scrollView1 = new EditorGUILayout.ScrollViewScope(tableViewHeaderHorizontalScrollPosition,
+                           alwaysShowHorizontal: true,
+                           alwaysShowVertical: false))
                 {
-                    // Update scroll position from the scope
-                    tableViewScrollPosition = scrollView.scrollPosition;
+                    tableViewHeaderHorizontalScrollPosition = scrollView1.scrollPosition;
                     
-                    // TODO: Figure out how to freeze the table header so it doesn't scroll
+                    // Freeze table header to top of the viewport
                     RenderTableHeader(attributeCount, scheme);
-                    
-                    // Calculate viewport rect for virtual scrolling after header is rendered
-                    // Get the remaining space in the scroll view
-                    var headerRect = GUILayoutUtility.GetLastRect();
-                    
-                    // Try to get the actual scroll view area by measuring the remaining space
-                    // We'll use a more conservative approach based on typical UI layout
-                    // Force recompile - updated viewport calculation
-                    float topSpace = headerRect.yMax + 20f; // Header + some padding
-                    float bottomSpace = 550f; // Even more space for debug info, buttons, and other UI elements
-                    float availableHeight = position.height - topSpace - bottomSpace;
-                    
-                    // Account for header overlap - when at top of scroll, header covers some rows
-                    // Based on your observation of 13 visible rows vs 16 calculated
-                    float headerOverlap = 60f; // Approximate space the header takes from visible area
-                    availableHeight -= headerOverlap;
-                    
-                    // Ensure we don't go negative and be very conservative
-                    availableHeight = Math.Max(availableHeight, 260f); // 13 rows * 20px = 260px
-                    
-                    lastScrollViewRect = new Rect(0, 0, position.width, availableHeight);
-                    
-                    Debug.Log($"TableView: Calculated viewport - availableHeight={availableHeight:F1}, headerYMax={headerRect.yMax:F1}, position.height={position.height:F1}, topSpace={topSpace:F1}, bottomSpace={bottomSpace:F1}, rect={lastScrollViewRect}");
-                    
-                    // Also log what the VirtualTableView will receive
-                    Debug.Log($"TableView: Will pass to VirtualTableView - viewportHeight={lastScrollViewRect.height:F1}");
-
-                    _tableBodyMarker.Begin();
-                    // Apply attribute filters
-                    if (attributeFilters.Count > 0)
+                    using (var scrollView = new EditorGUILayout.ScrollViewScope(tableViewBodyVerticalScrollPosition,
+                               alwaysShowHorizontal: false,
+                               alwaysShowVertical: true))
                     {
-                        allEntries = allEntries.Where(entry =>
+                        // Update scroll position from the scope
+                        tableViewBodyVerticalScrollPosition = scrollView.scrollPosition;
+
+                        LogDbgVerbose(
+                            $"TableView: Will pass to VirtualTableView - viewportHeight={lastScrollViewRect.height:F1}");
+
+                        _tableBodyMarker.Begin();
+                        _tableBodyFilterEntriesMarker.Begin();
+                        var compiledFilters = new List<(AttributeDefinition attribute, string needle)>();
+                        foreach (var kvp in attributeFilters)
                         {
-                            foreach (var filter in attributeFilters)
+                            if (string.IsNullOrWhiteSpace(kvp.Value))
+                                continue;
+                            
+                            var attributeRes = scheme.GetAttribute(kvp.Key);
+                            if (!attributeRes.Try(out var attribute))
+                                continue;
+
+                            var sanitizedNeedle = kvp.Value.Trim().ToLower();
+                            compiledFilters.Add((attribute, sanitizedNeedle));
+                        }
+                        
+                        // Apply attribute filters
+                        if (compiledFilters.Count > 0)
+                        {
+                            allEntries = allEntries.Where(entry =>
                             {
-                                var attributeRes = scheme.GetAttribute(filter.Key);
-                                if (!attributeRes.Try(out var attribute))
-                                    return false;
-                                var value = entry.GetDataDirect(attribute);
-                                if (value == null)
-                                    return false;
-                                var filterStr = filter.Value.ToLower();
-                                if (string.IsNullOrEmpty(filterStr))
-                                    continue;
-                                if (!value.ToString().ToLower().Contains(filterStr))
-                                    return false;
-                            }
+                                // ensure low GC
+                                foreach (var filter in compiledFilters)
+                                {
+                                    var (attribute, needle) = filter;
+                                    var value = entry.GetDataDirect(attribute);
+                                    if (value == null)
+                                        return false;
+                                    // expensive to compare everything to strings
+                                    // make faster for numeric comparisons?
+                                    if (value is string s)
+                                    {
+                                        if (s.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0)
+                                        {
+                                            return false;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        var str = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+                                        if (string.IsNullOrEmpty(str) ||
+                                            str.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0)
+                                        {
+                                            return false;
+                                        }
+                                    }
+                                }
 
-                            return true;
-                        }).ToList();
-                    }
+                                return true;
+                            }).ToList();
+                        }
+                        _tableBodyFilterEntriesMarker.End();
 
-                    // Calculate visible range for virtual scrolling
-                    var visibleRange = _virtualTableView.CalculateVisibleRange(
-                        tableViewScrollPosition,
-                        lastScrollViewRect,
-                        allEntries.Count,
-                        scheme.SchemeName,
-                        sortOrder,
-                        attributeFilters);
-                    
-                    // Debug logging to track visible range issues
-                    if (visibleRange.end > allEntries.Count)
-                    {
-                        Debug.LogWarning($"Visible range end ({visibleRange.end}) exceeds total entries ({allEntries.Count}). Clamping to valid range.");
-                        visibleRange = (visibleRange.start, Math.Min(visibleRange.end, allEntries.Count));
-                    }
+                        // Calculate visible range for virtual scrolling
+                        var visibleRange = _virtualTableView.CalculateVisibleRange(
+                            tableViewBodyVerticalScrollPosition,
+                            lastScrollViewRect,
+                            allEntries.Count,
+                            scheme.SchemeName,
+                            sortOrder,
+                            attributeFilters);
 
-                    // Get only the visible entries
-                    var visibleEntries = _virtualTableView.GetVisibleEntries(allEntries, visibleRange);
-                    EditorGUILayout.LabelField($"Num entries: {visibleEntries.Count()}");
+                        // Debug logging to track visible range issues
+                        if (visibleRange.end > allEntries.Count)
+                        {
+                            LogDbgWarning(
+                                $"Visible range end ({visibleRange.end}) exceeds total entries ({allEntries.Count}). Clamping to valid range.");
+                            visibleRange = (visibleRange.start, Math.Min(visibleRange.end, allEntries.Count));
+                        }
 
-                    // render table body, scheme data entries (only visible ones) using rect-based rendering
-                    
-                    // Debug logging for rendering
-                    Debug.Log($"TableView: Rendering range {visibleRange.start}-{visibleRange.end}, total entries {allEntries.Count}");
-                    
-                    // Efficient approach: use single spacers for all invisible rows instead of individual spaces
-                    // This reduces GUI allocations and improves performance
-                    int renderedCount = 0;
-                    
-                    // Top spacer for rows before visible range
-                    if (visibleRange.start > 0)
-                    {
-                        float topSpacerHeight = visibleRange.start * _tableLayout.RowHeight;
-                        GUILayout.Space(topSpacerHeight);
-                        Debug.Log($"TableView: Added top spacer of {topSpacerHeight:F1} pixels for {visibleRange.start} invisible rows");
-                    }
-                    
-                    // Render visible rows
-                    for (int i = visibleRange.start; i < visibleRange.end; i++)
-                    {
-                        var rowRect = GUILayoutUtility.GetRect(0, _tableLayout.RowHeight);
-                        RenderTableRow(rowRect, allEntries.ElementAt(i), i, attributeCount, scheme, tableCellControlIds, visibleEntryCount, visibleRange.start);
-                        renderedCount++;
-                        Debug.Log($"TableView: Rendered row {i} at position {rowRect.y:F1}");
-                    }
-                    
-                    // Bottom spacer for rows after visible range
-                    if (visibleRange.end < allEntries.Count)
-                    {
-                        float bottomSpacerHeight = (allEntries.Count - visibleRange.end) * _tableLayout.RowHeight;
-                        GUILayout.Space(bottomSpacerHeight);
-                        Debug.Log($"TableView: Added bottom spacer of {bottomSpacerHeight:F1} pixels for {allEntries.Count - visibleRange.end} invisible rows");
-                    }
-                    
-                    Debug.Log($"TableView: Rendered {renderedCount} visible rows out of {visibleRange.end - visibleRange.start} expected");
-                    
-                    // Update the cell count in VirtualTableView for debug display
-                    int totalCellsDrawn = renderedCount * attributeCount; // Each row has attributeCount cells
-                    _virtualTableView.UpdateCellCount(totalCellsDrawn);
-                    Debug.Log($"TableView: Total cells drawn: {totalCellsDrawn} ({renderedCount} rows × {attributeCount} attributes)");
+                        // Get only the visible entries
+                        var visibleEntries = _virtualTableView.GetVisibleEntries(allEntries, visibleRange);
+                        EditorGUILayout.LabelField($"Num entries: {visibleEntries.Count()}");
 
-                    // GUILayout.EndScrollView();
-                    _tableBodyMarker.End();
+                        // render table body, scheme data entries (only visible ones) using rect-based rendering
+
+                        // Debug logging for rendering
+                        LogDbgVerbose(
+                            $"TableView: Rendering range {visibleRange.start}-{visibleRange.end}, total entries {allEntries.Count}");
+
+                        // Efficient approach: use single spacers for all invisible rows instead of individual spaces
+                        // This reduces GUI allocations and improves performance
+                        int renderedCount = 0;
+
+                        // Top spacer for rows before visible range
+                        if (visibleRange.start > 0)
+                        {
+                            float topSpacerHeight = visibleRange.start * _tableLayout.RowHeight;
+                            GUILayout.Space(topSpacerHeight);
+                            LogDbgVerbose(
+                                $"TableView: Added top spacer of {topSpacerHeight:F1} pixels for {visibleRange.start} invisible rows");
+                        }
+
+                        // Render visible rows
+                        for (int i = visibleRange.start; i < visibleRange.end; i++)
+                        {
+                            var rowRect = GUILayoutUtility.GetRect(0, _tableLayout.RowHeight);
+                            RenderTableRow(rowRect, allEntries.ElementAt(i), i, attributeCount, scheme,
+                                tableCellControlIds, visibleEntryCount, visibleRange.start);
+                            renderedCount++;
+                            LogDbgVerbose($"TableView: Rendered row {i} at position {rowRect.y:F1}");
+                        }
+
+                        // Bottom spacer for rows after visible range
+                        if (visibleRange.end < allEntries.Count)
+                        {
+                            float bottomSpacerHeight = (allEntries.Count - visibleRange.end) * _tableLayout.RowHeight;
+                            GUILayout.Space(bottomSpacerHeight);
+                            LogDbgVerbose(
+                                $"TableView: Added bottom spacer of {bottomSpacerHeight:F1} pixels for {allEntries.Count - visibleRange.end} invisible rows");
+                        }
+
+                        LogDbgVerbose(
+                            $"TableView: Rendered {renderedCount} visible rows out of {visibleRange.end - visibleRange.start} expected");
+
+                        // Update the cell count in VirtualTableView for debug display
+                        int totalCellsDrawn = renderedCount * attributeCount; // Each row has attributeCount cells
+                        _virtualTableView.UpdateCellCount(totalCellsDrawn);
+                        LogDbgVerbose(
+                            $"TableView: Total cells drawn: {totalCellsDrawn} ({renderedCount} rows × {attributeCount} attributes)");
+
+                        // GUILayout.EndScrollView();
+                        _tableBodyMarker.End();
+                    }
+                }
+
+                if (Event.current.type == EventType.Repaint)
+                {
+                    lastScrollViewRect = GUILayoutUtility.GetLastRect();
                 }
                 
                 // add new entry form
@@ -309,7 +343,7 @@ namespace Schema.Unity.Editor
                     if (AddButton("Create New Entry", expandWidth: true, height: 50f))
                     {
                         scheme.CreateNewEmptyEntry();
-                        Debug.Log($"Added entry to '{scheme.SchemeName}'.");
+                        LogDbgVerbose($"Added entry to '{scheme.SchemeName}'.");
                     }
                 }
             }
@@ -403,7 +437,7 @@ namespace Schema.Unity.Editor
                             {
                                 // Target is outside visible range, scroll to it
                                 float targetY = globalEntryIdx * _virtualTableView.TotalContentHeight / allEntries.Count;
-                                tableViewScrollPosition.y = targetY;
+                                tableViewBodyVerticalScrollPosition.y = targetY;
                                 ev.Use();
                             }
                         }
@@ -478,7 +512,7 @@ namespace Schema.Unity.Editor
                         {
                             if (AddButton("Add Attribute"))
                             {
-                                Debug.Log($"Added new attribute to '{scheme.SchemeName}'.`");
+                                LogDbgVerbose($"Added new attribute to '{scheme.SchemeName}'.`");
                                 LatestResponse = scheme.AddAttribute(new AttributeDefinition
                                 {
                                     AttributeName = newAttributeName,
@@ -513,6 +547,8 @@ namespace Schema.Unity.Editor
                                 : string.Empty;
                             string newFilterValue =
                                 GUILayout.TextField(filterValue, GUILayout.Width(attribute.ColumnWidth));
+                            
+                            // On attribute filter change
                             if (newFilterValue != filterValue)
                             {
                                 if (string.IsNullOrWhiteSpace(newFilterValue))
@@ -692,7 +728,7 @@ namespace Schema.Unity.Editor
         {
             var originalColor = GUI.backgroundColor;
             GUI.backgroundColor = cellStyle.BackgroundColor;
-            GUI.DrawTexture(rowRect, EditorGUIUtility.whiteTexture);
+            GUI.DrawTexture(rowRect, Texture2D.grayTexture); // TODO: Replace with a nice texture for rows?
             GUI.backgroundColor = originalColor;
         }
         
@@ -947,11 +983,11 @@ namespace Schema.Unity.Editor
                 entryValue = attribute.CloneDefaultValue();
                 _ = ExecuteSetDataOnEntryAsync(scheme, entry, attribute.AttributeName, entryValue);
             }
-            else if (attribute.DataType.CheckIfValidData(entryValue).Failed)
+            else if (attribute.CheckIfValidData(entryValue).Failed)
             {
                 using (_dataConvertMarker.Auto())
                 {
-                    if (DataType.ConvertData(entryValue, DataType.Default, attribute.DataType).Try(out var convertedValue))
+                    if (DataType.ConvertData(entryValue, DataType.Default, attribute.DataType, attribute.Context).Try(out var convertedValue))
                     {
                         entryValue = convertedValue;
                         _ = ExecuteSetDataOnEntryAsync(scheme, entry, attribute.AttributeName, entryValue);

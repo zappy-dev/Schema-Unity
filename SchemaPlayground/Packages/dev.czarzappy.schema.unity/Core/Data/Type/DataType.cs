@@ -120,7 +120,7 @@ namespace Schema.Core.Data
         /// <param name="fromType">The source data type.</param>
         /// <param name="toType">The target data type.</param>
         /// <returns>A <see cref="SchemaResult{object}"/> representing the conversion result.</returns>
-        public static SchemaResult<object> ConvertData(object entryData, DataType fromType, DataType toType)
+        public static SchemaResult<object> ConvertData(object entryData, DataType fromType, DataType toType, SchemaContext context)
         {
             Logger.LogDbgVerbose($"Trying to convert {entryData} to {toType}", "DataConversion");
             // Handle unknown types from their default string values
@@ -143,10 +143,10 @@ namespace Schema.Core.Data
                         successMessage: "Converted empty data to default value", Schema.Context.DataConversion);
                 }
 
-                return toType.ConvertData(data);
+                return toType.ConvertData(data, context);
             }
 
-            return toType.ConvertData(entryData);
+            return toType.ConvertData(entryData, context);
         }
 
         /// <summary>
@@ -154,13 +154,13 @@ namespace Schema.Core.Data
         /// </summary>
         /// <param name="value">The value to validate.</param>
         /// <returns>A <see cref="SchemaResult"/> indicating if the value is valid.</returns>
-        public abstract SchemaResult CheckIfValidData(object value);
+        public abstract SchemaResult CheckIfValidData(object value, SchemaContext context);
         
         /// <summary>
         /// Converts the provided value to this data type.
         /// </summary>
         /// <param name="value">The value to convert.</param>
         /// <returns>A <see cref="SchemaResult{object}"/> representing the conversion result.</returns>
-        public abstract SchemaResult<object> ConvertData(object value);
+        public abstract SchemaResult<object> ConvertData(object value, SchemaContext context);
     }
 }

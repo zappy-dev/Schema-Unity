@@ -6,9 +6,16 @@ namespace Schema.Core.Data
     [Serializable]
     public class AttributeDefinition : Defaultable, ICloneable
     {
-        protected override string Context => nameof(AttributeDefinition);
+        public override SchemaContext Context => new SchemaContext
+        {
+            SchemeName = _scheme.SchemeName,
+            AttributeName = AttributeName,
+        };
+        
         public const int DefaultColumnWidth = 150;
         
+        [JsonIgnore]
+        internal DataScheme _scheme;
         public string AttributeName { get; set; }
         public string AttributeToolTip { get; set; }
         public DataType DataType { get; set; }
@@ -21,11 +28,13 @@ namespace Schema.Core.Data
             return $"Attribute: '{AttributeName}' ({DataType})";
         }
 
-        public AttributeDefinition(string attributeName, DataType dataType, 
+        public AttributeDefinition(DataScheme scheme, 
+            string attributeName, DataType dataType, 
             string attributeToolTip = null,
             object defaultValue = null,
             bool isIdentifier = false) : base(defaultValue)
         {
+            _scheme = scheme;
             AttributeName = attributeName;
             DataType = dataType;
             AttributeToolTip = attributeToolTip;
@@ -122,6 +131,16 @@ namespace Schema.Core.Data
         internal void UpdateAttributeName(string newAttributeName)
         {
             AttributeName = newAttributeName;
+        }
+
+        public SchemaResult CheckIfValidData(object value)
+        {
+            return DataType.CheckIfValidData(value, Context);
+        }
+
+        public SchemaResult<object> ConvertData(object value)
+        {
+            return DataType.ConvertData(value, Context);
         }
     }
 }

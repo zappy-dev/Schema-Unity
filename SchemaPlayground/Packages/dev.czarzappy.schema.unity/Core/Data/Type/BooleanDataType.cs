@@ -5,7 +5,11 @@ namespace Schema.Core.Data
     [Serializable]
     public class BooleanDataType : DataType
     {
-        protected override string Context => nameof(BooleanDataType);
+        public override SchemaContext Context => new SchemaContext()
+        {
+            DataType = nameof(BooleanDataType),
+        };
+        
         public override string TypeName => "Boolean";
 
         public BooleanDataType(bool defaultValue = false) : base(defaultValue)
@@ -16,28 +20,28 @@ namespace Schema.Core.Data
         {
         }
 
-        public override SchemaResult CheckIfValidData(object value)
+        public override SchemaResult CheckIfValidData(object value, SchemaContext context)
         {
             return CheckIf(value is bool, 
                 errorMessage: "Value is not a boolean.",
-                successMessage: "Value is a boolean.");
+                successMessage: "Value is a boolean.", context);
         }
 
-        public override SchemaResult<object> ConvertData(object fromData)
+        public override SchemaResult<object> ConvertData(object fromData, SchemaContext context)
         {
             try
             {
                 if (fromData is bool b)
-                    return SchemaResult<object>.Pass(b, successMessage: "Value is a boolean.", context: this);
+                    return Pass<object>(b, successMessage: "Value is a boolean.", context: context);
                 if (fromData is string s && bool.TryParse(s, out var parsed))
-                    return SchemaResult<object>.Pass(parsed, successMessage: "Parsed as boolean.", context: this);
+                    return Pass<object>(parsed, successMessage: "Parsed as boolean.", context: context);
                 if (fromData is int i)
-                    return SchemaResult<object>.Pass(i != 0, successMessage: "Converted int to boolean.", context: this);
-                return SchemaResult<object>.Fail("Failed to convert to Boolean", context: this);
+                    return Pass<object>(i != 0, successMessage: "Converted int to boolean.", context: context);
+                return Fail<object>("Failed to convert to Boolean", context: context);
             }
             catch (Exception e)
             {
-                return SchemaResult<object>.Fail($"Failed to convert to Boolean, error: {e.Message}", context: this);
+                return Fail<object>($"Failed to convert to Boolean, error: {e.Message}", context: context);
             }
         }
     }

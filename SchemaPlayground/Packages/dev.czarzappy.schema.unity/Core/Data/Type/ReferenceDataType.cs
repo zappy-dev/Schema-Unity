@@ -6,7 +6,11 @@ namespace Schema.Core.Data
     [Serializable]
     public class ReferenceDataType : DataType
     {
-        protected override string Context => nameof(ReferenceDataType);
+        public override SchemaContext Context => new SchemaContext()
+        {
+            DataType = nameof(ReferenceDataType),
+        };
+        
         public const string TypeNamePrefix = "Reference";
         
         public string ReferenceSchemeName { get; set; }
@@ -39,42 +43,42 @@ namespace Schema.Core.Data
             return $"ReferenceDataType: {ReferenceSchemeName}, Attribute: {ReferenceAttributeName}";
         }
 
-        public override SchemaResult CheckIfValidData(object value)
+        public override SchemaResult CheckIfValidData(object value, SchemaContext context)
         {
             if (value == null)
             {
                 return CheckIf(SupportsEmptyReferences, 
                     errorMessage: "Empty references are not allowed.",
-                    successMessage: "Empty references are allowed.");
+                    successMessage: "Empty references are allowed.", context);
             }
             
             if (!Schema.GetScheme(ReferenceSchemeName).Try(out var refSchema))
             {
-                return Fail("Could not load Reference Scheme");
+                return Fail("Could not load Reference Scheme", context);
             }
 
             if (!refSchema.GetIdentifierAttribute().Try(out var identifier))
             {
-                return Fail("Reference Scheme does not contain Identifier Attribute.");
+                return Fail("Reference Scheme does not contain Identifier Attribute.", context);
             }
 
             if (identifier.AttributeName != ReferenceAttributeName)
             {
-                return Fail("Reference Scheme Identifier Attribute does not match");
+                return Fail("Reference Scheme Identifier Attribute does not match", context);
             }
 
             bool identifierExist = refSchema.GetIdentifierValues().Any(v => v.Equals(value));
 
             return CheckIf(identifierExist, 
                 errorMessage: "Value does not exist as an identifier",
-                successMessage: "Value exists as an identifier");
+                successMessage: "Value exists as an identifier", context);
         }
 
-        public override SchemaResult<object> ConvertData(object value)
+        public override SchemaResult<object> ConvertData(object value, SchemaContext context)
         {
             var data = value as string;
 
-            var validate = CheckIfValidData(data);
+            var validate = CheckIfValidData(data, context);
             return SchemaResult<object>.CheckIf(
                 conditional: validate.Passed,
                 result: data,

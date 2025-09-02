@@ -8,7 +8,11 @@ namespace Schema.Core.Data
     [Serializable]
     public class FilePathDataType : DataType
     {
-        protected override string Context => nameof(FilePathDataType);
+        public override SchemaContext Context => new SchemaContext()
+        {
+            DataType = nameof(FilePathDataType),
+        };
+        
         [JsonProperty("AllowEmptyPath")]
         private bool allowEmptyPath;
         
@@ -101,21 +105,21 @@ namespace Schema.Core.Data
             return PathUtility.MakeAbsolutePath(path, contentBasePath);
         }
         
-        public override SchemaResult CheckIfValidData(object value)
+        public override SchemaResult CheckIfValidData(object value, SchemaContext context)
         {
             if (!(value is string filePath))
             {
-                return Fail("Value is not a file path");
+                return Fail("Value is not a file path", context);
             }
 
             if (string.IsNullOrWhiteSpace(filePath))
             {
-                return CheckIf(allowEmptyPath, errorMessage: "File path is empty", successMessage: "File path is set");
+                return CheckIf(allowEmptyPath, errorMessage: "File path is empty", successMessage: "File path is set", context);
             }
 
             if (PathUtility.IsAbsolutePath(filePath) && useRelativePaths)
             {
-                return Fail("File path is absolute when only relative paths are supported");
+                return Fail("File path is absolute when only relative paths are supported", context);
             }
             
             // Resolve the path to absolute for file system check
@@ -123,14 +127,14 @@ namespace Schema.Core.Data
             
             return CheckIf(Serialization.Storage.FileSystem.FileExists(resolvedPath), 
                 errorMessage: "File does not exist",
-                successMessage: "File exists");
+                successMessage: "File exists", context);
         }
 
-        public override SchemaResult<object> ConvertData(object value)
+        public override SchemaResult<object> ConvertData(object value, SchemaContext context)
         {
             if (!(value is string filePath))
             {
-                return SchemaResult<object>.Fail($"Value '{value}' is not a file path", context: this);
+                return Fail<object>($"Value '{value}' is not a file path", context: context);
             }
             
             // Format the path according to our settings (relative/absolute)
@@ -142,12 +146,12 @@ namespace Schema.Core.Data
             bool fileExists = !string.IsNullOrWhiteSpace(resolvedPath) && 
                               Serialization.Storage.FileSystem.FileExists(resolvedPath);
             
-            return SchemaResult<object>.CheckIf(
+            return CheckIf<object>(
                 fileExists || allowEmptyPath && string.IsNullOrEmpty(resolvedPath), 
                 result: formattedPath,
                 errorMessage: $"File '{resolvedPath}' does not exist",
                 successMessage: fileExists ? $"File '{resolvedPath}' exists" : "Empty path allowed", 
-                context: this);
+                context: context);
         }
     }
 }

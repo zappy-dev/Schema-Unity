@@ -32,6 +32,12 @@ namespace Schema.Core
                     throw new InvalidOperationException("Manifest import path cannot be null or empty.");
                 }
 
+                // No-op
+                if (manifestImportPath == value)
+                {
+                    return;
+                }
+
                 if (!string.IsNullOrWhiteSpace(manifestImportPath))
                 {
                     throw new InvalidOperationException($"Attempt to set Manifest import path is already set to {manifestImportPath}");

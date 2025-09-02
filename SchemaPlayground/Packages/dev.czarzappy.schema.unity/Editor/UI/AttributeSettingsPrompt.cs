@@ -77,6 +77,8 @@ namespace Schema.Unity.Editor
                     else
                     {
                         // TODO: validate that no other scheme is referencing this identifier
+                        // Warn / confirm with user before committing this operations?
+                        // preview what other schemes are referencing this attribute / scheme
                         editAttribute.IsIdentifier = false;
                     }
                 }

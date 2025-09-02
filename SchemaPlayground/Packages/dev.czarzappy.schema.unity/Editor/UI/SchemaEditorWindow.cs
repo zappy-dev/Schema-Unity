@@ -2,23 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Serialization;
 using Unity.Profiling;
 using UnityEditor;
 using UnityEngine;
-using static Schema.Core.Logging.Logger;
-using static Schema.Core.Schema;
-using static Schema.Core.SchemaResult;
-using static Schema.Unity.Editor.SchemaLayout;
 using Random = System.Random;
 using Schema.Core.Commands;
 using System.Threading;
 using System.Threading.Tasks;
-using Schema.Core.IO;
 using Schema.Core.Schemes;
+using static Schema.Core.Logging.Logger;
+using static Schema.Core.Schema;
+using static Schema.Core.SchemaResult;
+using static Schema.Unity.Editor.SchemaLayout;
 
 namespace Schema.Unity.Editor
 {
@@ -26,6 +24,11 @@ namespace Schema.Unity.Editor
     internal partial class SchemaEditorWindow : EditorWindow
     {
         #region Static Fields and Constants
+
+        private static readonly SchemaContext Context = new SchemaContext
+        {
+            Driver = "Editor",
+        };
 
         private const string EDITORPREFS_KEY_SELECTEDSCHEME = "Schema:SelectedSchemeName";
         
@@ -56,7 +59,6 @@ namespace Schema.Unity.Editor
         }
 
         private Vector2 explorerScrollPosition;
-        private Vector2 tableViewScrollPosition;
 
         [NonSerialized]
         private string newSchemeName = string.Empty;
@@ -269,7 +271,7 @@ namespace Schema.Unity.Editor
             }
             catch (OperationCanceledException)
             {
-                Debug.Log("Add schema operation cancelled");
+                LogDbgVerbose("Add schema operation cancelled");
             }
             finally
             {
@@ -307,7 +309,7 @@ namespace Schema.Unity.Editor
             // TODO: Figure out why progress reporting is making the Unity Editor unhappy
             // using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
             LatestManifestLoadResponse = LoadManifestFromPath(ManifestImportPath);
-            LatestResponse = CheckIf(LatestManifestLoadResponse.Passed, LatestManifestLoadResponse.Message);
+            LatestResponse = CheckIf(LatestManifestLoadResponse.Passed, LatestManifestLoadResponse.Message, Context);
             return LatestResponse;
         }
         
@@ -354,6 +356,7 @@ namespace Schema.Unity.Editor
             return tooltips.GetEntry(randomIdx).Message;
         }
         
+        
         private void OnGUI()
         {
             if (!isInitialized)
@@ -387,7 +390,7 @@ namespace Schema.Unity.Editor
                     LatestManifestLoadResponse = SchemaResult<ManifestLoadStatus>.CheckIf(LatestResponse.Passed, 
                         ManifestLoadStatus.FULLY_LOADED, 
                         LatestResponse.Message,
-                        "Loaded template manifest");
+                        "Loaded template manifest", Context);
                 }
                 return;
             }
@@ -414,180 +417,6 @@ namespace Schema.Unity.Editor
             }
             // Table View
             GUILayout.EndHorizontal();
-        }
-
-        private void RenderDebugView()
-        {
-            using (new EditorGUI.DisabledScope())
-            {
-                EditorGUILayout.Toggle("Is Schema Initialized?", IsInitialized);
-                EditorGUILayout.Toggle("Is Load In Progress?", IsManifestLoadInProgress);
-                EditorGUILayout.IntField("Num available schemes", AllSchemes.Count());
-                
-                // Virtual scrolling debug info (compact)
-                if (_virtualTableView != null)
-                {
-                    EditorGUILayout.Space();
-                    EditorGUILayout.LabelField("Virtual Scrolling Debug:", EditorStyles.boldLabel);
-                    
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        // Left column - Core info
-                        using (new EditorGUILayout.VerticalScope())
-                        {
-                            EditorGUILayout.Toggle("Virtual Scrolling Active", _virtualTableView.IsVirtualScrollingActive);
-                            if (_virtualTableView.IsVirtualScrollingActive)
-                            {
-                                var range = _virtualTableView.VisibleRange;
-                                EditorGUILayout.LabelField($"Range: {range.start}-{range.end}");
-                                EditorGUILayout.LabelField($"Scroll: {tableViewScrollPosition.y:F0}");
-                                EditorGUILayout.LabelField($"Cells Drawn: {_virtualTableView.CellsDrawn}");
-                                
-                                if (selectedSchemeName != null && GetScheme(selectedSchemeName).Try(out var scheme))
-                                {
-                                    var allEntries = scheme.GetEntries().ToList();
-                                    int totalCells = allEntries.Count * scheme.AttributeCount;
-                                    EditorGUILayout.LabelField($"Total Cells: {totalCells}");
-                                    EditorGUILayout.LabelField($"Efficiency: {(_virtualTableView.CellsDrawn * 100f / Math.Max(1, totalCells)):F1}%");
-                                    
-                                    float expectedScrollY = range.start * (_virtualTableView.TotalContentHeight / Math.Max(1, allEntries.Count));
-                                    EditorGUILayout.LabelField($"Delta: {tableViewScrollPosition.y - expectedScrollY:F0}");
-                                    EditorGUILayout.LabelField($"Progress: {(tableViewScrollPosition.y / Math.Max(1, _virtualTableView.TotalContentHeight)) * 100:F0}%");
-                                }
-                            }
-                        }
-                        
-                        // Right column - Warnings and errors
-                        using (new EditorGUILayout.VerticalScope())
-                        {
-                            if (selectedSchemeName != null && GetScheme(selectedSchemeName).Try(out var scheme))
-                            {
-                                var allEntries = scheme.GetEntries().ToList();
-                                var visibleRange = _virtualTableView.VisibleRange;
-                                
-                                EditorGUILayout.LabelField($"Entries: {allEntries.Count}");
-                                
-                                if (visibleRange.end > allEntries.Count)
-                                {
-                                    EditorGUILayout.LabelField($"⚠️ OVERFLOW: {visibleRange.end}>{allEntries.Count}", EditorStyles.boldLabel);
-                                }
-                                
-                                if (visibleRange.start >= visibleRange.end)
-                                {
-                                    EditorGUILayout.LabelField($"⚠️ INVALID: {visibleRange.start}>={visibleRange.end}", EditorStyles.boldLabel);
-                                }
-                                
-                                if (Math.Abs(tableViewScrollPosition.y - (visibleRange.start * (_virtualTableView.TotalContentHeight / Math.Max(1, allEntries.Count)))) > 50)
-                                {
-                                    EditorGUILayout.LabelField($"⚠️ SCROLL MISMATCH", EditorStyles.boldLabel);
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Performance monitoring info
-                // _performanceMonitor?.RenderDebugInfo();
-            }
-            
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                GUILayout.Label("Manifest Path");
-                
-                using (new EditorGUI.DisabledScope())
-                {
-                    EditorGUILayout.TextField("Manifest Import Path", ManifestImportPath);
-                    EditorGUILayout.IntField("Loaded Manifest Scheme Hash", RuntimeHelpers.GetHashCode(LoadedManifestScheme._));
-                }
-
-                if (GUILayout.Button("Load"))
-                {
-                    OnLoadManifest("On User Load");
-                }
-
-                // save schemes to manifest
-                if (GUILayout.Button("Save Manifest"))
-                {
-                    LatestResponse = SaveManifest();
-                }
-            }
-
-            if (GUILayout.Button("Fix Duplicate Entries"))
-            {
-                foreach (var schemeName in AllSchemes)
-                {
-                    if (!GetScheme(schemeName).Try(out var scheme))
-                    {
-                        continue; // can't de-dupe these schemes easily
-                    }
-
-                    if (!scheme.GetIdentifierAttribute().Try(out var identifierAttribute))
-                    {
-                        identifierAttribute = scheme.GetAttribute(0); // just use first attribute
-                    }
-
-                    var identifiers = scheme.GetValuesForAttribute(identifierAttribute).ToArray();
-                    bool[] foundEntry = new bool[identifiers.Length];
-                    int numDeleted = 0;
-                    for (int i = 0; i < scheme.EntryCount; i++)
-                    {
-                        var entry = scheme.GetEntry(i);
-                        var entryIdValue = entry.GetDataAsString(identifierAttribute.AttributeName);
-                        int identifierIdx = Array.IndexOf(identifiers, entryIdValue);
-
-                        if (identifierIdx != -1 && foundEntry[identifierIdx])
-                        {
-                            scheme.DeleteEntry(entry);
-                            numDeleted++;
-                        }
-                        else
-                        {
-                            foundEntry[identifierIdx] = true;
-                        }
-                    }
-
-                    if (numDeleted > 0)
-                    {
-                        LogWarning($"Scheme '{schemeName}' has deleted {numDeleted} entries.");
-                        SaveDataScheme(scheme, false);
-                    }
-                }
-            }
-
-            if (LatestManifestLoadResponse.Message != null)
-            {
-                EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestManifestLoadResponse.Result}: {LatestManifestLoadResponse.Message}", LatestManifestLoadResponse.MessageType());
-            }
-            
-            if (LatestResponse.Message != null)
-            {
-                EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestResponse.Message}", LatestResponse.MessageType());
-            }
-
-            if (GUILayout.Button("Add SCHEMA_DEBUG Scripting Define"))
-            {
-                var buildTargetGroup = UnityEditor.EditorUserBuildSettings.selectedBuildTargetGroup;
-                var defines = UnityEditor.PlayerSettings.GetScriptingDefineSymbolsForGroup(buildTargetGroup);
-                if (!defines.Contains("SCHEMA_DEBUG"))
-                {
-                    if (!string.IsNullOrEmpty(defines))
-                        defines += ";";
-                    defines += "SCHEMA_DEBUG";
-                    UnityEditor.PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, defines);
-                    Debug.Log("Added SCHEMA_DEBUG scripting define.");
-                }
-            }
-            if (GUILayout.Button("Remove SCHEMA_DEBUG Scripting Define"))
-            {
-                var buildTargetGroup = UnityEditor.EditorUserBuildSettings.selectedBuildTargetGroup;
-                var defines = UnityEditor.PlayerSettings.GetScriptingDefineSymbolsForGroup(buildTargetGroup);
-                if (defines.Contains("SCHEMA_DEBUG"))
-                {
-                    var newDefines = string.Join(";", defines.Split(';').Where(d => d != "SCHEMA_DEBUG"));
-                    UnityEditor.PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, newDefines);
-                    Debug.Log("Removed SCHEMA_DEBUG scripting define.");
-                }
-            }
         }
 
         /// <summary>

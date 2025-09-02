@@ -50,12 +50,13 @@ namespace Schema.Unity.Editor
             var testScheme = new DataScheme($"VirtualScrollingTest_{entryCount}");
             
             // Add various attribute types
-            testScheme.AddAttribute(new AttributeDefinition("ID", DataType.Integer, isIdentifier: true));
-            testScheme.AddAttribute(new AttributeDefinition("Name", DataType.Text));
-            testScheme.AddAttribute(new AttributeDefinition("Description", DataType.Text));
-            testScheme.AddAttribute(new AttributeDefinition("IsActive", new BooleanDataType()));
-            testScheme.AddAttribute(new AttributeDefinition("CreatedDate", new DateTimeDataType()));
-            testScheme.AddAttribute(new AttributeDefinition("Value", DataType.Integer));
+            var idAttribute = new AttributeDefinition(testScheme, "ID", DataType.Integer);
+            testScheme.AddAttribute(idAttribute);
+            testScheme.AddAttribute("Name", DataType.Text);
+            testScheme.AddAttribute("Description", DataType.Text);
+            testScheme.AddAttribute("IsActive", new BooleanDataType());
+            testScheme.AddAttribute("CreatedDate", new DateTimeDataType());
+            testScheme.AddAttribute("Value", DataType.Integer);
             
             // Generate test entries
             for (int i = 0; i < entryCount; i++)
@@ -68,10 +69,14 @@ namespace Schema.Unity.Editor
                 entry.SetData("CreatedDate", System.DateTime.Now.AddDays(-i));
                 entry.SetData("Value", Random.Range(1, 1000));
             }
+            // HACK - setting idAttribute to an identifier after creating entries
+            idAttribute.IsIdentifier = true;
             
             // Save the scheme
-            LoadDataScheme(testScheme, overwriteExisting: true, registerManifestEntry: true, importFilePath: testScheme.SchemeName);
-            var result = SaveDataScheme(testScheme, alsoSaveManifest: true);
+            var targetFilePath = $"{testScheme.SchemeName}.json";
+            LoadDataScheme(testScheme, overwriteExisting: true, registerManifestEntry: true, importFilePath: targetFilePath);
+            
+            var result = SaveDataScheme(testScheme, alsoSaveManifest: false);
             
             if (result.Passed)
             {

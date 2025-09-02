@@ -48,7 +48,7 @@ namespace Schema.Core.Data
                 var entryValue = kvp.Value;
                 if (runDataValidation)
                 {
-                    var isValidRes = attribute.DataType.CheckIfValidData(entryValue);
+                    var isValidRes = attribute.CheckIfValidData(entryValue);
                     if (isValidRes.Failed)
                     {
                         return isValidRes;

@@ -46,10 +46,11 @@ namespace Schema.Core
             
                 progress?.Report((0f, $"Loading: {manifestLoadPath}..."));
                 Logger.Log($"Loading manifest from file: {manifestLoadPath}...", "Manifest");
-                if (!Serialization.Storage.DefaultManifestStorageFormat.DeserializeFromFile(manifestLoadPath)
-                        .Try( out var manifestDataScheme))
+                var loadResult =
+                    Serialization.Storage.DefaultManifestStorageFormat.DeserializeFromFile(manifestLoadPath);
+                if (!loadResult.Try( out var manifestDataScheme))
                 {
-                    return SchemaResult<ManifestLoadStatus>.Fail("Failed to load manifest schema.", context: "Manifest");
+                    return loadResult.CastError<ManifestLoadStatus>();
                 }
                 
                 var loadStopwatch = Stopwatch.StartNew();
@@ -235,11 +236,14 @@ namespace Schema.Core
                 return Fail("Schema already exists: " + schemeName, context: scheme);
             }
 
+            // TODO: This can be parallelized
             // process all incoming entry data and make sure it is in a valid formats 
             foreach (var entry in scheme.AllEntries)
             {
                 foreach (var attribute in scheme.GetAttributes())
                 {
+                    attribute._scheme = scheme;
+                    
                     var entryData = entry.GetData(attribute);
                     if (entryData.Failed)
                     {
@@ -249,10 +253,10 @@ namespace Schema.Core
                     else
                     {
                         var fieldData = entryData.Result;
-                        var validateData = attribute.DataType.CheckIfValidData(fieldData);
+                        var validateData = attribute.CheckIfValidData(fieldData);
                         if (validateData.Failed) // Try to force the manifest to be loaded, TODO: better handli
                         {
-                            var conversion = attribute.DataType.ConvertData(fieldData);
+                            var conversion = attribute.ConvertData(fieldData);
                             if (conversion.Failed)
                             {
                                 // TODO: What should the user flow be here? Auto-convert? Prompt for user feedback?
@@ -388,7 +392,7 @@ namespace Schema.Core
             {
                 return Fail("Could not find manifest entry for scheme name: " + scheme.SchemeName);
             }
-
+            
             if (scheme.IsManifest && GetManifestScheme().Try(out var loadedManifestScheme) &&
                 !loadedManifestScheme._.Equals(scheme))
             {
@@ -433,7 +437,21 @@ namespace Schema.Core
 
             if (scheme.IsManifest || alsoSaveManifest)
             {
-                var manifestScheme = new ManifestScheme(scheme);
+                ManifestScheme manifestScheme;
+                if (alsoSaveManifest)
+                {
+                    // use loaded manifest schema to update entry
+                    var loadedManifestRes = GetManifestScheme();
+                    if (!loadedManifestRes.Try(out manifestScheme))
+                    {
+                        return loadedManifestRes.Cast();
+                    }
+                }
+                else
+                {
+                    // Try given scheme as a manifest to update self entry
+                    manifestScheme = new ManifestScheme(scheme);
+                }
                 var manifestSelfEntry = manifestScheme.SelfEntry;
                 
                 if (string.IsNullOrWhiteSpace(manifestSelfEntry.FilePath))

@@ -14,7 +14,11 @@ namespace Schema.Core.Data
     [Serializable]
     public partial class DataScheme : ResultGenerator
     {
-        protected override string Context => nameof(DataScheme);
+        public override SchemaContext Context => new SchemaContext
+        {
+            SchemeName = SchemeName,
+        };
+        
         #region Fields and Properties
         
         [JsonProperty("SchemeName")]
