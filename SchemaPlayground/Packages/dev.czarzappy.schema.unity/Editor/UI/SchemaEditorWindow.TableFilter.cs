@@ -50,6 +50,8 @@ namespace Schema.Unity.Editor
 
         private List<(AttributeDefinition attributeDefinition, string needle)> GetAttributeFiltersForScheme(DataScheme scheme)
         {
+            LoadAttributeFilters(scheme.SchemeName);
+            
             var compiledFilters = new List<(AttributeDefinition attribute, string needle)>();
             foreach (var kvp in attributeFilters)
             {
