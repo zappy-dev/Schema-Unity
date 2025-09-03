@@ -162,8 +162,7 @@ namespace Schema.Unity.Editor
             var sortOrder = GetSortOrderForScheme(scheme);
             // allEntries = scheme.GetEntries(sortOrder).ToList();
             
-            // Load filters for the current schema (if not already loaded)
-            LoadAttributeFilters(scheme.SchemeName);
+            // Filters are loaded on scheme selection; avoid reloading during render
             
             int attributeCount = scheme.AttributeCount;
             int availableEntryCount = allEntries.Count;
@@ -251,7 +250,11 @@ namespace Schema.Unity.Editor
                                alwaysShowVertical: true))
                     {
                         // Update scroll position from the scope
-                        tableViewBodyVerticalScrollPosition = tableBodyScrollView.scrollPosition;
+                        if (tableBodyScrollView.scrollPosition != tableViewBodyVerticalScrollPosition) 
+                        {
+                            tableViewBodyVerticalScrollPosition = tableBodyScrollView.scrollPosition;
+                            GUI.FocusControl(null);
+                        }
 
                         LogDbgVerbose(
                             $"TableView: Will pass to VirtualTableView - viewportHeight={lastScrollViewRect.height:F1}");
@@ -337,6 +340,7 @@ namespace Schema.Unity.Editor
                     {
                         scheme.CreateNewEmptyEntry();
                         LogDbgVerbose($"Added entry to '{scheme.SchemeName}'.");
+                        OnSelectedSchemeChanged?.Invoke();
                     }
                 }
             }
@@ -519,7 +523,7 @@ namespace Schema.Unity.Editor
                     // Filter row
                     using (new GUILayout.HorizontalScope())
                     {
-                        LoadAttributeFilters(scheme.SchemeName);
+                        // Filters are already in-memory; avoid reloading here
                         EditorGUILayout.LabelField("", RightAlignedLabelStyle,
                             GUILayout.Width(SETTINGS_WIDTH),
                             GUILayout.ExpandWidth(false));
@@ -530,14 +534,52 @@ namespace Schema.Unity.Editor
                             string filterValue = attributeFilters.TryGetValue(attribute.AttributeName, out var val)
                                 ? val
                                 : string.Empty;
-                            string newFilterValue =
-                                GUILayout.TextField(filterValue, GUILayout.Width(attribute.ColumnWidth));
-                            
-                            // On attribute filter change
-                            if (newFilterValue != filterValue)
+
+                            switch (attribute.DataType) 
                             {
-                                UpdateAttributeFilter(attribute.AttributeName, newFilterValue);
-                                SaveAttributeFilters(scheme.SchemeName);
+                                case ReferenceDataType refDataType:
+                                    if (GUILayout.Button(filterValue, GUILayout.Width(attribute.ColumnWidth)))
+                                    {
+                                        var referenceEntryOptions = new GenericMenu();
+                
+                                        if (GetScheme(refDataType.ReferenceSchemeName).Try(out var refSchema))
+                                        {
+                                            foreach (var identifierValue in refSchema.GetIdentifierValues())
+                                            {
+                                                var optionValue = identifierValue.ToString();
+                                                referenceEntryOptions.AddItem(
+                                                    new GUIContent(optionValue),
+                                                    on: filterValue.Contains(optionValue),
+                                                    () =>
+                                                    {
+                                                        string newFilterValue;
+                                                        if (filterValue.Contains(optionValue))
+                                                        {
+                                                            newFilterValue = filterValue.Replace(optionValue, "");
+                                                        }
+                                                        else
+                                                        {
+                                                            newFilterValue = (string.IsNullOrEmpty(filterValue)) ? optionValue : $"{filterValue},{optionValue}";
+                                                        }
+                                                        newFilterValue = newFilterValue.Replace(",,", "");
+                                                        UpdateAttributeFilter(attribute.AttributeName, newFilterValue);
+                                                    });
+                                            }
+                                        }
+                
+                                        referenceEntryOptions.ShowAsContext();
+                                    }
+                                    break;
+                                
+                                default:
+                                    string newFilterValue = GUILayout.TextField(filterValue, GUILayout.Width(attribute.ColumnWidth));
+                            
+                                    // On attribute filter change
+                                    if (newFilterValue != filterValue)
+                                    {
+                                        UpdateAttributeFilter(attribute.AttributeName, newFilterValue);
+                                    }
+                                    break;
                             }
                         }
 
@@ -559,21 +601,25 @@ namespace Schema.Unity.Editor
             {
                 scheme.MoveEntry(entry, 0);
                 SaveDataScheme(scheme, alsoSaveManifest: false);
+                OnSelectedSchemeChanged?.Invoke();
             });
             rowOptionsMenu.AddItem(new GUIContent("Move Up"), isDisabled: canMoveUp, () =>
             {
                 scheme.MoveUpEntry(entry);
                 SaveDataScheme(scheme, alsoSaveManifest: false);
+                OnSelectedSchemeChanged?.Invoke();
             });
             rowOptionsMenu.AddItem(new GUIContent("Move Down"), isDisabled: canMoveDown, () =>
             {
                 scheme.MoveDownEntry(entry);
                 SaveDataScheme(scheme, alsoSaveManifest: false);
+                OnSelectedSchemeChanged?.Invoke();
             });
             rowOptionsMenu.AddItem(new GUIContent("Move To Bottom"), isDisabled: canMoveDown, () =>
             {
                 scheme.MoveEntry(entry, entryCount - 1);
                 SaveDataScheme(scheme, alsoSaveManifest: false);
+                OnSelectedSchemeChanged?.Invoke();
             });
             rowOptionsMenu.AddSeparator("");
             rowOptionsMenu.AddItem(new GUIContent("Delete Entry"), false, () =>
@@ -582,6 +628,7 @@ namespace Schema.Unity.Editor
                 {
                     LatestResponse = scheme.DeleteEntry(entry);
                     SaveDataScheme(scheme, alsoSaveManifest: false);
+                    OnSelectedSchemeChanged?.Invoke();
                 }
             });
             rowOptionsMenu.ShowAsContext();

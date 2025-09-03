@@ -146,6 +146,13 @@ namespace Schema.Unity.Editor
 
             OnAttributeFiltersUpdated += RefreshTableEntriesForSelectedScheme;
             OnSelectedSchemeChanged += RefreshTableEntriesForSelectedScheme;
+            OnSelectedSchemeChanged += () =>
+            {
+                if (!string.IsNullOrEmpty(selectedSchemeName))
+                {
+                    LoadAttributeFilters(selectedSchemeName);
+                }
+            };
         }
 
         private void InitializeSafely()
