@@ -4,6 +4,10 @@ namespace Schema.Core.Serialization
     {
         /// File extension for the format
         string Extension { get; }
+        string DisplayName { get; }
+
+        bool IsImportSupported { get; }
+        bool IsExportSupported { get; }
         SchemaResult<T> DeserializeFromFile(string filePath);
         SchemaResult<T> Deserialize(string content);
         SchemaResult SerializeToFile(string filePath, T data);

@@ -14,6 +14,9 @@ namespace Schema.Core.Serialization
     {
         private JsonSerializerSettings settings;
         public string Extension => "json";
+        public string DisplayName => "JSON";
+        public bool IsImportSupported => false;
+        public bool IsExportSupported => true;
 
         private readonly IFileSystem fileSystem;
 

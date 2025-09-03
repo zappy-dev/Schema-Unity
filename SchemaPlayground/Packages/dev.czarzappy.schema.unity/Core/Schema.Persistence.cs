@@ -270,7 +270,7 @@ namespace Schema.Core
                                     context: scheme);
                             }
 
-                            var updateData = scheme.SetDataOnEntry(entry, attribute.AttributeName, conversion.Result);
+                            var updateData = scheme.SetDataOnEntry(entry, attribute.AttributeName, conversion.Result, allowIdentifierUpdate: true);
                             if (updateData.Failed)
                             {
                                 return Fail(updateData.Message, scheme);

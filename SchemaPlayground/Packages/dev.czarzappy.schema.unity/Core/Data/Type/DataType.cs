@@ -20,9 +20,17 @@ namespace Schema.Core.Data
         /// </summary>
         public static readonly DataType FilePath = new FilePathDataType(allowEmptyPath: true, useRelativePaths: true);
         /// <summary>
+        /// Built-in guid data type
+        /// </summary>
+        public static readonly DataType Guid = new GuidDataType();
+        /// <summary>
         /// Built-in integer data type.
         /// </summary>
         public static readonly DataType Integer = new IntegerDataType();
+        /// <summary>
+        /// Built-in integer data type.
+        /// </summary>
+        public static readonly DataType Float = new FloatingPointDataType();
         /// <summary>
         /// Built-in date/time data type.
         /// </summary>
@@ -44,11 +52,13 @@ namespace Schema.Core.Data
         public static readonly DataType[] BuiltInTypes = {
             Text,
             FilePath,
+            Guid,
             Integer,
+            Float,
             DateTime,
             Boolean,
         };
-        
+
         /// <summary>
         /// Gets the name of the data type.
         /// </summary>

@@ -8,7 +8,7 @@ namespace Schema.Core.Data
     {
         public override SchemaContext Context => new SchemaContext()
         {
-            DataType = nameof(ReferenceDataType),
+            DataType = this.ToString(),
         };
         
         public const string TypeNamePrefix = "Reference";

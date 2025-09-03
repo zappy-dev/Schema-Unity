@@ -10,6 +10,9 @@ namespace Schema.Core.Serialization
     public class CSharpStorageFormat : IStorageFormat<DataScheme>
     {
         public string Extension => "g.cs";
+        public string DisplayName => "CodeGen C#";
+        public bool IsImportSupported => false;
+        public bool IsExportSupported => true;
 
         private readonly IFileSystem fileSystem;
 
@@ -96,6 +99,8 @@ $"");
                     .ToPascalCase();
                 var attributeName = attributeDefinition.AttributeName;
 
+                // TODO: Support more GetData functions for new data types
+                // Codegen?
                 string getDataMethod = "GetDataAsString";
                 string csDataType = "string";
                 switch (attributeDefinition.DataType)
@@ -106,6 +111,10 @@ $"");
                         break;
                     case IntegerDataType _:
                         getDataMethod = "GetDataAsInt";
+                        csDataType = "bool";
+                        break;
+                    case FloatingPointDataType _:
+                        getDataMethod = "GetDataAsFloat";
                         csDataType = "bool";
                         break;
                 }

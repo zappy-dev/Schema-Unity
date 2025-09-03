@@ -519,6 +519,7 @@ namespace Schema.Unity.Editor
                     // Filter row
                     using (new GUILayout.HorizontalScope())
                     {
+                        LoadAttributeFilters(scheme.SchemeName);
                         EditorGUILayout.LabelField("", RightAlignedLabelStyle,
                             GUILayout.Width(SETTINGS_WIDTH),
                             GUILayout.ExpandWidth(false));
@@ -740,11 +741,15 @@ namespace Schema.Unity.Editor
             // Render based on data type
             switch (attribute.DataType)
             {
-                case IntegerDataType intDataType:
+                case IntegerDataType _:
                     RenderIntegerCell(cellRect, Convert.ToInt32(entryValue), cellStyle, value => 
                         UpdateEntryValue(entry, attribute, value, scheme));
                     break;
-                case BooleanDataType boolDataType:
+                case FloatingPointDataType _:
+                    RenderFloatCell(cellRect, Convert.ToSingle(entryValue), cellStyle, value => 
+                        UpdateEntryValue(entry, attribute, value, scheme));
+                    break;
+                case BooleanDataType _:
                     bool boolValue = false;
                     if (entryValue is bool b)
                         boolValue = b;
@@ -755,7 +760,7 @@ namespace Schema.Unity.Editor
                     RenderBooleanCell(cellRect, boolValue, cellStyle, value => 
                         UpdateEntryValue(entry, attribute, value, scheme));
                     break;
-                case FilePathDataType filePathDataType:
+                case FilePathDataType _:
                     RenderFilePathCell(cellRect, entryValue.ToString(), cellStyle, value => 
                         UpdateEntryValue(entry, attribute, value, scheme));
                     break;
@@ -763,19 +768,41 @@ namespace Schema.Unity.Editor
                     RenderReferenceCell(cellRect, entryValue, refDataType, cellStyle, value => 
                         UpdateEntryValue(entry, attribute, value, scheme));
                     break;
-                case DateTimeDataType dateTimeDataType:
+                case DateTimeDataType _:
                     RenderDateTimeCell(cellRect, entryValue is DateTime dt ? dt : DateTime.Now, cellStyle, value => 
                         UpdateEntryValue(entry, attribute, value, scheme));
                     break;
-                default:
+                case TextDataType _:
                     RenderTextFieldCell(cellRect, entryValue, cellStyle, value => 
                         UpdateEntryValue(entry, attribute, value, scheme));
+                    break;
+                case GuidDataType _:
+                    RenderGuidCell(cellRect, entryValue is Guid ? (Guid)entryValue : default, cellStyle,
+                        value => UpdateEntryValue(entry, attribute, value, scheme));
+                    break;
+                default:
+                    RenderUnmappedFieldCell(cellRect, entryValue, cellStyle);
                     break;
             }
             
             GUI.backgroundColor = originalColor;
         }
-        
+
+        private void RenderGuidCell(Rect cellRect, Guid entryValue, CellStyle cellStyle, Action<object> action)
+        {
+            var assetPath = AssetDatabase.GUIDToAssetPath(entryValue.ToString().Replace("-", string.Empty));
+            var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            if (asset != null)
+            {
+                var assetType = asset.GetType();
+                EditorGUI.ObjectField(cellRect, asset, assetType);
+            }
+            else
+            {
+                EditorGUI.TextField(cellRect, entryValue.ToString(), cellStyle.FieldStyle);
+            }
+        }
+
         /// <summary>
         /// Renders an integer field cell
         /// </summary>
@@ -783,6 +810,19 @@ namespace Schema.Unity.Editor
         {
             // var newValue = EditorGUI.IntField(cellRect, value, cellStyle.FieldStyle);
             var newValue = SchemaGUI.IntField(cellRect, value, cellStyle.FieldStyle);
+            if (newValue != value)
+            {
+                onValueChanged?.Invoke(newValue);
+            }
+        }
+        
+        /// <summary>
+        /// Renders an floating-point field cell
+        /// </summary>
+        private void RenderFloatCell(Rect cellRect, float value, CellStyle cellStyle, Action<float> onValueChanged)
+        {
+            // var newValue = EditorGUI.IntField(cellRect, value, cellStyle.FieldStyle);
+            var newValue = SchemaGUI.FloatField(cellRect, value, cellStyle.FieldStyle);
             if (newValue != value)
             {
                 onValueChanged?.Invoke(newValue);
@@ -812,6 +852,15 @@ namespace Schema.Unity.Editor
             {
                 onValueChanged?.Invoke(newValue);
             }
+        }
+        
+        /// <summary>
+        /// Renders a unmapped field cell
+        /// </summary>
+        private void RenderUnmappedFieldCell(Rect cellRect, object value, CellStyle cellStyle)
+        {
+            var stringValue = value?.ToString() ?? string.Empty;
+            EditorGUI.TextField(cellRect, stringValue, cellStyle.FieldStyle);
         }
         
         /// <summary>
@@ -964,7 +1013,7 @@ namespace Schema.Unity.Editor
             {
                 LogDbgWarning($"Setting {attribute} data for {entry}");
                 entryValue = attribute.CloneDefaultValue();
-                _ = ExecuteSetDataOnEntryAsync(scheme, entry, attribute.AttributeName, entryValue);
+                entry.SetData(attribute.AttributeName, entryValue);
             }
             else if (attribute.CheckIfValidData(entryValue).Failed)
             {
@@ -973,12 +1022,12 @@ namespace Schema.Unity.Editor
                     if (DataType.ConvertData(entryValue, DataType.Default, attribute.DataType, attribute.Context).Try(out var convertedValue))
                     {
                         entryValue = convertedValue;
-                        _ = ExecuteSetDataOnEntryAsync(scheme, entry, attribute.AttributeName, entryValue);
+                        entry.SetData(attribute.AttributeName, entryValue);
                     }
                     else
                     {
                         entryValue = attribute.CloneDefaultValue();
-                        _ = ExecuteSetDataOnEntryAsync(scheme, entry, attribute.AttributeName, entryValue);
+                        entry.SetData(attribute.AttributeName, entryValue);
                     }
                 }
             }

@@ -12,6 +12,10 @@ namespace Schema.Core.Serialization
     public class CSVStorageFormat : IStorageFormat<DataScheme>
     {
         public string Extension => "csv";
+        public string DisplayName => "CSV";
+        public bool IsImportSupported => true;
+        public bool IsExportSupported => true;
+
         public bool TryDeserializeFromFile(string filePath, out DataScheme data)
         {
             return DeserializeFromFile(filePath).Try(out data);
