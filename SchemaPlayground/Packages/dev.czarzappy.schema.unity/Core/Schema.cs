@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using Schema.Core.Data;
+using Schema.Core.Logging;
 using Schema.Core.Serialization;
 using static Schema.Core.SchemaResult;
 
@@ -21,7 +22,7 @@ namespace Schema.Core
             public const string System = "System";
         }
 
-        private static readonly Dictionary<string, DataScheme> LoadedSchemes = new Dictionary<string, DataScheme>();
+        internal static readonly Dictionary<string, DataScheme> LoadedSchemes = new Dictionary<string, DataScheme>();
         
         /// <summary>
         /// Returns all the available valid scheme names.
@@ -78,6 +79,7 @@ namespace Schema.Core
 
         public static void Reset()
         {
+            Logger.LogDbgWarning("Schema: Resetting...");
             IsInitialized = false;
             LoadedSchemes.Clear();
             manifestImportPath = String.Empty;
@@ -99,17 +101,17 @@ namespace Schema.Core
         }
 
         // TODO support async
-        public static SchemaResult<DataScheme> GetScheme(string schemeName)
+        public static SchemaResult<DataScheme> GetScheme(string schemeName, SchemaContext? context = null)
         {
             if (!IsInitialized)
             {
-                return SchemaResult<DataScheme>.Fail("Scheme not initialized!", Context.Schema);
+                return SchemaResult<DataScheme>.Fail("Scheme not initialized!", context);
             }
             
             var success = LoadedSchemes.TryGetValue(schemeName, out var scheme);
             return SchemaResult<DataScheme>.CheckIf(success, scheme, 
                 errorMessage: $"Scheme '{schemeName}' is not loaded.",
-                successMessage: $"Scheme '{schemeName}' is loaded.");
+                successMessage: $"Scheme '{schemeName}' is loaded.", context);
         }
 
         public static bool TryGetSchemeForAttribute(AttributeDefinition searchAttr, out DataScheme ownerScheme)

@@ -2,13 +2,14 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Schema.Core.Data;
+using static Schema.Core.Commands.CommandResult;
 
 namespace Schema.Core.Commands
 {
     /// <summary>
     /// Command that sets a value on a DataEntry within a DataScheme. Supports undo/redo by restoring the previous value.
     /// </summary>
-    public sealed class SetDataOnEntryCommand : SchemaCommandBase<SchemaResult>
+    public sealed class SetDataOnEntryCommand : SchemaCommandBase
     {
         private readonly DataScheme _scheme;
         private readonly DataEntry _entry;
@@ -37,7 +38,7 @@ namespace Schema.Core.Commands
         public override string Description =>
             $"SetDataOnEntry '{_scheme.SchemeName}.{_attributeName}'";
 
-        protected override Task<CommandResult<SchemaResult>> ExecuteInternalAsync(CancellationToken cancellationToken)
+        protected override Task<CommandResult> ExecuteInternalAsync(CancellationToken cancellationToken)
         {
             // First execution: capture previous value for undo
             if (!_hasCapturedOldValue)
@@ -50,8 +51,8 @@ namespace Schema.Core.Commands
             var result = _scheme.SetDataOnEntry(_entry, _attributeName, _newValue, _allowIdentifierUpdate);
 
             var cmdResult = result.Passed
-                ? CommandResult<SchemaResult>.Success(result)
-                : CommandResult<SchemaResult>.Failure(result.Message);
+                ? Pass(result)
+                : Fail(result.Message);
 
             return Task.FromResult(cmdResult);
         }
@@ -59,7 +60,7 @@ namespace Schema.Core.Commands
         protected override Task<CommandResult> UndoInternalAsync(CancellationToken cancellationToken)
         {
             var result = _scheme.SetDataOnEntry(_entry, _attributeName, _oldValue, allowIdentifierUpdate: true);
-            return Task.FromResult(result.Passed ? CommandResult.Success("Undo successful") : CommandResult.Failure(result.Message));
+            return Task.FromResult(result.Passed ? Pass("Undo successful") : Fail(result.Message));
         }
     }
 } 

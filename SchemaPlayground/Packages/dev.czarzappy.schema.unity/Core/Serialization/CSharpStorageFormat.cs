@@ -1,4 +1,3 @@
-using System;
 using Schema.Core.Data;
 using Schema.Core.IO;
 using static Schema.Core.SchemaResult;
@@ -54,7 +53,8 @@ namespace Schema.Core.Schemes
 
             var hasIdAttr = scheme.GetIdentifierAttribute().Try(out var idAttr);
             // ID Entry Enum
-            if (hasIdAttr)
+            // TODO: Sanitize identifier enums and validate the use-case for this
+            if (false && hasIdAttr)
             {
                 sb.Append(
 $"  public enum Id" +
@@ -99,6 +99,7 @@ $"");
                     .ToPascalCase();
                 var attributeName = attributeDefinition.AttributeName;
 
+                bool codeGenAttributeSetters = scheme.SchemeName == Manifest.MANIFEST_SCHEME_NAME;
                 // TODO: Support more GetData functions for new data types
                 // Codegen?
                 string getDataMethod = "GetDataAsString";
@@ -126,7 +127,19 @@ $"");
                     sb.AppendLine($"        /// {attributeDefinition.AttributeToolTip}");
                     sb.AppendLine($"        /// </summary>");
                 }
-                sb.AppendLine($"        public {csDataType} {attributePropertyName} => _dataEntry.{getDataMethod}(\"{attributeName}\");");
+
+                if (codeGenAttributeSetters)
+                {
+                    sb.AppendLine($"        public {csDataType} {attributePropertyName}");
+                    sb.AppendLine($"        {{");
+                    sb.AppendLine($"            get => _dataEntry.{getDataMethod}(\"{attributeName}\");");
+                    sb.AppendLine($"            set => _dataScheme.SetDataOnEntry(_dataEntry, \"{attributeName}\", value);");
+                    sb.AppendLine($"        }}");
+                }
+                else
+                {
+                    sb.AppendLine($"        public {csDataType} {attributePropertyName} => _dataEntry.{getDataMethod}(\"{attributeName}\");");
+                }
             }
             sb.AppendLine("    }");
             sb.AppendLine("}");

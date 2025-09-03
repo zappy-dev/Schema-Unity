@@ -30,20 +30,22 @@ namespace Schema.Core
             this.message = message;
             this.context = context;;
 
-#if SCHEMA_DEBUG
-            string logMsg = $"[Context={context}] {message}";
-            if (status == RequestStatus.Passed)
-            {
-                Logger.LogDbgVerbose(logMsg);
-            }
-            else
-            {
-                if (Logger.Level <= Logger.LogLevel.VERBOSE)
-                {
-                    Logger.LogDbgError(logMsg);
-                }
-            }
-#endif
+            // TODO: Maybe create a preference for whether schema results automatically create a log?
+            // TODO: Handle logging when creating an empty result
+// #if SCHEMA_DEBUG
+//             string logMsg = $"[Context={context}] {message}";
+//             if (status == RequestStatus.Passed)
+//             {
+//                 Logger.LogDbgVerbose(logMsg);
+//             }
+//             else
+//             {
+//                 if (Logger.Level <= Logger.LogLevel.VERBOSE)
+//                 {
+//                     Logger.LogDbgError(logMsg);
+//                 }
+//             }
+// #endif
         }
         
         public override string ToString()
@@ -72,10 +74,10 @@ namespace Schema.Core
         {
             get
             {
-                if (status == RequestStatus.Failed)
-                {
-                    throw new InvalidOperationException($"The request status {status} is not supported.");
-                }
+                // if (status == RequestStatus.Failed)
+                // {
+                //     throw new InvalidOperationException($"The request status {status} is not supported.");
+                // }
                 
                 return result;
             }
@@ -95,17 +97,19 @@ namespace Schema.Core
             this.message = message;
             this.context = context;;
 
-#if SCHEMA_DEBUG
-            string logMsg = $"[Context={context}] {message}";
-            if (status == RequestStatus.Passed)
-            {
-                Logger.LogDbgVerbose(logMsg);
-            }
-            else
-            {
-                Logger.LogDbgError(logMsg);
-            }
-#endif
+            // TODO: Maybe create a preference for whether schema results automatically create a log?
+            // TODO: Handle logging when creating an empty result
+// #if SCHEMA_DEBUG
+//             string logMsg = $"[Context={context}] {message}";
+//             if (status == RequestStatus.Passed)
+//             {
+//                 Logger.LogDbgVerbose(logMsg);
+//             }
+//             else
+//             {
+//                 Logger.LogDbgError(logMsg);
+//             }
+// #endif
         }
         
         public override string ToString()

@@ -1,10 +1,11 @@
 using System.Text;
+using Schema.Core.Data;
 
 namespace Schema.Core
 {
     public struct SchemaContext
     {
-        public string SchemeName;
+        public DataScheme Scheme;
         public string AttributeName;
         public string DataType;
         public string Driver;
@@ -16,9 +17,9 @@ namespace Schema.Core
             {
                 sb.Append($"[Driver={Driver}]");
             }
-            if (!string.IsNullOrEmpty(SchemeName))
+            if (Scheme != null)
             {
-                sb.Append($"[SchemeName={SchemeName}]");
+                sb.Append($"[Scheme={Scheme}]");
             }
             if (!string.IsNullOrEmpty(AttributeName))
             {
@@ -36,7 +37,7 @@ namespace Schema.Core
         {
             return new SchemaContext
             {
-                SchemeName = (string.IsNullOrEmpty(ctxA.SchemeName) ? ctxB.SchemeName : ctxA.SchemeName),
+                Scheme = ctxA.Scheme ?? ctxB.Scheme,
                 AttributeName = (string.IsNullOrEmpty(ctxA.AttributeName) ? ctxB.AttributeName : ctxA.AttributeName),
                 DataType = (string.IsNullOrEmpty(ctxA.DataType) ? ctxB.DataType : ctxA.DataType),
             };

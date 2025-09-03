@@ -11,7 +11,7 @@ namespace Schema.Core.Commands
     /// <summary>
     /// Implementation of command history for managing undo/redo operations
     /// </summary>
-    public class CommandHistory : ICommandHistory
+    public class CommandProcessor : ICommandProcessor
     {
         private readonly Stack<ISchemaCommand> _undoStack = new Stack<ISchemaCommand>();
         private readonly Stack<ISchemaCommand> _redoStack = new Stack<ISchemaCommand>();
@@ -40,12 +40,12 @@ namespace Schema.Core.Commands
         public event EventHandler<CommandRedoneEventArgs> CommandRedone;
         public event EventHandler HistoryCleared;
         
-        public CommandHistory(ILogger logger = null)
+        public CommandProcessor(ILogger logger = null)
         {
             _logger = logger ?? new NullLogger();
         }
         
-        public async Task<CommandResult<TResult>> ExecuteAsync<TResult>(ISchemaCommand<TResult> command, CancellationToken cancellationToken = default)
+        public async Task<CommandResult> ExecuteAsync(ISchemaCommand command, CancellationToken cancellationToken = default)
         {
             if (command == null)
                 throw new ArgumentNullException(nameof(command));
@@ -97,7 +97,7 @@ namespace Schema.Core.Commands
                     }
                     
                     Logger.LogDbgVerbose($"Command executed successfully: {command.Description} ({stopwatch.ElapsedMilliseconds}ms)", this);
-                    CommandExecuted?.Invoke(this, new CommandExecutedEventArgs(command as ISchemaCommand, result.ToCommandResult(), stopwatch.Elapsed));
+                    CommandExecuted?.Invoke(this, new CommandExecutedEventArgs(command as ISchemaCommand, result, stopwatch.Elapsed));
                 }
                 else
                 {
@@ -119,7 +119,7 @@ namespace Schema.Core.Commands
             {
                 if (!CanUndo)
                 {
-                    return CommandResult.Failure("No commands available to undo");
+                    return CommandResult.Fail("No commands available to undo");
                 }
                 
                 var command = _undoStack.Pop();
@@ -157,7 +157,7 @@ namespace Schema.Core.Commands
             {
                 if (!CanRedo)
                 {
-                    return CommandResult.Failure("No commands available to redo");
+                    return CommandResult.Fail("No commands available to redo");
                 }
                 
                 var command = _redoStack.Pop();

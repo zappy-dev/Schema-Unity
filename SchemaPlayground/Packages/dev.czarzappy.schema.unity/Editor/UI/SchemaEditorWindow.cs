@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Serialization;
@@ -10,9 +11,6 @@ using Unity.Profiling;
 using UnityEditor;
 using UnityEngine;
 using Random = System.Random;
-using Schema.Core.Commands;
-using System.Threading;
-using System.Threading.Tasks;
 using Schema.Core.Schemes;
 using Schema.Unity.Editor.Ext;
 using static Schema.Core.Logging.Logger;
@@ -20,7 +18,6 @@ using static Schema.Core.Schema;
 using static Schema.Core.SchemaResult;
 using static Schema.Unity.Editor.SchemaLayout;
 using Logger = Schema.Core.Logging.Logger;
-using Object = UnityEngine.Object;
 
 namespace Schema.Unity.Editor
 {
@@ -100,18 +97,7 @@ namespace Schema.Unity.Editor
         
         private int debugIdx;
 
-        private readonly Dictionary<string, AttributeSortOrder> primarySchemeSort = 
-            new Dictionary<string, AttributeSortOrder>();
-        
-        // NEW FIELDS FOR ASYNC COMMAND SYSTEM
-        private readonly ICommandHistory _commandHistory = new CommandHistory();
-        private CancellationTokenSource _cancellationTokenSource;
-
-        // Progress tracking
-        private bool _operationInProgress;
-        private string _currentOperationDescription;
-        private float _currentProgress;
-        private string _currentProgressMessage;
+        private readonly Dictionary<string, AttributeSortOrder> primarySchemeSort = new Dictionary<string, AttributeSortOrder>();
 
         // Undo/Redo UI toggle
         private bool _showUndoRedoPanel = true;
@@ -135,11 +121,7 @@ namespace Schema.Unity.Editor
             LogDbgVerbose("Scheme Editor enabled", this);
             isInitialized = false;
             EditorApplication.update += InitializeSafely;
-            _cancellationTokenSource = new CancellationTokenSource();
-            // Subscribe to command history events for repainting
-            _commandHistory.CommandExecuted += (_, __) => Repaint();
-            _commandHistory.CommandUndone += (_, __) => Repaint();
-            _commandHistory.CommandRedone += (_, __) => Repaint();
+            RegisterCommandHistoryCallbacks();
             
             // Initialize virtual scrolling
             _virtualTableView = new VirtualTableView();
@@ -152,7 +134,18 @@ namespace Schema.Unity.Editor
                 {
                     LoadAttributeFilters(selectedSchemeName);
                 }
+
+                selectedSchemeLoadPath = null;
             };
+        }
+
+        private void OnDisable()
+        {
+            // Clean up event handlers to prevent memory leaks
+            EditorApplication.delayCall -= InitializeSafely;
+            manifestWatcher?.Dispose();
+            
+            UnregisterCommandHistoryCallbacks();
         }
 
         private void InitializeSafely()
@@ -237,82 +230,14 @@ namespace Schema.Unity.Editor
         }
         #endregion
 
-        private void OnDisable()
-        {
-            // Clean up event handlers to prevent memory leaks
-            EditorApplication.delayCall -= InitializeSafely;
-            manifestWatcher?.Dispose();
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource?.Dispose();
-            _cancellationTokenSource = null;
-            _commandHistory.CommandExecuted -= (_, __) => Repaint();
-            _commandHistory.CommandUndone -= (_, __) => Repaint();
-            _commandHistory.CommandRedone -= (_, __) => Repaint();
-        }
-
         #endregion
         
         #region UI Command Handling
 
-        // Async version of adding a schema using command system
-        private async Task AddSchemaAsync(DataScheme newSchema, string importFilePath = null)
-        {
-            if (_operationInProgress) return;
-
-            // Confirm overwrite if needed
-            bool overwriteExisting = false;
-            if (DoesSchemeExist(newSchema.SchemeName))
-            {
-                overwriteExisting = EditorUtility.DisplayDialog(
-                    "Add Schema",
-                    $"A Schema named {newSchema.SchemeName} already exists. Do you want to overwrite this scheme?",
-                    "Yes",
-                    "No");
-                if (!overwriteExisting) return; // user cancelled
-            }
-
-            _operationInProgress = true;
-            _currentOperationDescription = $"Adding schema '{newSchema.SchemeName}'";
-
-            try
-            {
-                var progress = new Progress<CommandProgress>(UpdateProgress);
-                var command = new LoadDataSchemeCommand(
-                    newSchema,
-                    overwriteExisting: overwriteExisting,
-                    importFilePath: importFilePath,
-                    progress: progress);
-
-                var result = await _commandHistory.ExecuteAsync(command, _cancellationTokenSource.Token);
-
-                if (result.IsSuccess)
-                {
-                    OnSelectScheme(newSchema.SchemeName, "Added schema");
-                    // Persist changes
-                    Core.Schema.Save(true);
-                }
-                else
-                {
-                    Debug.LogError(result.Message);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                LogDbgVerbose("Add schema operation cancelled");
-            }
-            finally
-            {
-                _operationInProgress = false;
-                _currentProgress = 0f;
-                _currentProgressMessage = string.Empty;
-                Repaint();
-            }
-        }
-
         private void OnSelectScheme(string schemeName, string context)
         {
             // Unfocus any selected control fields when selecting a new scheme
-            GUI.FocusControl(null);
+            ReleaseControlFocus();
             var schemeNames = AllSchemes.ToArray();
             var prevSelectedIndex = Array.IndexOf(schemeNames, schemeName);
             if (prevSelectedIndex == -1)
@@ -335,8 +260,8 @@ namespace Schema.Unity.Editor
             LogDbgVerbose($"Loading Manifest", context);
             // TODO: Figure out why progress reporting is making the Unity Editor unhappy
             // using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
-            LatestManifestLoadResponse = LoadManifestFromPath(ManifestImportPath);
-            LatestResponse = CheckIf(LatestManifestLoadResponse.Passed, LatestManifestLoadResponse.Message, Context);
+            LatestManifestLoadResponse = LoadManifestFromPath(ManifestImportPath, Context);
+            LatestResponse = CheckIf(LatestManifestLoadResponse.Passed, LatestManifestLoadResponse.Message, LatestManifestLoadResponse.Context);
             return LatestResponse;
         }
         
@@ -365,6 +290,14 @@ namespace Schema.Unity.Editor
 
         #region Rendering Methods
 
+        /// <summary>
+        /// Utility method for release focus from a selected control.
+        /// Selecting a control can prevent it from updating with new values. By forcing a release of the focus, these controls can repaint with new values
+        /// </summary>
+        private void ReleaseControlFocus()
+        {
+            GUI.FocusControl(null);
+        }
         private string GetTooltipMessage()
         {
             if (!GetScheme("Tooltips").Try(out var tooltipDataScheme)) 
@@ -392,16 +325,57 @@ namespace Schema.Unity.Editor
                 return;
             }
             
-            showDebugView = EditorGUILayout.Foldout(showDebugView, "Debug View");
-            if (showDebugView)
-            {
-                RenderDebugView();
-            }
+            // showDebugView = EditorGUILayout.Foldout(showDebugView, "Debug View");
+            // if (showDebugView)
+            // {
+            //     RenderDebugView();
+            // }
             
             InitializeStyles();
             debugIdx = 0;
             GUILayout.Label("Scheme Editor", EditorStyles.largeLabel, 
                 ExpandWidthOptions);
+            
+            
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Label("Manifest Path");
+                
+                using (new EditorGUI.DisabledScope())
+                {
+                    EditorGUILayout.TextField("Manifest Import Path", ManifestImportPath);
+#if SCHEMA_DEBUG
+                    EditorGUILayout.IntField("Loaded Manifest Scheme Hash",
+                        RuntimeHelpers.GetHashCode(LoadedManifestScheme._));
+#endif
+                }
+
+                if (GUILayout.Button("Load"))
+                {
+                    OnLoadManifest("On User Load");
+                }
+
+                if (GUILayout.Button("Open", ExpandWidthOptions))
+                {
+                    EditorUtility.RevealInFinder(ManifestImportPath);
+                }
+
+                // save schemes to manifest
+                if (GUILayout.Button("Save Manifest"))
+                {
+                    LatestResponse = SaveManifest();
+                }
+            }
+            
+            if (LatestManifestLoadResponse.Message != null)
+            {
+                EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestManifestLoadResponse.Result}: {LatestManifestLoadResponse.Message}", LatestManifestLoadResponse.MessageType());
+            }
+            
+            if (LatestResponse.Message != null)
+            {
+                EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestResponse.Message}", LatestResponse.MessageType());
+            }
 
             // NEW: Undo/Redo controls and progress display
             DrawUndoRedoPanel();
@@ -474,7 +448,7 @@ namespace Schema.Unity.Editor
                             // Get the full path for actual file creation
                             string fullPath = GetContentPath(fileName);
                             
-                            AddSchemaAsync(newSchema, importFilePath: relativePath).FireAndForget();
+                            SubmitAddSchemeRequest(newSchema, importFilePath: relativePath).FireAndForget();
                             newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name
                         }
                     }
@@ -497,20 +471,7 @@ namespace Schema.Unity.Editor
 
                         if (storageFormat is ScriptableObjectStorageFormat so)
                         {
-                            var scriptableObjectType = typeof(ScriptableObject);
-                            var editorWindowType = typeof(EditorWindow);
-                            var editorType = typeof(UnityEditor.Editor);
-                            var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-                                .Where(a => !a.FullName.StartsWith("Unity.") && // filter Unity-related assembles.
-                                            !a.FullName.StartsWith("UnityEngine") &&
-                                            !a.FullName.StartsWith("UnityEditor") &&
-                                            !a.FullName.Contains("Unity.Editor") &&
-                                            !a.FullName.StartsWith("Schema")); // Filter Schema assemblies
-                            var soTypes = assemblies.SelectMany(a => a.GetTypes())
-                                .Where(t => scriptableObjectType.IsAssignableFrom(t) && 
-                                            !(editorWindowType.IsAssignableFrom(t) || editorType.IsAssignableFrom(t))); // Editor and EditorWindow are Scriptable Objects :upsidedown-smile:
-
-                            foreach (var soType in soTypes)
+                            foreach (var soType in TypeUtils.GetUserDefinedScriptableObjectTypes())
                             {
                                 menu.AddItem(new GUIContent($"{storageFormat.DisplayName}/{soType.Name} - {soType.Assembly.GetName().Name}"), false, () =>
                                 {
@@ -524,7 +485,7 @@ namespace Schema.Unity.Editor
                             {
                                 if (storageFormat.TryImport(out var importedSchema, out var importFilePath))
                                 {
-                                    AddSchemaAsync(importedSchema, importFilePath: importFilePath).FireAndForget();
+                                    SubmitAddSchemeRequest(importedSchema, importFilePath: importFilePath).FireAndForget();
                                 }
                             });
                         }
@@ -562,6 +523,18 @@ namespace Schema.Unity.Editor
             }
         }
 
+        public static void DrawUILine(Color color, int thickness = 2, int padding = 10)
+        {
+            Rect r = EditorGUILayout.GetControlRect(GUILayout.Height(padding+thickness));
+            r.height = thickness;
+            r.y+=padding/2.0f;
+            r.x-=2;
+            r.width +=6;
+            EditorGUI.DrawRect(r, color);
+        }
+        
+        #endregion
+        
         /// <summary>
         /// Imports a given type of a Scriptable Object as a new or updated Data Scheme
         /// </summary>
@@ -574,9 +547,7 @@ namespace Schema.Unity.Editor
             string operationTitle = $"Schema - Import Scheme for '{newSOSchemeName}' Scriptable Object";
             using var progress = new ProgressScope(operationTitle);
             progress.Progress($"Scanning for available Fields", 0.1f);
-            var serializedFieldAttribute = typeof(SerializeField);
-            var serializedFields = soType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                .Where(field => field.GetCustomAttribute(serializedFieldAttribute) != null);
+            var serializedFields = TypeUtils.GetSerializedFieldsForType(soType);
 
             progress.Progress($"Mapping fields to available Data Types", 0.3f);
             var dataScheme = new DataScheme(newSOSchemeName);
@@ -651,7 +622,7 @@ namespace Schema.Unity.Editor
                                                     
                             // finally save new data scheme
                             string enumSchemeFileName = $"{enumSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}";
-                            AddSchemaAsync(enumScheme, importFilePath: enumSchemeFileName).FireAndForget();
+                            SubmitAddSchemeRequest(enumScheme, importFilePath: enumSchemeFileName).FireAndForget();
                         }
                     }
                     else
@@ -745,6 +716,8 @@ namespace Schema.Unity.Editor
 
                         if (otherAsset.dataEntry != default)
                         {
+                            // TODO: fix this... the reference type itself is a guid...
+                            // should this value match the reference's attribute (i.e a guid?)
                             entryValue = otherAsset.dataEntry.GetDataDirect(assetGuidAttr);
                             LogVerbose($"Setting reference: {entryValue}");
                         }
@@ -766,148 +739,123 @@ namespace Schema.Unity.Editor
 
             progress.Progress($"Loading final Data Scheme", 0.9f);
             string fileName = $"{newSOSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}";
-            AddSchemaAsync(dataScheme, importFilePath: fileName).FireAndForget();
+            SubmitAddSchemeRequest(dataScheme, importFilePath: fileName).FireAndForget();
         }
 
-        public static void DrawUILine(Color color, int thickness = 2, int padding = 10)
+        private SchemaResult PublishScheme(string schemeName)
         {
-            Rect r = EditorGUILayout.GetControlRect(GUILayout.Height(padding+thickness));
-            r.height = thickness;
-            r.y+=padding/2.0f;
-            r.x-=2;
-            r.width +=6;
-            EditorGUI.DrawRect(r, color);
-        }
-        
-        #endregion
-
-        private void DrawUndoRedoPanel()
-        {
-            _showUndoRedoPanel = EditorGUILayout.Foldout(_showUndoRedoPanel, "Undo/Redo Controls");
-            if (!_showUndoRedoPanel) return;
-
-            EditorGUILayout.BeginHorizontal();
-            EditorGUI.BeginDisabledGroup(!_commandHistory.CanUndo || _operationInProgress);
-            if (GUILayout.Button($"Undo ({_commandHistory.UndoHistory.Count})", GUILayout.Width(100)))
+            LogDbgVerbose($"Publishing {schemeName}");
+            var schemeEntry = GetManifestEntryForScheme(schemeName);
+            if (!schemeEntry.Try(out ManifestEntry manifestEntry) ||
+                !GetScheme(schemeName).Try(out var schemeToPublish))
             {
-                _ = ExecuteUndoAsync();
+                return Fail($"Could not find manifest entry for scheme to publish, scheme: {schemeName}");
             }
-            EditorGUI.EndDisabledGroup();
 
-            EditorGUI.BeginDisabledGroup(!_commandHistory.CanRedo || _operationInProgress);
-            if (GUILayout.Button($"Redo ({_commandHistory.RedoHistory.Count})", GUILayout.Width(100)))
+            // TODO: Figure out how to better enumerate this, enforce Manifest scheme attribute is valid
+            // Problem: Manifest Scheme loads first, before any other scheme, so if it has a reference data type attribute to another scheme, that is invalid
+            // could skip validation and validate after load?
+            // But seems hacky
+            switch (manifestEntry.PublishTarget)
             {
-                _ = ExecuteRedoAsync();
-            }
-            EditorGUI.EndDisabledGroup();
+                case "SCRIPTABLE_OBJECT":
 
-            EditorGUI.BeginDisabledGroup(_commandHistory.Count == 0 || _operationInProgress);
-            if (GUILayout.Button("Clear History", GUILayout.Width(100)))
-            {
-                _commandHistory.ClearHistory();
+                    // HACK: Assumes ID column is the asset guid for an underlying scriptable object to publish to
+                    if (!schemeToPublish.GetIdentifierAttribute().Try(out var idAttr))
+                    {
+                        return Fail("No identifier attribute found for scheme to publish", schemeToPublish.Context);
+                    }
+                    
+                    foreach (var entry in schemeToPublish.AllEntries)
+                    {
+                        PublishScriptableObjectEntry(schemeToPublish, entry, idAttr);
+                    }
+                    break;
+                default:
+                    break;
             }
-            EditorGUI.EndDisabledGroup();
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.Space();
+            
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            return Pass("Published assets");
         }
 
-        private void DrawProgressBar()
+        private SchemaResult PublishScriptableObjectEntry(DataScheme schemeToPublish, DataEntry entry, AttributeDefinition idAttr)
         {
-            if (!_operationInProgress) return;
+            var assetGuid = entry.GetDataAsGuid(idAttr.AttributeName);
 
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(_currentOperationDescription ?? "Working...", GUILayout.Width(200));
-            var rect = EditorGUILayout.GetControlRect();
-            EditorGUI.ProgressBar(rect, _currentProgress, _currentProgressMessage ?? string.Empty);
-            if (GUILayout.Button("Cancel", GUILayout.Width(60)))
+            if (!AssetUtils.TryLoadAssetFromGUID(assetGuid, out var currentAsset))
             {
-                CancelCurrentOperation();
+                return Fail($"Not asset found with guid: {assetGuid}");
             }
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.Space();
-        }
+                        
+            var assetType = currentAsset.GetType();
 
-        private async Task ExecuteUndoAsync()
-        {
-            if (_operationInProgress) return;
-            _operationInProgress = true;
-            _currentOperationDescription = "Undoing last command";
-            try
+            var soFields = TypeUtils.GetSerializedFieldsForType(assetType);
+            var fieldMap = schemeToPublish.GetAttributes()
+                .ToDictionary(attr => attr.AttributeName, attr => soFields.FirstOrDefault(field => field.Name == attr.AttributeName));
+            
+            // BUG: Referenced Data Type stops matching Reference'd Data Type
+            foreach (var kvp in entry)
             {
-                await _commandHistory.UndoAsync(_cancellationTokenSource.Token);
-                // Persist sync save for now
-                Schema.Core.Schema.Save();
-            }
-            catch (OperationCanceledException) { }
-            finally
-            {
-                _operationInProgress = false;
-                Repaint();
-            }
-        }
-
-        private async Task ExecuteRedoAsync()
-        {
-            if (_operationInProgress) return;
-            _operationInProgress = true;
-            _currentOperationDescription = "Redoing last undone command";
-            try
-            {
-                await _commandHistory.RedoAsync(_cancellationTokenSource.Token);
-                Schema.Core.Schema.Save();
-            }
-            catch (OperationCanceledException) { }
-            finally
-            {
-                _operationInProgress = false;
-                Repaint();
-            }
-        }
-
-        // NEW: Progress update callback (placeholder for future commands)
-        private void UpdateProgress(CommandProgress progress)
-        {
-            _currentProgress = progress.Value;
-            _currentProgressMessage = progress.Message;
-            EditorApplication.delayCall += Repaint;
-        }
-
-        private void CancelCurrentOperation()
-        {
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource?.Dispose();
-            _cancellationTokenSource = new CancellationTokenSource();
-            _operationInProgress = false;
-        }
-
-        private async Task ExecuteSetDataOnEntryAsync(DataScheme scheme, DataEntry entry, string attributeName, object value)
-        {
-            if (_operationInProgress) return;
-            _operationInProgress = true;
-            _currentOperationDescription = $"Updating '{scheme.SchemeName}.{attributeName}'";
-            try
-            {
-                var progress = new Progress<CommandProgress>(UpdateProgress);
-                var cmd = new SetDataOnEntryCommand(scheme, entry, attributeName, value);
-                var result = await _commandHistory.ExecuteAsync(cmd, _cancellationTokenSource.Token);
-                if (!result.IsSuccess)
+                var attrName = kvp.Key;
+                var value = kvp.Value;
+                
+                // HACK: Skip Asset GUID Id field
+                if (attrName == idAttr.AttributeName) continue;
+                            
+                var field = fieldMap[attrName];
+                if (!schemeToPublish.GetAttribute(attrName).Try(out var attr))
                 {
-                    Debug.LogError(result.Message);
+                    LogError($"No attribute found for entry key: {attrName}");
+                    continue;
                 }
-                else
+                            
+                try
                 {
-                    // Persist change
-                    Schema.Core.Schema.Save();
+                    object mappedValue = null;
+                    if (field.FieldType.IsEnum)
+                    {
+                        mappedValue = Enum.Parse(field.FieldType, value?.ToString() ?? string.Empty);
+                    }
+                    else
+                    {
+                        switch (attr.DataType)
+                        {
+                            // HACK: I know in this case the one reference data type we have is an asset guid reference, just resolve that reference
+                            case ReferenceDataType refDataType:
+
+                                if (!schemeToPublish.TryGetEntry(searchEntry =>
+                                        searchEntry.GetData(refDataType.ReferenceAttributeName) == value, out var refEntry))
+                                {
+                                    LogError($"Failed to find referenced entry for value: {value} ({value?.GetType()})");
+                                    continue;
+                                }
+
+                                var refGuid = refEntry.GetDataAsGuid(refDataType.ReferenceAttributeName);
+                                if (AssetUtils.TryLoadAssetFromGUID(refGuid, out var refAsset))
+                                {
+                                    mappedValue = refAsset;
+                                }
+                                break;
+                            default:
+                                mappedValue = value;
+                                break;
+                        }
+                    }
+                    field.SetValue(currentAsset, mappedValue);
+                    LogDbgVerbose($"{field.Name}=>{mappedValue}");
+                }
+                catch (Exception e)
+                {
+                    LogError(e.Message);
                 }
             }
-            catch (OperationCanceledException) { }
-            finally
-            {
-                _operationInProgress = false;
-                _currentProgress = 0f;
-                _currentProgressMessage = string.Empty;
-                Repaint();
-            }
+            
+            LogDbgVerbose($"Saving changes to asset: {currentAsset}");
+            EditorUtility.SetDirty(currentAsset);
+
+            return Pass($"Saving changes to asset: {currentAsset}");
         }
     }
 }

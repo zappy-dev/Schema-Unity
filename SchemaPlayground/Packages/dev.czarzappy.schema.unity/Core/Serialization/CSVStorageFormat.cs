@@ -103,7 +103,7 @@ namespace Schema.Core.Serialization
             {
                 var attrCtx = new SchemaContext
                 {
-                    SchemeName = schemeName,
+                    Scheme = importedScheme,
                     AttributeName = attributes[attrIdx].AttributeName,
                 };
                 
@@ -161,7 +161,7 @@ namespace Schema.Core.Serialization
                 {
                     var attrCtx = new SchemaContext
                     {
-                        SchemeName = schemeName,
+                        Scheme = importedScheme,
                         AttributeName = attributes[attrIdx].AttributeName,
                     };
                     

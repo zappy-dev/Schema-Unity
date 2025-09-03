@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
+using Schema.Core.Logging;
 using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.Data
@@ -104,6 +105,20 @@ namespace Schema.Core.Data
                 return parsedValue;
                 
             return false;
+        }
+
+        public Guid GetDataAsGuid(string attributeName)
+        {
+            if (!entryData.TryGetValue(attributeName, out var value))
+                return Guid.Empty;
+                
+            if (value is Guid guidValue)
+                return guidValue;
+                
+            if (Guid.TryParse(value.ToString(), out var parsedValue))
+                return parsedValue;
+                
+            return Guid.Empty;
         }
 
         public float GetDataAsFloat(string attributeName)
@@ -309,6 +324,7 @@ namespace Schema.Core.Data
                 return Fail($"The attribute name is empty.");
             }
             
+            // Logger.LogDbgVerbose($"{attributeName}=>{value}({value?.GetType().Name})", Context);
             entryData[attributeName] = value;
             return Pass("Setting attribute value");
         }
@@ -337,6 +353,8 @@ namespace Schema.Core.Data
                 if (kvp.Value != null)
                 {
                     sb.Append(kvp.Value);
+                    sb.Append(':');
+                    sb.Append(kvp.Value.GetType().Name);
                 }
                 else
                 {

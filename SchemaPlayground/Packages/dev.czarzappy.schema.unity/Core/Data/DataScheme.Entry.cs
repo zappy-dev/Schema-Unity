@@ -131,5 +131,15 @@ namespace Schema.Core.Data
         #endregion
 
         #endregion
+
+        /// <summary>
+        /// Retrieve the order index for the given entry
+        /// </summary>
+        /// <param name="entry">Entry to index</param>
+        /// <returns>-1 if entry does not exist in the given scheme</returns>
+        public int GetEntryIndex(DataEntry entry)
+        {
+            return entries.IndexOf(entry);
+        }
     }
 }

@@ -8,7 +8,7 @@ namespace Schema.Core.Data
     {
         public override SchemaContext Context => new SchemaContext
         {
-            SchemeName = _scheme?.SchemeName ?? "UNSET",
+            Scheme = _scheme,
             AttributeName = AttributeName,
         };
         

@@ -8,16 +8,15 @@ namespace Schema.Core.Commands
     /// <summary>
     /// Interface for managing command execution history and undo/redo operations
     /// </summary>
-    public interface ICommandHistory
+    public interface ICommandProcessor
     {
         /// <summary>
         /// Executes a command and adds it to the history if successful
         /// </summary>
-        /// <typeparam name="TResult">Type of the command result</typeparam>
         /// <param name="command">Command to execute</param>
         /// <param name="cancellationToken">Token to cancel the operation</param>
         /// <returns>Result of the command execution</returns>
-        Task<CommandResult<TResult>> ExecuteAsync<TResult>(ISchemaCommand<TResult> command, CancellationToken cancellationToken = default);
+        Task<CommandResult> ExecuteAsync(ISchemaCommand command, CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Undoes the last executed command

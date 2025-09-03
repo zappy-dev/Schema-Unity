@@ -26,22 +26,25 @@ namespace Schema.Core
         #region Load Operations
         
         
-        public static SchemaResult<ManifestLoadStatus> LoadManifestFromPath(string manifestLoadPath, IProgress<(float, string)> progress = null)
+        public static SchemaResult<ManifestLoadStatus> LoadManifestFromPath(string manifestLoadPath,
+            SchemaContext context, IProgress<(float, string)> progress = null)
         {
             if (string.IsNullOrWhiteSpace(manifestLoadPath))
             {
-                return SchemaResult<ManifestLoadStatus>.Fail("Manifest path is invalid: " + manifestLoadPath, context: "Manifest");
+                return SchemaResult<ManifestLoadStatus>.Fail("Manifest path is invalid: " + manifestLoadPath, context: context);
             }
 
             if (!Serialization.Storage.FileSystem.FileExists(manifestLoadPath))
             {
-                return SchemaResult<ManifestLoadStatus>.Fail($"No Manifest scheme found.\nSearched the following path: {manifestLoadPath}\nLoad an existing manifest scheme or save the empty template.", context: "Manifest");
+                return SchemaResult<ManifestLoadStatus>.Fail($"No Manifest scheme found.\nSearched the following path: {manifestLoadPath}\nLoad an existing manifest scheme or save the empty template.", context: context);
             }
             
             lock (manifestOperationLock)
             {
                 // clear out previous data in case it is stagnant
                 var prevDataSchemes = Schema.LoadedSchemes;
+                
+                Logger.LogDbgVerbose($"Schema: Unloading all schemes");
                 Schema.LoadedSchemes.Clear();
             
                 progress?.Report((0f, $"Loading: {manifestLoadPath}..."));
@@ -60,8 +63,10 @@ namespace Schema.Core
                 nextManifestScheme = new ManifestScheme(manifestDataScheme);
                 var saveManifestResponse = LoadDataScheme(manifestDataScheme, overwriteExisting: true,
                     registerManifestEntry: false);
+                Logger.LogDbgVerbose(saveManifestResponse.Message, saveManifestResponse.Context);
                 if (!saveManifestResponse.Passed)
                 {
+                    Logger.LogError(saveManifestResponse.Message, saveManifestResponse.Context);
                     nextManifestScheme = null;
                     return SchemaResult<ManifestLoadStatus>.Fail(saveManifestResponse.Message, context: Context.Manifest);
                 }
@@ -88,7 +93,7 @@ namespace Schema.Core
                 foreach (var manifestEntry in nextManifestScheme.GetEntries())
                 {
                     currentSchema++;
-                    Logger.Log($"Loading manifest entry {manifestEntry}...", manifestDataScheme);
+                    Logger.Log($"Loading manifest entry {manifestEntry._}...", manifestDataScheme);
 
                     if (manifestEntry.SchemeName.Equals(Manifest.MANIFEST_SCHEME_NAME))
                     {
@@ -120,6 +125,8 @@ namespace Schema.Core
                             // TODO: Clarify this message better
                             Logger.LogError($"Mismatch between loaded manifest scheme and manifest scheme referenced by loaded manifest.", context: manifestDataScheme);
                         }
+
+                        continue;
                         // TODO: How best to handle loading the manifest schema while already loading the manifest schema?
                         // Add validation to make sure it is the same file path?
                         // continue;
@@ -134,16 +141,18 @@ namespace Schema.Core
                 progress?.Report((0.1f, "Loading..."));
                 foreach (var scheme in schemeLoadOrder)
                 {
-                    Logger.Log($"Loading manifest scheme: {scheme}", context: manifestDataScheme);
-                    var loadScheme = LoadDataScheme(scheme,
+                    Logger.Log($"Loading scheme from manifest: {scheme}", context: manifestDataScheme);
+                    var loadRes = LoadDataScheme(scheme,
                         overwriteExisting: false,
                         registerManifestEntry: false);
-                    if (loadScheme.Failed)
+                    if (loadRes.Failed)
                     {
                         success = false;
-                        Logger.LogError(loadScheme.Message, loadScheme.Context);
-                        sb.AppendLine(loadScheme.Message);
+                        Logger.LogError(loadRes.Message, loadRes.Context);
+                        sb.AppendLine(loadRes.Message);
                     }
+                    
+                    Logger.LogDbgVerbose(loadRes.Message, loadRes.Context);
                 }
 
                 if (!success)
@@ -264,10 +273,13 @@ namespace Schema.Core
                                 
                                 // Allow file path data types to load in, even if the file doesn't exist.
                                 // TODO: Runtime warn users when a filepath doesn't exist
-                                var allowFailedConversion = attribute.DataType == DataType.FilePath ||
-                                                            attribute.DataType is ReferenceDataType;
-                                return CheckIf(allowFailedConversion, $"{scheme}.{attribute}: {conversion.Message}",
-                                    context: scheme);
+                                // var allowFailedConversion = attribute.DataType == DataType.FilePath ||
+                                //                             attribute.DataType is ReferenceDataType;
+                                //
+                                // if (!allowFailedConversion)
+                                // {
+                                    return Fail($"{scheme}.{attribute}: {conversion.Message}", context: scheme);
+                                // }
                             }
 
                             var updateData = scheme.SetDataOnEntry(entry, attribute.AttributeName, conversion.Result, allowIdentifierUpdate: true);
@@ -280,6 +292,7 @@ namespace Schema.Core
                 }
             }
         
+            Logger.LogDbgVerbose($"Schema: Loading scheme {scheme.SchemeName}");
             LoadedSchemes[schemeName] = scheme;
             if (scheme.IsManifest)
             {
@@ -316,6 +329,7 @@ namespace Schema.Core
 
         public static SchemaResult UnloadScheme(string schemeName)
         {
+            Logger.LogDbgWarning($"Unloading Scheme: {schemeName}");
             bool wasRemoved = LoadedSchemes.Remove(schemeName);
 
             return CheckIf(wasRemoved, "Scheme was not unloaded", context: Context.System, successMessage: "Scheme was unloaded.");

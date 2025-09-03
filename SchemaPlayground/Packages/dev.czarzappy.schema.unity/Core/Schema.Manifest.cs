@@ -119,6 +119,7 @@ namespace Schema.Core
             {
                 var templateManifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema();
                 var result =  LoadDataScheme(templateManifestScheme._, overwriteExisting: true);
+                Logger.LogDbgVerbose(result.Message, result.Context);
                 if (result.Passed)
                 {
                     IsTemplateManifestLoaded = true;

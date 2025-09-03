@@ -16,7 +16,7 @@ namespace Schema.Core.Data
     {
         public override SchemaContext Context => new SchemaContext
         {
-            SchemeName = SchemeName,
+            Scheme = this,
         };
         
         #region Fields and Properties
@@ -61,7 +61,7 @@ namespace Schema.Core.Data
             get => isDirty;
             set
             {
-                Logger.LogVerbose(message: $"IsDirty=>{value}", context: this);
+                // Logger.LogDbgVerbose($"IsDirty=>true", Context);
                 isDirty = value;
             }
         }
@@ -349,6 +349,7 @@ namespace Schema.Core.Data
                 return SchemaResult.Fail($"Direct mutation of identifier attribute '{attributeName}' is not allowed. Use Schema.UpdateIdentifierValue instead.");
             }
 
+            // Logger.LogDbgVerbose($"SetDataOnEntry, entry: {entry}, {attributeName}=>{value}", context: Context);
             IsDirty = true;
             return entry.SetData(attributeName, value);
         }

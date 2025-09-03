@@ -15,7 +15,7 @@ namespace Schema.Unity.Editor
 
         public void Progress(string step, float progress)
         {
-            Logger.LogVerbose($"{step}");
+            Logger.LogVerbose($"[{title}] {step}");
             EditorUtility.DisplayProgressBar(title, step, progress);
         }
 

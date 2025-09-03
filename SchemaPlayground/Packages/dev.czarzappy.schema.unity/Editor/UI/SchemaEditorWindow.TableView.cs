@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Schema.Core.Commands;
 using Schema.Core.Data;
 using Schema.Core.DataStructures;
 using Schema.Core.IO;
@@ -212,6 +213,11 @@ namespace Schema.Unity.Editor
                         EditorUtility.RevealInFinder(selectedSchemeLoadPath);
                     }
 
+                    if (GUILayout.Button("Publish", ExpandWidthOptions))
+                    {
+                        PublishScheme(selectedSchemeName);
+                    }
+
                     // TODO: Open raw schema files
                     // if (GUILayout.Button("Open", ExpandWidthOptions) &&
                     //     GetManifestEntryForScheme(scheme).Try(out var manifestEntry))
@@ -253,11 +259,8 @@ namespace Schema.Unity.Editor
                         if (tableBodyScrollView.scrollPosition != tableViewBodyVerticalScrollPosition) 
                         {
                             tableViewBodyVerticalScrollPosition = tableBodyScrollView.scrollPosition;
-                            GUI.FocusControl(null);
+                            ReleaseControlFocus();
                         }
-
-                        LogDbgVerbose(
-                            $"TableView: Will pass to VirtualTableView - viewportHeight={lastScrollViewRect.height:F1}");
 
                         _tableBodyMarker.Begin();
 
@@ -273,14 +276,8 @@ namespace Schema.Unity.Editor
                         // Debug logging to track visible range issues
                         if (visibleRange.end > allEntries.Count)
                         {
-                            LogDbgWarning(
-                                $"Visible range end ({visibleRange.end}) exceeds total entries ({allEntries.Count}). Clamping to valid range.");
                             visibleRange = (visibleRange.start, Math.Min(visibleRange.end, allEntries.Count));
                         }
-
-                        // Debug logging for rendering
-                        LogDbgVerbose(
-                            $"TableView: Rendering range {visibleRange.start}-{visibleRange.end}, total entries {allEntries.Count}");
 
                         // Efficient approach: use single spacers for all invisible rows instead of individual spaces
                         // This reduces GUI allocations and improves performance
@@ -291,8 +288,6 @@ namespace Schema.Unity.Editor
                         {
                             float topSpacerHeight = visibleRange.start * _tableLayout.RowHeight;
                             GUILayout.Space(topSpacerHeight);
-                            LogDbgVerbose(
-                                $"TableView: Added top spacer of {topSpacerHeight:F1} pixels for {visibleRange.start} invisible rows");
                         }
 
                         // Render visible rows
@@ -302,7 +297,6 @@ namespace Schema.Unity.Editor
                             RenderTableRow(rowRect, allEntries.ElementAt(i), i, attributeCount, scheme,
                                 tableCellControlIds, visibleEntryCount, visibleRange.start);
                             renderedCount++;
-                            LogDbgVerbose($"TableView: Rendered row {i} at position {rowRect.y:F1}");
                         }
 
                         // Bottom spacer for rows after visible range
@@ -310,18 +304,11 @@ namespace Schema.Unity.Editor
                         {
                             float bottomSpacerHeight = (allEntries.Count - visibleRange.end) * _tableLayout.RowHeight;
                             GUILayout.Space(bottomSpacerHeight);
-                            LogDbgVerbose(
-                                $"TableView: Added bottom spacer of {bottomSpacerHeight:F1} pixels for {allEntries.Count - visibleRange.end} invisible rows");
                         }
-
-                        LogDbgVerbose(
-                            $"TableView: Rendered {renderedCount} visible rows out of {visibleRange.end - visibleRange.start} expected");
 
                         // Update the cell count in VirtualTableView for debug display
                         int totalCellsDrawn = renderedCount * attributeCount; // Each row has attributeCount cells
                         _virtualTableView.UpdateCellCount(totalCellsDrawn);
-                        LogDbgVerbose(
-                            $"TableView: Total cells drawn: {totalCellsDrawn} ({renderedCount} rows × {attributeCount} attributes)");
 
                         // GUILayout.EndScrollView();
                         _tableBodyMarker.End();
@@ -338,6 +325,7 @@ namespace Schema.Unity.Editor
                 {
                     if (AddButton("Create New Entry", expandWidth: true, height: 50f))
                     {
+                        // TODO: Convert to command
                         scheme.CreateNewEmptyEntry();
                         LogDbgVerbose($"Added entry to '{scheme.SchemeName}'.");
                         OnSelectedSchemeChanged?.Invoke();
@@ -597,6 +585,7 @@ namespace Schema.Unity.Editor
             bool canMoveUp = sortOrder.HasValue && entryIdx != 0;
             bool canMoveDown = sortOrder.HasValue && entryIdx != entryCount - 1;
             
+            // TODO: Convert to command
             rowOptionsMenu.AddItem(new GUIContent("Move To Top"), isDisabled: canMoveUp, () =>
             {
                 scheme.MoveEntry(entry, 0);
@@ -626,9 +615,20 @@ namespace Schema.Unity.Editor
             {
                 if (EditorUtility.DisplayDialog("Schema", "Are you sure you want to delete this entry?", "Yes, delete this entry", "No, cancel"))
                 {
-                    LatestResponse = scheme.DeleteEntry(entry);
-                    SaveDataScheme(scheme, alsoSaveManifest: false);
-                    OnSelectedSchemeChanged?.Invoke();
+                    SubmitCommandRequest(new CommandRequest
+                    {
+                        Description = $"Delete entry ({entryIdx}) from Scheme {scheme.SchemeName}",
+                        Command = new DeleteEntryCommand(scheme, entry),
+                        OnRequestComplete = result =>
+                        {
+                            // if (result.IsSuccess)
+                            // {
+                            //     // LatestResponse = scheme.DeleteEntry(entry);
+                            //     SaveDataScheme(scheme, alsoSaveManifest: false);
+                            //     OnSelectedSchemeChanged?.Invoke();
+                            // }
+                        }
+                    });
                 }
             });
             rowOptionsMenu.ShowAsContext();
@@ -837,9 +837,9 @@ namespace Schema.Unity.Editor
 
         private void RenderGuidCell(Rect cellRect, Guid entryValue, CellStyle cellStyle, Action<object> action)
         {
-            var assetPath = AssetDatabase.GUIDToAssetPath(entryValue.ToString().Replace("-", string.Empty));
-            var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
-            if (asset != null)
+            // var assetPath = AssetDatabase.GUIDToAssetPath(entryValue.ToString().Replace("-", string.Empty));
+            // var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            if (AssetUtils.TryLoadAssetFromGUID(entryValue, out var asset))
             {
                 var assetType = asset.GetType();
                 EditorGUI.ObjectField(cellRect, asset, assetType);
@@ -965,7 +965,7 @@ namespace Schema.Unity.Editor
             if (GUI.Button(gotoRect, "O"))
             {
                 FocusOnEntry(refDataType.ReferenceSchemeName, refDataType.ReferenceAttributeName, currentValue);
-                GUI.FocusControl(null);
+                ReleaseControlFocus();
             }
         }
         
@@ -1058,9 +1058,11 @@ namespace Schema.Unity.Editor
             
             if (entryValue == null)
             {
-                LogDbgWarning($"Setting {attribute} data for {entry}");
-                entryValue = attribute.CloneDefaultValue();
-                entry.SetData(attribute.AttributeName, entryValue);
+                var defaultValue = attribute.CloneDefaultValue();
+                if (defaultValue != null)
+                {
+                    entry.SetData(attribute.AttributeName, entryValue);
+                }
             }
             else if (attribute.CheckIfValidData(entryValue).Failed)
             {

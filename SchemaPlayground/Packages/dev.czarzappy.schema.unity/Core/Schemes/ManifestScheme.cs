@@ -4,7 +4,7 @@ using Schema.Core.Data;
 
 namespace Schema.Core.Schemes
 {
-    public class ManifestScheme : SchemeWrapper<ManifestEntry>
+    public partial class ManifestScheme
     {
         private ManifestEntry _selfEntry;
         public ManifestEntry SelfEntry
@@ -36,10 +36,6 @@ namespace Schema.Core.Schemes
 
         public string SchemeName => _dataScheme.SchemeName;
 
-        public ManifestScheme(DataScheme dataScheme) : base(dataScheme)
-        {
-        }
-
         public IEnumerable<string> GetAllSchemeNames()
         {
             return _dataScheme.GetValuesForAttribute(nameof(ManifestEntry.SchemeName))
@@ -67,16 +63,6 @@ namespace Schema.Core.Schemes
         public void DeleteEntry(ManifestEntry manifestEntry)
         {
             _dataScheme.DeleteEntry(manifestEntry._);
-        }
-
-        public override int GetHashCode()
-        {
-            return _dataScheme.GetHashCode();
-        }
-
-        protected override ManifestEntry EntryFactory(DataScheme dataScheme, DataEntry dataEntry)
-        {
-            return new ManifestEntry(dataScheme, dataEntry);
         }
     }
 }

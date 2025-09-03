@@ -5,23 +5,12 @@ using System.Threading.Tasks;
 namespace Schema.Core.Commands
 {
     /// <summary>
-    /// Base interface for all schema operations that can be executed and undone
-    /// </summary>
-    public interface ISchemaCommand<TResult> : ISchemaCommand
-    {
-        /// <summary>
-        /// Executes the command asynchronously
-        /// </summary>
-        /// <param name="cancellationToken">Token to cancel the operation</param>
-        /// <returns>Command result with operation outcome</returns>
-        Task<CommandResult<TResult>> ExecuteAsync(CancellationToken cancellationToken = default);
-    }
-    
-    /// <summary>
     /// Non-generic base interface for command operations
     /// </summary>
     public interface ISchemaCommand
     {
+        Task<CommandResult> ExecuteAsync(CancellationToken ct = default);
+        
         /// <summary>
         /// Undoes the command asynchronously
         /// </summary>
