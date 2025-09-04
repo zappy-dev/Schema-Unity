@@ -141,7 +141,7 @@ namespace Schema.Core
                 progress?.Report((0.1f, "Loading..."));
                 foreach (var scheme in schemeLoadOrder)
                 {
-                    Logger.Log($"Loading scheme from manifest: {scheme}", context: manifestDataScheme);
+                    Logger.LogDbgVerbose($"Loading scheme from manifest: {scheme}", context: manifestDataScheme);
                     var loadRes = LoadDataScheme(scheme,
                         overwriteExisting: false,
                         registerManifestEntry: false);

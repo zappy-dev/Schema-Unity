@@ -830,7 +830,7 @@ namespace Schema.Unity.Editor
                                 if (!schemeToPublish.TryGetEntry(searchEntry =>
                                         searchEntry.GetData(refDataType.ReferenceAttributeName) == value, out var refEntry))
                                 {
-                                    LogError($"Failed to find referenced entry for value: {value} ({value?.GetType()})");
+                                    LogDbgError($"Failed to find referenced entry for value: {value} ({value?.GetType()})");
                                     continue;
                                 }
 

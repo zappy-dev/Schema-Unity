@@ -9,11 +9,9 @@ namespace Schema.Unity.Editor
     /// <summary>
     /// Test utility for generating large datasets to verify virtual scrolling performance
     /// </summary>
-    public static class VirtualScrollingTest
+    internal static class VirtualScrollingTest
     {
-        
-        
-        private static void GenerateTestData(int entryCount)
+        internal static void GenerateTestData(int entryCount)
         {
             // Create a test scheme with multiple data types
             var testScheme = new DataScheme($"VirtualScrollingTest_{entryCount}");
