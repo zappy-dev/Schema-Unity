@@ -5,8 +5,17 @@ using static Schema.Core.SchemaResult;
 
 namespace Schema.Unity
 {
+    /// <summary>
+    /// Extension methods for converting Schema result statuses to Unity editor message types.
+    /// </summary>
     public static class SchemaResultExt
     {
+        /// <summary>
+        /// Converts a SchemaResult status to a Unity MessageType for editor display.
+        /// </summary>
+        /// <param name="response">The Schema result to convert.</param>
+        /// <returns>A Unity MessageType corresponding to the Schema result status:
+        /// Info for Passed, Error for Failed, None for unknown statuses.</returns>
         public static MessageType MessageType(this SchemaResult response)
         {
             switch (response.Status)
@@ -21,6 +30,13 @@ namespace Schema.Unity
             }
         }
         
+        /// <summary>
+        /// Converts a generic SchemaResult status to a Unity MessageType for editor display.
+        /// </summary>
+        /// <typeparam name="T">The type of the result payload.</typeparam>
+        /// <param name="response">The generic Schema result to convert.</param>
+        /// <returns>A Unity MessageType corresponding to the Schema result status:
+        /// Info for Passed, Error for Failed, None for unknown statuses.</returns>
         public static MessageType MessageType<T>(this SchemaResult<T> response)
         {
             switch (response.Status)

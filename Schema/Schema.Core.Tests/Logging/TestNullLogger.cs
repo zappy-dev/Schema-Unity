@@ -20,6 +20,6 @@ public class TestNullLogger
         });
 
         // Ensure level property is mutable and does not throw
-        Assert.DoesNotThrow(() => logger.LogLevel = Logger.LogLevel.WARNING);
+        Assert.DoesNotThrow(() => logger.LogLevel = Logger.LogLevel.WARN);
     }
 } 

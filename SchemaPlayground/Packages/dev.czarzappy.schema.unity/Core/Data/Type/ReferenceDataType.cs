@@ -6,6 +6,11 @@ namespace Schema.Core.Data
     [Serializable]
     public class ReferenceDataType : DataType
     {
+        public override SchemaContext Context => new SchemaContext()
+        {
+            DataType = this.ToString(),
+        };
+        
         public const string TypeNamePrefix = "Reference";
         
         public string ReferenceSchemeName { get; set; }
@@ -22,6 +27,13 @@ namespace Schema.Core.Data
         {
             ReferenceSchemeName = schemeName;
             ReferenceAttributeName = identifierAttribute;
+            
+            // Set an initial default value
+            if (Schema.GetScheme(ReferenceSchemeName).Try(out var refScheme))
+            {
+                var values = refScheme.GetIdentifierValues().Select(v => v?.ToString() ?? "").ToList();
+                DefaultValue = values.Count > 0 ? values[0] : "";
+            }
         }
 
         public override string TypeName => $"{TypeNamePrefix}/{ReferenceSchemeName} - {ReferenceAttributeName}";
@@ -31,45 +43,141 @@ namespace Schema.Core.Data
             return $"ReferenceDataType: {ReferenceSchemeName}, Attribute: {ReferenceAttributeName}";
         }
 
-        public override SchemaResult CheckIfValidData(object value)
+        public override SchemaResult CheckIfValidData(object value, SchemaContext context)
         {
             if (value == null)
             {
                 return CheckIf(SupportsEmptyReferences, 
                     errorMessage: "Empty references are not allowed.",
-                    successMessage: "Empty references are allowed.");
+                    successMessage: "Empty references are allowed.", context);
             }
             
+            // what if the referenced scheme is the self scheme?
             if (!Schema.GetScheme(ReferenceSchemeName).Try(out var refSchema))
             {
-                return Fail($"Could not load Reference Scheme named '{ReferenceSchemeName}'");
+                if (context.Scheme.SchemeName == ReferenceSchemeName)
+                {
+                    refSchema = context.Scheme;
+                }
+                else
+                {
+                    return Fail("Could not load Reference Scheme", context);
+                }
             }
 
             if (!refSchema.GetIdentifierAttribute().Try(out var identifier))
             {
-                return Fail($"Referenced Scheme {refSchema} with no Identifier Attribute.");
+                return Fail("Reference Scheme does not contain Identifier Attribute.", context);
             }
 
             if (identifier.AttributeName != ReferenceAttributeName)
             {
-                return Fail($"Reference Scheme identifier {identifier} attribute does not match {ReferenceAttributeName}");
+                return Fail("Reference Scheme Identifier Attribute does not match", context);
             }
 
-            bool identifierExist = refSchema.GetIdentifierValues().Any(v => v.Equals(value));
+            // Problem
+            // we're in the middle of loading the data schemes...
+            // we're assuming that all of the identifier values have been converted to their expected types
+            // Weirder situation, the value is the correct type, and the identifier hasn't been mapped yet :(
+            // Amount of time debugging this problem: 3 hours
 
-            return CheckIf(identifierExist, 
-                errorMessage: $"Value '{value}' does not exist as an identifier in {this}",
-                successMessage: $"Value '{value}' exists as an identifier in {this}");
+            // HACK: Convert all of the id values here
+            // Probably expensive to do this all of the time, assumes the values are not valid
+            // Converting for every new entry value added
+            var finalizedIdValues = refSchema.GetIdentifierValues()
+                .Select(idValue =>
+                {
+                    var isValidRes = identifier.DataType.CheckIfValidData(idValue, context);
+                    if (isValidRes.Passed) return idValue;
+
+                    var convertRes = identifier.DataType.ConvertData(idValue, context);
+                    return convertRes.Result;
+                });
+            var matchingIdentifier = finalizedIdValues.FirstOrDefault(v => v.Equals(value));
+            if (matchingIdentifier == null)
+            {
+                return Fail("Value does not exist as an identifier", context);
+            }
+
+            // HACK: Do the conversion for the identifier value here...
+
+            var isValidIdRes = identifier.DataType.CheckIfValidData(matchingIdentifier, context);
+            if (isValidIdRes.Failed)
+            {
+                var convertRes = identifier.DataType.ConvertData(matchingIdentifier, context);
+                if (convertRes.Failed)
+                {
+                    // Weird if the referenced identifier cannot convert to the expected type here
+                    return Fail(convertRes.Message, context);
+                }
+
+                // finally set the correct value for the matching identifier
+                matchingIdentifier = convertRes.Result;
+            }
+
+            // confirm again that the source value matches the identifier value
+            var matchesIdentifier = matchingIdentifier.Equals(value);
+            // if (matchingIdentifier == null)
+            // {
+            //     return Fail("Value does not exist as an identifier", context);
+            // }
+            //
+            // if (matchingIdentifier.GetType() != value.GetType())
+            // {
+            //     return Fail("Value type does not match identifier type", context);
+            // }
+            //
+            // return Pass("Value matches a referenced identifier", context);
+            return CheckIf(matchesIdentifier, 
+                errorMessage: "Value does not match identifier, likely type mismatch",
+                successMessage: "Value exists as an identifier", context);
         }
 
-        public override SchemaResult<object> ConvertData(object value)
+        public override SchemaResult<object> ConvertData(object value, SchemaContext context)
         {
-            var data = value as string;
+            // this is incorrect
+            // var data = value as string;
+            
+            // First, convert the value to the same data type as a reference's attribute
+            if (!Schema.GetScheme(ReferenceSchemeName).Try(out var refSchema))
+            {
+                if (context.Scheme.SchemeName == ReferenceSchemeName)
+                {
+                    refSchema = context.Scheme;
+                }
+                else
+                {
+                    return Fail<object>("Could not load Reference Scheme", context);
+                }
+            }
 
-            var validate = CheckIfValidData(data);
+            if (!refSchema.GetIdentifierAttribute().Try(out var identifier))
+            {
+                return Fail<object>("Reference Scheme does not contain Identifier Attribute.", context);
+            }
+
+            var isValidRes = identifier.DataType.CheckIfValidData(value, context);
+
+            if (isValidRes.Failed)
+            {
+                var convertRes = identifier.DataType.ConvertData(value, context);
+
+                if (convertRes.Failed)
+                {
+                    return Fail<object>(convertRes.Message, context);
+                }
+
+                // set value to the converted data type for the referenced attribute
+                value = convertRes.Result;
+            }
+            
+            // Then check if that matches an existing identifier
+            var validate = CheckIfValidData(value, context);
+            
+            // If it doesn't, the conversion failed
             return SchemaResult<object>.CheckIf(
                 conditional: validate.Passed,
-                result: data,
+                result: value,
                 errorMessage: validate.Message,
                 successMessage: validate.Message,
                 context: this);

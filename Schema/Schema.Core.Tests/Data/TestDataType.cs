@@ -33,8 +33,8 @@ public class TestDataType
 
         // pre-load data schemes
         var validScheme = new DataScheme(VALID_SCHEME_NAME);
-        validScheme.AddAttribute(new AttributeDefinition(VALID_REFERENCE_ATTRIBUTE, DataType.Text, isIdentifier: true));
-        validScheme.AddAttribute(new AttributeDefinition(INVALID_REFERENCE_ATTRIBUTE, DataType.Text));
+        validScheme.AddAttribute(VALID_REFERENCE_ATTRIBUTE, DataType.Text, isIdentifier: true);
+        validScheme.AddAttribute(INVALID_REFERENCE_ATTRIBUTE, DataType.Text);
         validScheme.AddEntry(new DataEntry(new Dictionary<string, object>()
         {
             { VALID_REFERENCE_ATTRIBUTE, VALID_REFERENCE_VALUE }
@@ -42,7 +42,7 @@ public class TestDataType
         Schema.LoadDataScheme(validScheme, true);
         
         var validSchemaNoIdentifier = new DataScheme(VALID_SCHEME_NAME_NO_IDENTIFIER);
-        validSchemaNoIdentifier.AddAttribute(new AttributeDefinition(VALID_REFERENCE_ATTRIBUTE, DataType.Text));
+        validSchemaNoIdentifier.AddAttribute(VALID_REFERENCE_ATTRIBUTE, DataType.Text);
         validSchemaNoIdentifier.AddEntry(new DataEntry(new Dictionary<string, object>()
         {
             { VALID_REFERENCE_ATTRIBUTE, VALID_REFERENCE_VALUE }
@@ -53,7 +53,7 @@ public class TestDataType
     [Test, TestCaseSource(nameof(ConversionTestCases))]
     public void Test_TryToConvertData(object data, DataType fromType, DataType toType, bool expectSuccessResult, object expectedConvertedResult)
     {
-        var conversion = DataType.ConvertData(data, fromType, toType);
+        var conversion = DataType.ConvertData(data, fromType, toType, context: TestFixtureSetup.SchemaTestContext);
 
         conversion.AssertCondition(expectSuccessResult, expectedConvertedResult);
     }
@@ -136,9 +136,9 @@ public class TestDataType
     public void Test_BooleanDataType_CheckIfValidData()
     {
         var boolType = new BooleanDataType();
-        Assert.That(boolType.CheckIfValidData(true).Passed, Is.True);
-        Assert.That(boolType.CheckIfValidData(false).Passed, Is.True);
-        Assert.That(boolType.CheckIfValidData("true").Passed, Is.False);
-        Assert.That(boolType.CheckIfValidData(1).Passed, Is.False);
+        Assert.That(boolType.CheckIfValidData(true, TestFixtureSetup.SchemaTestContext).Passed, Is.True);
+        Assert.That(boolType.CheckIfValidData(false, TestFixtureSetup.SchemaTestContext).Passed, Is.True);
+        Assert.That(boolType.CheckIfValidData("true", TestFixtureSetup.SchemaTestContext).Passed, Is.False);
+        Assert.That(boolType.CheckIfValidData(1, TestFixtureSetup.SchemaTestContext).Passed, Is.False);
     }
 }

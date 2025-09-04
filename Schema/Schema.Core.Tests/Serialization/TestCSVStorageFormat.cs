@@ -21,8 +21,8 @@ public class TestCSVStorageFormat
         storageFormat = new CSVStorageFormat(mockFileSystem.Object);
 
         testScheme = new DataScheme("Test");
-        testScheme.AddAttribute(new AttributeDefinition("StringField", DataType.Text));
-        testScheme.AddAttribute(new AttributeDefinition("IntField", DataType.Integer));
+        testScheme.AddAttribute("StringField", DataType.Text);
+        testScheme.AddAttribute("IntField", DataType.Integer);
         testScheme.AddEntry(new DataEntry
         {
             {"StringField", "StringData"},

@@ -18,11 +18,19 @@ namespace Schema.Core.Data
         /// <summary>
         /// Built-in file path data type.
         /// </summary>
-        public static readonly DataType FilePath = new FilePathDataType();
+        public static readonly DataType FilePath = new FilePathDataType(allowEmptyPath: true, useRelativePaths: true);
+        /// <summary>
+        /// Built-in guid data type
+        /// </summary>
+        public static readonly DataType Guid = new GuidDataType();
         /// <summary>
         /// Built-in integer data type.
         /// </summary>
         public static readonly DataType Integer = new IntegerDataType();
+        /// <summary>
+        /// Built-in integer data type.
+        /// </summary>
+        public static readonly DataType Float = new FloatingPointDataType();
         /// <summary>
         /// Built-in date/time data type.
         /// </summary>
@@ -44,11 +52,13 @@ namespace Schema.Core.Data
         public static readonly DataType[] BuiltInTypes = {
             Text,
             FilePath,
+            Guid,
             Integer,
+            Float,
             DateTime,
             Boolean,
         };
-        
+
         /// <summary>
         /// Gets the name of the data type.
         /// </summary>
@@ -120,7 +130,7 @@ namespace Schema.Core.Data
         /// <param name="fromType">The source data type.</param>
         /// <param name="toType">The target data type.</param>
         /// <returns>A <see cref="SchemaResult{object}"/> representing the conversion result.</returns>
-        public static SchemaResult<object> ConvertData(object entryData, DataType fromType, DataType toType)
+        public static SchemaResult<object> ConvertData(object entryData, DataType fromType, DataType toType, SchemaContext context)
         {
             Logger.LogDbgVerbose($"Trying to convert {entryData} to {toType}", "DataConversion");
             // Handle unknown types from their default string values
@@ -130,7 +140,7 @@ namespace Schema.Core.Data
             if (fromType == toType)
             {
                 return SchemaResult<object>.Pass(entryData,
-                    successMessage: $"Conversion no-op for matching type {fromType}", Schema.Context.DataConversion);
+                    successMessage: "Conversion no-op for matching type", Schema.Context.DataConversion);
             }
 
             if (fromType.Equals(Text) || isUnknownType)
@@ -140,13 +150,13 @@ namespace Schema.Core.Data
                 if (string.IsNullOrWhiteSpace(data))
                 {
                     return SchemaResult<object>.Pass(toType.CloneDefaultValue(),
-                        successMessage: $"Converted empty data to default value", Schema.Context.DataConversion);
+                        successMessage: "Converted empty data to default value", Schema.Context.DataConversion);
                 }
 
-                return toType.ConvertData(data);
+                return toType.ConvertData(data, context);
             }
 
-            return toType.ConvertData(entryData);
+            return toType.ConvertData(entryData, context);
         }
 
         /// <summary>
@@ -154,13 +164,13 @@ namespace Schema.Core.Data
         /// </summary>
         /// <param name="value">The value to validate.</param>
         /// <returns>A <see cref="SchemaResult"/> indicating if the value is valid.</returns>
-        public abstract SchemaResult CheckIfValidData(object value);
+        public abstract SchemaResult CheckIfValidData(object value, SchemaContext context);
         
         /// <summary>
         /// Converts the provided value to this data type.
         /// </summary>
         /// <param name="value">The value to convert.</param>
         /// <returns>A <see cref="SchemaResult{object}"/> representing the conversion result.</returns>
-        public abstract SchemaResult<object> ConvertData(object value);
+        public abstract SchemaResult<object> ConvertData(object value, SchemaContext context);
     }
 }

@@ -10,16 +10,14 @@ namespace Schema.Core.Serialization
 
         public static IStorageFormat<DataScheme> JSONStorageFormat;
         public static IStorageFormat<DataScheme> CSVStorageFormat;
+        public static IStorageFormat<DataScheme> CSharpStorageFormat;
+        public static IStorageFormat<DataScheme> ScriptableObjectStorageFormat;
         
         public static IStorageFormat<DataScheme> DefaultSchemaStorageFormat => JSONStorageFormat;
 
         public static IStorageFormat<DataScheme> DefaultManifestStorageFormat => JSONStorageFormat;
 
-        public static IEnumerable<IStorageFormat<DataScheme>> AllFormats = new[]
-        {
-            JSONStorageFormat,
-            CSVStorageFormat,
-        };
+        public static IEnumerable<IStorageFormat<DataScheme>> AllFormats;
 
         public static IFileSystem FileSystem { get; private set; }
 
@@ -28,6 +26,16 @@ namespace Schema.Core.Serialization
             FileSystem = fileSystem;
             JSONStorageFormat = new JsonStorageFormat<DataScheme>(fileSystem);
             CSVStorageFormat = new CSVStorageFormat(fileSystem);
+            CSharpStorageFormat = new CSharpStorageFormat(fileSystem);
+            ScriptableObjectStorageFormat = new ScriptableObjectStorageFormat();
+            
+            AllFormats = new[]
+            {
+                JSONStorageFormat,
+                CSVStorageFormat,
+                CSharpStorageFormat,
+                ScriptableObjectStorageFormat
+            };
         }
 
         static Storage()

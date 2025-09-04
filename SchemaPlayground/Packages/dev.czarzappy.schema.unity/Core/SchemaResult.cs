@@ -3,43 +3,49 @@ using Schema.Core.Logging;
 
 namespace Schema.Core
 {
+    public enum RequestStatus
+    {
+        UNSET,
+        Passed,
+        Failed,
+    }
+    
     public struct SchemaResult
     {
         public static readonly SchemaResult NoOp = new SchemaResult(status: RequestStatus.Passed, "NoOp");
-
-        public enum RequestStatus
-        {
-            Passed,
-            Failed,
-        }
         
         private RequestStatus status;
         public RequestStatus Status => status;
+
         private string message;
         public string Message => message;
-        private string context;
-        public string Context => context;
+        private object context;
+        public object Context => context;
         public bool Passed => status == RequestStatus.Passed;
         public bool Failed => status == RequestStatus.Failed;
 
-        public SchemaResult(RequestStatus status, string message, string context = null)
+        public SchemaResult(RequestStatus status, string message, object context = null)
         {
             this.status = status;
             this.message = message;
             this.context = context;;
 
-            string logMsg = $"[Context={context}] {message}";
-            if (status == RequestStatus.Passed)
-            {
-                Logger.LogDbgVerbose(logMsg);
-            }
-            else
-            {
-                if (Logger.Level <= Logger.LogLevel.VERBOSE)
-                {
-                    Logger.LogDbgError(logMsg);
-                }
-            }
+            // TODO: Maybe create a preference for whether schema results automatically create a log?
+            // TODO: Handle logging when creating an empty result
+// #if SCHEMA_DEBUG
+//             string logMsg = $"[Context={context}] {message}";
+//             if (status == RequestStatus.Passed)
+//             {
+//                 Logger.LogDbgVerbose(logMsg);
+//             }
+//             else
+//             {
+//                 if (Logger.Level <= Logger.LogLevel.VERBOSE)
+//                 {
+//                     Logger.LogDbgError(logMsg);
+//                 }
+//             }
+// #endif
         }
         
         public override string ToString()
@@ -61,45 +67,49 @@ namespace Schema.Core
 
     public struct SchemaResult<TResult>
     {
-        private SchemaResult.RequestStatus status;
-        public SchemaResult.RequestStatus Status => status;
+        private RequestStatus status;
+        public RequestStatus Status => status;
         private TResult result;
         public TResult Result
         {
             get
             {
-                if (status == SchemaResult.RequestStatus.Failed)
-                {
-                    throw new InvalidOperationException($"The request status {status} is not supported.");
-                }
+                // if (status == RequestStatus.Failed)
+                // {
+                //     throw new InvalidOperationException($"The request status {status} is not supported.");
+                // }
                 
                 return result;
             }
         }
 
-        private string context;
-        public string Context => context;
+        private object context;
+        public object Context => context;
         private string message;
         public string Message => message;
-        public bool Passed => status == SchemaResult.RequestStatus.Passed;
-        public bool Failed => status == SchemaResult.RequestStatus.Failed;
+        public bool Passed => status == RequestStatus.Passed;
+        public bool Failed => status == RequestStatus.Failed;
 
-        public SchemaResult(SchemaResult.RequestStatus status, TResult result, string message, string context = null)
+        public SchemaResult(RequestStatus status, TResult result, string message, object context = null)
         {
             this.status = status;
             this.result = result;
             this.message = message;
             this.context = context;;
 
-            string logMsg = $"[Context={context}] {message}";
-            if (status == SchemaResult.RequestStatus.Passed)
-            {
-                Logger.LogDbgVerbose(logMsg);
-            }
-            else
-            {
-                Logger.LogDbgError(logMsg);
-            }
+            // TODO: Maybe create a preference for whether schema results automatically create a log?
+            // TODO: Handle logging when creating an empty result
+// #if SCHEMA_DEBUG
+//             string logMsg = $"[Context={context}] {message}";
+//             if (status == RequestStatus.Passed)
+//             {
+//                 Logger.LogDbgVerbose(logMsg);
+//             }
+//             else
+//             {
+//                 Logger.LogDbgError(logMsg);
+//             }
+// #endif
         }
         
         public override string ToString()
@@ -108,10 +118,10 @@ namespace Schema.Core
         }
     
         public static SchemaResult<TResult> Fail(string errorMessage, object context) => 
-            new SchemaResult<TResult>(status: SchemaResult.RequestStatus.Failed, message: errorMessage, result: default, context: context?.ToString());
+            new SchemaResult<TResult>(status: RequestStatus.Failed, message: errorMessage, result: default, context: context?.ToString());
 
         public static SchemaResult<TResult> Pass(TResult result, string successMessage, object context) =>
-            new SchemaResult<TResult>(status: SchemaResult.RequestStatus.Passed, message: successMessage, result: result, context: context?.ToString());
+            new SchemaResult<TResult>(status: RequestStatus.Passed, message: successMessage, result: result, context: context?.ToString());
         
         public static SchemaResult<TResult> CheckIf(bool conditional, TResult result, string errorMessage, string successMessage, object context = null)
         {
@@ -122,6 +132,37 @@ namespace Schema.Core
         {
             result = this.result;
             return Passed;
+        }
+
+        public SchemaResult<TOut> CastError<TOut>()
+        {
+            return SchemaResult<TOut>.Fail(Message, Context);
+        }
+
+        public SchemaResult<TResult> Fail(string errorMessage)
+        {
+            return Fail(errorMessage, context);
+        }
+
+        public SchemaResult<TResult> Pass(TResult result, string successMessage)
+        {
+            return Pass(result, successMessage, context: context);
+        }
+        
+        public SchemaResult<TResult> CheckIf(bool conditional, TResult result, string errorMessage, string successMessage)
+        {
+            return conditional ? Pass(result: result, successMessage: successMessage, context: context) : Fail(errorMessage: errorMessage, context: context);
+        }
+
+        public static SchemaResult<TResult> New(object context)
+        {
+            var newRes = new SchemaResult<TResult>(status: RequestStatus.UNSET, default, null, context?.ToString());
+            return newRes;
+        }
+
+        public SchemaResult Cast()
+        {
+            return new SchemaResult(status, message, context);
         }
     }
 }

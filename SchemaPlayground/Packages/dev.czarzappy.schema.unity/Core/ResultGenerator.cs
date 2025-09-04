@@ -1,25 +1,29 @@
+using Newtonsoft.Json;
+
 namespace Schema.Core
 {
     public abstract class ResultGenerator
     {
-        internal SchemaResult Fail(string errorMessage) => 
-            new SchemaResult(status: SchemaResult.RequestStatus.Failed, message: errorMessage, context: this.ToString());
+        [JsonIgnore]
+        public abstract SchemaContext Context { get; }
+        internal SchemaResult Fail(string errorMessage, SchemaContext? context = null) => 
+            new SchemaResult(status: RequestStatus.Failed, message: errorMessage, context: Context | context);
 
-        internal SchemaResult Pass(string message = null) =>
-            new SchemaResult(status: SchemaResult.RequestStatus.Passed, message: message, context: this.ToString());
+        internal SchemaResult Pass(string message = null, SchemaContext? context = null) =>
+            new SchemaResult(status: RequestStatus.Passed, message: message, context: Context | context);
 
-        internal SchemaResult CheckIf(bool conditional, string errorMessage, string successMessage)
+        internal SchemaResult CheckIf(bool conditional, string errorMessage, string successMessage, SchemaContext? context = null)
         {
-            return conditional ? Pass(message: successMessage) : Fail(errorMessage);
+            return conditional ? Pass(message: successMessage, context) : Fail(errorMessage, context);
         }
         
-        public SchemaResult<TResult> Fail<TResult>(string errorMessage) => 
-            SchemaResult<TResult>.Fail(errorMessage, this.ToString());
+        public SchemaResult<TResult> Fail<TResult>(string errorMessage, SchemaContext? context = null) => 
+            SchemaResult<TResult>.Fail(errorMessage, Context | context);
 
-        public SchemaResult<TResult> Pass<TResult>(TResult result, string message = null) => 
-            SchemaResult<TResult>.Pass(result: result, successMessage: message, context: this.ToString());
+        public SchemaResult<TResult> Pass<TResult>(TResult result, string successMessage = null, SchemaContext? context = null) => 
+            SchemaResult<TResult>.Pass(result: result, successMessage: successMessage, context: Context | context);
 
-        public SchemaResult<TResult> CheckIf<TResult>(bool conditional, TResult result, string errorMessage, string successMessage)
-            => SchemaResult<TResult>.CheckIf(conditional, result: result, errorMessage: errorMessage, successMessage: successMessage);
+        public SchemaResult<TResult> CheckIf<TResult>(bool conditional, TResult result, string errorMessage, string successMessage, SchemaContext? context = null)
+            => SchemaResult<TResult>.CheckIf(conditional, result: result, errorMessage: errorMessage, successMessage: successMessage, context: context);
     }
 }

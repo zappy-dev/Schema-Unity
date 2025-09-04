@@ -11,7 +11,7 @@ namespace Schema.Core.Data
         
         #region Entry Mutations
         
-        public DataEntry CreateNewEntry()
+        public DataEntry CreateNewEmptyEntry()
         {
             var entry = new DataEntry();
             foreach (var attribute in attributes)
@@ -48,7 +48,7 @@ namespace Schema.Core.Data
                 var entryValue = kvp.Value;
                 if (runDataValidation)
                 {
-                    var isValidRes = attribute.DataType.CheckIfValidData(entryValue);
+                    var isValidRes = attribute.CheckIfValidData(entryValue);
                     if (isValidRes.Failed)
                     {
                         return isValidRes;
@@ -120,24 +120,7 @@ namespace Schema.Core.Data
 
         public SchemaResult MoveEntry(DataEntry entry, int targetIndex)
         {
-            if (targetIndex < 0 || targetIndex >= entries.Count)
-            {
-                return SchemaResult.Fail($"Target index {targetIndex} is out of range.", this);
-            }
-            
-            var entryIdx = entries.IndexOf(entry);
-            if (entryIdx == -1)
-            {
-                return SchemaResult.Fail("Entry not found", this);
-            }
-            if (entryIdx == targetIndex)
-            {
-                return SchemaResult.Fail("Entry cannot be the same as the target.", this);
-            }
-            entries.RemoveAt(entryIdx);
-            entries.Insert(targetIndex, entry);
-            
-            return SchemaResult.Pass($"Moved {entry} from {entryIdx} to {targetIndex}", this);
+            return Move(entry, targetIndex, entries);
         }
 
         public SchemaResult SwapEntries(int srcIndex, int dstIndex)
@@ -148,5 +131,15 @@ namespace Schema.Core.Data
         #endregion
 
         #endregion
+
+        /// <summary>
+        /// Retrieve the order index for the given entry
+        /// </summary>
+        /// <param name="entry">Entry to index</param>
+        /// <returns>-1 if entry does not exist in the given scheme</returns>
+        public int GetEntryIndex(DataEntry entry)
+        {
+            return entries.IndexOf(entry);
+        }
     }
 }

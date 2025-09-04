@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using Schema.Core.Data;
+using Schema.Core.Logging;
 using Schema.Core.Serialization;
 using static Schema.Core.SchemaResult;
 
@@ -21,20 +22,8 @@ namespace Schema.Core
             public const string System = "System";
         }
 
-        public static string ManifestLoadPath
-        {
-            get
-            {
-                if (!IsInitialized)
-                {
-                    return null;
-                }
-
-                return ManifestSelfEntry.GetDataAsString(MANIFEST_ATTRIBUTE_FILEPATH);
-            }
-        }
-
-        private static readonly Dictionary<string, DataScheme> LoadedSchemes = new Dictionary<string, DataScheme>();
+        private static readonly Dictionary<string, DataScheme> loadedSchemes = new Dictionary<string, DataScheme>();
+        public static IReadOnlyDictionary<string, DataScheme> LoadedSchemes => loadedSchemes;
         
         /// <summary>
         /// Returns all the available valid scheme names.
@@ -56,11 +45,8 @@ namespace Schema.Core
                     {
                         return Enumerable.Empty<string>();
                     }
-                    
-                    return manifestScheme.GetValuesForAttribute(MANIFEST_ATTRIBUTE_SCHEME_NAME)
-                        .Select(a => a?.ToString())
-                        .Where(a => !string.IsNullOrWhiteSpace(a))
-                        ;
+
+                    return manifestScheme.GetAllSchemeNames();
                 }
             }
         }
@@ -94,8 +80,12 @@ namespace Schema.Core
 
         public static void Reset()
         {
+            Logger.LogDbgWarning("Schema: Resetting...");
             IsInitialized = false;
-            LoadedSchemes.Clear();
+            loadedSchemes.Clear();
+            manifestImportPath = String.Empty;
+            nextManifestScheme = null;
+            loadedManifestScheme = null;
 
             var initResult = InitializeTemplateManifestScheme();
             IsInitialized = initResult.Passed;
@@ -108,21 +98,21 @@ namespace Schema.Core
 
         public static bool DoesSchemeExist(string schemeName)
         {
-            return LoadedSchemes.ContainsKey(schemeName);
+            return loadedSchemes.ContainsKey(schemeName);
         }
 
         // TODO support async
-        public static SchemaResult<DataScheme> GetScheme(string schemeName)
+        public static SchemaResult<DataScheme> GetScheme(string schemeName, SchemaContext? context = null)
         {
             if (!IsInitialized)
             {
-                return SchemaResult<DataScheme>.Fail("Scheme not initialized!", Context.Schema);
+                return SchemaResult<DataScheme>.Fail("Scheme not initialized!", context);
             }
             
-            var success = LoadedSchemes.TryGetValue(schemeName, out var scheme);
+            var success = loadedSchemes.TryGetValue(schemeName, out var scheme);
             return SchemaResult<DataScheme>.CheckIf(success, scheme, 
                 errorMessage: $"Scheme '{schemeName}' is not loaded.",
-                successMessage: $"Scheme '{schemeName}' is loaded.");
+                successMessage: $"Scheme '{schemeName}' is loaded.", context);
         }
 
         public static bool TryGetSchemeForAttribute(AttributeDefinition searchAttr, out DataScheme ownerScheme)
@@ -133,7 +123,7 @@ namespace Schema.Core
                 return false;
             }
             
-            ownerScheme = LoadedSchemes.Values.FirstOrDefault(scheme =>
+            ownerScheme = loadedSchemes.Values.FirstOrDefault(scheme =>
             {
                 return scheme.GetAttribute(attr => attr.Equals(searchAttr)).Try(out _);
             });

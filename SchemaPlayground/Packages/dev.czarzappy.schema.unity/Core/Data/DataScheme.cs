@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using Newtonsoft.Json;
 using Schema.Core.Ext;
@@ -13,6 +14,11 @@ namespace Schema.Core.Data
     [Serializable]
     public partial class DataScheme : ResultGenerator
     {
+        public override SchemaContext Context => new SchemaContext
+        {
+            Scheme = this,
+        };
+        
         #region Fields and Properties
         
         [JsonProperty("SchemeName")]
@@ -38,7 +44,7 @@ namespace Schema.Core.Data
         public int AttributeCount => attributes?.Count ?? 0;
         
         [JsonIgnore]
-        public bool IsManifest => Schema.MANIFEST_SCHEME_NAME.Equals(SchemeName);
+        public bool IsManifest => Manifest.MANIFEST_SCHEME_NAME.Equals(SchemeName);
         
         [JsonIgnore]
         public bool HasIdentifierAttribute
@@ -55,7 +61,7 @@ namespace Schema.Core.Data
             get => isDirty;
             set
             {
-                Logger.LogVerbose(message: $"IsDirty=>{value}", context: this);
+                // Logger.LogDbgVerbose($"IsDirty=>true", Context);
                 isDirty = value;
             }
         }
@@ -107,22 +113,38 @@ namespace Schema.Core.Data
         public string ToString(bool verbose)
         {
             StringBuilder stringBuilder = new StringBuilder();
-            var isDirty = IsDirty ? "!" : "";
-            stringBuilder.Append($"DataScheme '{SchemeName}' ({isDirty}), {AttributeCount} attributes, {AllEntries.Count()} entries");
+            Write(stringBuilder, verbose);
+            return stringBuilder.ToString();
+        }
+        
+        public void Write(StringBuilder stringBuilder, bool verbose)
+        {
+            var isDirty = IsDirty ? "*" : "";
+            stringBuilder.Append($"DataScheme '{SchemeName}' [{AttributeCount}x{AllEntries.Count()}]{isDirty} ({RuntimeHelpers.GetHashCode(this)})");
             if (verbose)
             {
-                stringBuilder.AppendLine("==== Attributes ====");
+                
+                // var handle = GCHandle.Alloc(this, GCHandleType.Pinned);
+                //
+                // try
+                // {
+                //     IntPtr address = handle.AddrOfPinnedObject();
+                // }
+                // finally
+                // {
+                //     handle.Free();                           // ALWAYS free the handle
+                // }
+                stringBuilder.AppendLine();
                 foreach (var attribute in attributes)
                 {
-                    stringBuilder.AppendLine($"\t{attribute}");
+                    stringBuilder.Append($"{attribute.AttributeName},");
                 }
-                stringBuilder.AppendLine("==== Entries ====");
+                stringBuilder.AppendLine();
                 foreach (var entry in entries)
                 {
-                    stringBuilder.AppendLine($"\t{entry}");
+                    stringBuilder.AppendLine($"{entry}");
                 }
             }
-            return stringBuilder.ToString();
         }
         
         #region Utilities
@@ -142,6 +164,29 @@ namespace Schema.Core.Data
             (data[srcIndex], data[dstIndex]) = (data[dstIndex], data[srcIndex]);
             IsDirty = true;
             return SchemaResult.Pass("Successfully swapped entry", this);
+        }
+        
+        public SchemaResult Move<T>(T element, int targetIndex, List<T> data)
+        {
+            if (targetIndex < 0 || targetIndex >= data.Count)
+            {
+                return SchemaResult.Fail($"Target index {targetIndex} is out of range.", this);
+            }
+            
+            var entryIdx = data.IndexOf(element);
+            if (entryIdx == -1)
+            {
+                return SchemaResult.Fail("Element not found", this);
+            }
+            if (entryIdx == targetIndex)
+            {
+                return SchemaResult.Fail("Element cannot be the same as the target.", this);
+            }
+            data.RemoveAt(entryIdx);
+            data.Insert(targetIndex, element);
+
+            isDirty = true;
+            return SchemaResult.Pass($"Moved {element} from {entryIdx} to {targetIndex}", this);
         }
         
         #endregion
@@ -304,6 +349,7 @@ namespace Schema.Core.Data
                 return SchemaResult.Fail($"Direct mutation of identifier attribute '{attributeName}' is not allowed. Use Schema.UpdateIdentifierValue instead.");
             }
 
+            // Logger.LogDbgVerbose($"SetDataOnEntry, entry: {entry}, {attributeName}=>{value}", context: Context);
             IsDirty = true;
             return entry.SetData(attributeName, value);
         }

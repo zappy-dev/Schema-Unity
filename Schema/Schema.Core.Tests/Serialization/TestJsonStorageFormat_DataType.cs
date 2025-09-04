@@ -8,7 +8,7 @@ using Schema.Core.Tests.Ext;
 namespace Schema.Core.Tests.Serialization;
 
 [TestFixture]
-public class TestJsonStorageFormat
+public class TestJsonStorageFormat_DataType
 {
     private JsonStorageFormat<DataType> dataTypeStorageFormat;
     
@@ -39,6 +39,8 @@ public class TestJsonStorageFormat
         {
             var realExpectedJsonString =
                 altExpectedJsonString != null ? altExpectedJsonString : expectedJsonString;
+
+            realExpectedJsonString = realExpectedJsonString.ReplaceLineEndings();
             Assert.That(jsonString, Is.EqualTo(realExpectedJsonString));
         }
     }
@@ -52,19 +54,34 @@ public class TestJsonStorageFormat
                 new TextDataType(),
                 true,
                 null);
-            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"UseRelativePaths\": false,\n  \"BasePath\": null,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
                 true,
-                new FilePathDataType(false),
-                true,
-                null);
-            yield return new TestCaseData("{\n  \"AllowEmptyPath\": true,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
-                true,
-                new FilePathDataType(true),
+                new FilePathDataType(allowEmptyPath: false),
                 true,
                 null);
-            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": true,\n  \"UseRelativePaths\": false,\n  \"BasePath\": null,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
                 true,
-                new FilePathDataType(false),
+                new FilePathDataType(allowEmptyPath: true),
+                true,
+                null);
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"UseRelativePaths\": false,\n  \"BasePath\": null,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+                true,
+                new FilePathDataType(allowEmptyPath: false),
+                true,
+                null);
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"UseRelativePaths\": true,\n  \"BasePath\": null,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+                true,
+                new FilePathDataType(allowEmptyPath: false, useRelativePaths: true),
+                true,
+                null);
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": true,\n  \"UseRelativePaths\": true,\n  \"BasePath\": null,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+                true,
+                new FilePathDataType(allowEmptyPath: true, useRelativePaths: true),
+                true,
+                null);
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"UseRelativePaths\": true,\n  \"BasePath\": null,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+                true,
+                new FilePathDataType(false, useRelativePaths: true),
                 true,
                 null);
             yield return new TestCaseData("{\n  \"TypeName\": \"Integer\",\n  \"DefaultValue\": 0\n}",

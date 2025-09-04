@@ -9,8 +9,7 @@ namespace Schema.Core.Commands
     /// <summary>
     /// Base class for schema commands providing common functionality
     /// </summary>
-    /// <typeparam name="TResult">Type of the result returned by the command</typeparam>
-    public abstract class SchemaCommandBase<TResult> : ISchemaCommand<TResult>
+    public abstract class SchemaCommandBase : ISchemaCommand
     {
         /// <summary>
         /// Unique identifier for this command instance
@@ -25,7 +24,7 @@ namespace Schema.Core.Commands
         public async Task<CommandResult> RedoAsync(CancellationToken cancellationToken = default)
         {
             var result = await ExecuteAsync(cancellationToken);
-            return result.ToCommandResult();
+            return result;
         }
 
         private bool wasExecuted = false;
@@ -49,7 +48,7 @@ namespace Schema.Core.Commands
         /// <summary>
         /// Executes the command asynchronously
         /// </summary>
-        public async Task<CommandResult<TResult>> ExecuteAsync(CancellationToken cancellationToken = default)
+        public async Task<CommandResult> ExecuteAsync(CancellationToken cancellationToken = default)
         {
             Logger.LogDbgVerbose($"Starting execution of command: {Description}", this);
             
@@ -71,14 +70,14 @@ namespace Schema.Core.Commands
             {
                 stopwatch.Stop();
                 Logger.LogDbgVerbose($"Command cancelled: {Description} ({stopwatch.ElapsedMilliseconds}ms)", this);
-                return CommandResult<TResult>.Cancelled($"Command '{Description}' was cancelled", stopwatch.Elapsed);
+                return CommandResult.Cancel($"Command '{Description}' was cancelled", stopwatch.Elapsed);
             }
             catch (Exception ex)
             {
                 stopwatch.Stop();
                 Logger.LogDbgError($"Command failed: {Description} - {ex.Message} ({stopwatch.ElapsedMilliseconds}ms)",
                     this);
-                return CommandResult<TResult>.Failure($"Command '{Description}' failed: {ex.Message}", ex,
+                return CommandResult.Fail($"Command '{Description}' failed: {ex.Message}", ex,
                     stopwatch.Elapsed);
             }
         }
@@ -90,7 +89,7 @@ namespace Schema.Core.Commands
         {
             if (!CanUndo)
             {
-                return CommandResult.Failure($"Command '{Description}' cannot be undone");
+                return CommandResult.Fail($"Command '{Description}' cannot be undone");
             }
             
             Logger.LogDbgVerbose($"Starting undo of command: {Description}", this);
@@ -112,20 +111,20 @@ namespace Schema.Core.Commands
             {
                 stopwatch.Stop();
                 Logger.LogDbgVerbose($"Command undo cancelled: {Description} ({stopwatch.ElapsedMilliseconds}ms)", this);
-                return CommandResult.Cancelled($"Undo of command '{Description}' was cancelled", stopwatch.Elapsed);
+                return CommandResult.Cancel($"Undo of command '{Description}' was cancelled", stopwatch.Elapsed);
             }
             catch (Exception ex)
             {
                 stopwatch.Stop();
                 Logger.LogDbgError($"Command undo failed: {Description} - {ex.Message} ({stopwatch.ElapsedMilliseconds}ms)", this);
-                return CommandResult.Failure($"Undo of command '{Description}' failed: {ex.Message}", ex, stopwatch.Elapsed);
+                return CommandResult.Fail($"Undo of command '{Description}' failed: {ex.Message}", ex, stopwatch.Elapsed);
             }
         }
         
         /// <summary>
         /// Derived classes implement the actual command execution logic
         /// </summary>
-        protected abstract Task<CommandResult<TResult>> ExecuteInternalAsync(CancellationToken cancellationToken);
+        protected abstract Task<CommandResult> ExecuteInternalAsync(CancellationToken cancellationToken);
         
         /// <summary>
         /// Derived classes implement the actual undo logic

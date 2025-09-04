@@ -35,7 +35,7 @@ Schema-Unity/
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/Schema-Unity.git
+   git clone https://github.com/zappy-dev/Schema-Unity.git
    cd Schema-Unity
    ```
 
@@ -65,16 +65,9 @@ This project includes comprehensive CI/CD workflows to ensure code quality:
 - **Coverage**: Runs unit tests with code coverage reporting
 - **Triggers**: Push/PR to main branch
 
-### Unity Build CI
-- **File**: `.github/workflows/unity.yml`
-- **Purpose**: Verifies Unity project compilation and testing
-- **Features**: Multi-platform builds, Unity tests, package validation
-- **Quick Start**: See [UNITY_CI_QUICK_START.md](UNITY_CI_QUICK_START.md) for easy setup
-- **Detailed Setup**: See [UNITY_CI_SETUP.md](UNITY_CI_SETUP.md) for complete configuration
 
 ### Status Badges
-![.NET Build](https://github.com/yourusername/Schema-Unity/workflows/.NET%20Core%20CI/badge.svg)
-![Unity Build](https://github.com/yourusername/Schema-Unity/workflows/Unity%20Build/badge.svg)
+![.NET Build](https://github.com/zappy-dev/Schema-Unity/workflows/.NET%20Core%20CI/badge.svg)
 
 ## Contributing
 

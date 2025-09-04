@@ -11,4 +11,9 @@ public class TestFixtureSetup
         Logger.SetLogger(new TestLogger());
         Logger.Level = Logger.LogLevel.ERROR;
     }
+    
+    internal static readonly SchemaContext SchemaTestContext = new()
+    {
+        Driver = "UnitTests",
+    };
 }

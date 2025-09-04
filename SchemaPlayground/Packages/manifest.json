@@ -2,9 +2,10 @@
   "dependencies": {
     "com.needle.compilation-visualizer": "https://github.com/needle-tools/compilation-visualizer.git",
     "com.quickeye.icon-browser": "https://github.com/ErnSur/unity-editor-icons.git",
-    "com.unity.ide.rider": "2.0.7",
+    "com.unity.ide.rider": "3.0.21",
+    "com.unity.memoryprofiler": "0.7.1-preview.1",
     "com.unity.nuget.newtonsoft-json": "3.2.1",
-    "com.unity.test-framework": "1.1.29",
+    "com.unity.test-framework": "1.1.33",
     "dev.czarzappy.schema.unity": "file:../Packages/dev.czarzappy.schema.unity",
     "com.unity.modules.ai": "1.0.0",
     "com.unity.modules.androidjni": "1.0.0",

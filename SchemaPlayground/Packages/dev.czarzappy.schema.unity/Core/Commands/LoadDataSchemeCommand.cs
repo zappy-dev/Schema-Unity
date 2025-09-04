@@ -5,13 +5,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schema.Core.Data;
 using Schema.Core.Logging;
+using Schema.Core.Schemes;
+using static Schema.Core.Commands.CommandResult;
 
 namespace Schema.Core.Commands
 {
     /// <summary>
     /// Command for loading a data scheme with full undo support
     /// </summary>
-    public class LoadDataSchemeCommand : SchemaCommandBase<DataScheme>
+    public class LoadDataSchemeCommand : SchemaCommandBase
     {
         private readonly DataScheme _scheme;
         private readonly bool _overwriteExisting;
@@ -37,14 +39,14 @@ namespace Schema.Core.Commands
             _progress = progress;
         }
         
-        protected override async Task<CommandResult<DataScheme>> ExecuteInternalAsync(CancellationToken cancellationToken)
+        protected override async Task<CommandResult> ExecuteInternalAsync(CancellationToken cancellationToken)
         {
             ReportProgress(_progress, 0.0f, "Starting scheme load...");
             
             // 1. Validate inputs
             if (string.IsNullOrWhiteSpace(_scheme.SchemeName))
             {
-                return CommandResult<DataScheme>.Failure("Schema name is invalid");
+                return Fail("Schema name is invalid");
             }
             
             ReportProgress(_progress, 0.1f, "Validating scheme...");
@@ -56,7 +58,7 @@ namespace Schema.Core.Commands
             {
                 if (!_overwriteExisting)
                 {
-                    return CommandResult<DataScheme>.Failure($"Schema '{_scheme.SchemeName}' already exists and overwrite is not enabled");
+                    return Fail($"Schema '{_scheme.SchemeName}' already exists and overwrite is not enabled");
                 }
                 
                 // Store the previous scheme for undo
@@ -94,14 +96,14 @@ namespace Schema.Core.Commands
             ReportProgress(_progress, 1.0f, "Scheme loaded successfully");
             
             Logger.LogDbgVerbose($"Successfully loaded scheme '{_scheme.SchemeName}'", this);
-            return CommandResult<DataScheme>.Success(_scheme, $"Successfully loaded scheme '{_scheme.SchemeName}'");
+            return Pass(_scheme, $"Successfully loaded scheme '{_scheme.SchemeName}'");
         }
         
         protected override async Task<CommandResult> UndoInternalAsync(CancellationToken cancellationToken)
         {
             if (!_wasExecuted)
             {
-                return CommandResult.Failure("Cannot undo command that was not executed");
+                return Fail("Cannot undo command that was not executed");
             }
             
             Logger.LogDbgVerbose($"Undoing load of scheme '{_scheme.SchemeName}'", this);
@@ -118,7 +120,8 @@ namespace Schema.Core.Commands
                     
                     if (restoreResult.Failed)
                     {
-                        return CommandResult.Failure($"Failed to restore previous scheme: {restoreResult.Message}");
+                        Logger.LogError(restoreResult.Message, restoreResult.Context);
+                        return Fail($"Failed to restore previous scheme: {restoreResult.Message}");
                     }
                 }
                 else
@@ -135,16 +138,16 @@ namespace Schema.Core.Commands
                     await UnloadSchemeFromSystemAsync(_scheme.SchemeName, cancellationToken);
                 }
                 
-                return CommandResult.Success($"Successfully undone load of scheme '{_scheme.SchemeName}'");
+                return Pass($"Successfully undone load of scheme '{_scheme.SchemeName}'");
             }
             catch (Exception ex)
             {
                 Logger.LogDbgError($"Failed to undo load of scheme '{_scheme.SchemeName}': {ex.Message}", this);
-                return CommandResult.Failure($"Failed to undo load: {ex.Message}", ex);
+                return Fail($"Failed to undo load: {ex.Message}", ex);
             }
         }
 
-        private async Task<CommandResult<DataScheme>> ProcessSchemeDataAsync(DataScheme scheme, CancellationToken cancellationToken)
+        private async Task ProcessSchemeDataAsync(DataScheme scheme, CancellationToken cancellationToken)
         {
             ThrowIfCancellationRequested(cancellationToken);
             
@@ -173,18 +176,19 @@ namespace Schema.Core.Commands
                     {
                         // Validate and potentially convert data
                         var fieldData = entryData.Result;
-                        var validateResult = attribute.DataType.CheckIfValidData(fieldData);
+                        var validateResult = attribute.CheckIfValidData(fieldData);
                         
                         if (validateResult.Failed && !scheme.IsManifest)
                         {
-                            var conversionResult = attribute.DataType.ConvertData(fieldData);
+                            var conversionResult = attribute.ConvertData(fieldData);
                             if (conversionResult.Failed)
                             {
                                 // Allow file path types to load even if file doesn't exist
                                 if (attribute.DataType != DataType.FilePath)
                                 {
-                                    return CommandResult<DataScheme>.Failure(
+                                    Fail(
                                         $"Failed to convert data for attribute '{attribute.AttributeName}': {conversionResult.Message}");
+                                    return;
                                 }
                             }
                             else
@@ -202,11 +206,11 @@ namespace Schema.Core.Commands
                     ReportProgress(_progress, progress, $"Processed {processedEntries}/{totalEntries} entries");
                 }
             }
-            
-            return CommandResult<DataScheme>.Success(scheme);
+
+            Pass(scheme);
         }
         
-        private async Task<CommandResult<DataScheme>> LoadSchemeIntoSystemAsync(DataScheme scheme, CancellationToken cancellationToken)
+        private async Task<CommandResult> LoadSchemeIntoSystemAsync(DataScheme scheme, CancellationToken cancellationToken)
         {
             ThrowIfCancellationRequested(cancellationToken);
             
@@ -218,11 +222,13 @@ namespace Schema.Core.Commands
                 var result = Schema.LoadDataScheme(scheme, _overwriteExisting);
                 if (result.Failed)
                 {
+                    Logger.LogError(result.Message, result.Context);
                     throw new InvalidOperationException($"Failed to load scheme: {result.Message}");
                 }
+                Logger.LogDbgVerbose(result.Message, result.Context);
             }, cancellationToken);
             
-            return CommandResult<DataScheme>.Success(scheme);
+            return Pass(scheme);
         }
 
         private async Task UnloadSchemeFromSystemAsync(string schemeName, CancellationToken cancellationToken)
@@ -250,16 +256,35 @@ namespace Schema.Core.Commands
                 if (Schema.GetManifestScheme().Try(out var manifestScheme))
                 {
                     // Add or update manifest entry
-                    var manifestEntry = manifestScheme.AllEntries.FirstOrDefault(e => 
-                        e.GetDataAsString(Schema.MANIFEST_ATTRIBUTE_SCHEME_NAME) == scheme.SchemeName);
-                    
-                    if (manifestEntry == null)
+                    if (!manifestScheme.TryGetEntryForSchemeName(scheme.SchemeName, out var manifestEntry))
                     {
-                        manifestEntry = manifestScheme.CreateNewEntry();
-                        manifestScheme.SetDataOnEntry(manifestEntry, Schema.MANIFEST_ATTRIBUTE_SCHEME_NAME, scheme.SchemeName);
+                        manifestScheme.AddManifestEntry(scheme.SchemeName).Try(out manifestEntry);
                     }
                     
-                    manifestScheme.SetDataOnEntry(manifestEntry, Schema.MANIFEST_ATTRIBUTE_FILEPATH, importFilePath);
+                    // Get the FilePath attribute definition to access its DataType
+                    if (manifestScheme._.GetAttribute(nameof(ManifestEntry.FilePath)).Try(out var filePathAttr) &&
+                        filePathAttr.DataType is FilePathDataType)
+                    {
+                        // Let the FilePathDataType handle the path conversion
+                        var convertResult = filePathAttr.ConvertData(importFilePath);
+                        if (convertResult.Try(out var convertedPath))
+                        {
+                            manifestEntry.FilePath = convertedPath as string;
+                            // manifestScheme._.SetDataOnEntry(manifestEntry, nameof(ManifestEntry.FilePath), convertedPath);
+                        }
+                        else
+                        {
+                            // Fallback to direct path if conversion fails
+                            manifestEntry.FilePath = importFilePath;
+                            // manifestScheme._.SetDataOnEntry(manifestEntry, nameof(ManifestEntry.FilePath), importFilePath);
+                        }
+                    }
+                    else
+                    {
+                        // Fallback if we can't get the attribute or it's not a FilePathDataType
+                        manifestEntry.FilePath = importFilePath;
+                    }
+                    
                     manifestScheme.IsDirty = true;
                 }
             }, cancellationToken);
@@ -273,10 +298,7 @@ namespace Schema.Core.Commands
             {
                 if (Schema.GetManifestScheme().Try(out var manifestScheme))
                 {
-                    var manifestEntry = manifestScheme.AllEntries.FirstOrDefault(e => 
-                        e.GetDataAsString(Schema.MANIFEST_ATTRIBUTE_SCHEME_NAME) == schemeName);
-                    
-                    if (manifestEntry != null)
+                    if (manifestScheme.TryGetEntryForSchemeName(schemeName, out var manifestEntry))
                     {
                         manifestScheme.DeleteEntry(manifestEntry);
                         manifestScheme.IsDirty = true;

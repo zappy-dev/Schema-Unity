@@ -12,6 +12,10 @@ namespace Schema.Core.Serialization
     public class CSVStorageFormat : IStorageFormat<DataScheme>
     {
         public string Extension => "csv";
+        public string DisplayName => "CSV";
+        public bool IsImportSupported => true;
+        public bool IsExportSupported => true;
+
         public bool TryDeserializeFromFile(string filePath, out DataScheme data)
         {
             return DeserializeFromFile(filePath).Try(out data);
@@ -97,6 +101,12 @@ namespace Schema.Core.Serialization
             // determine the best data type for a column
             for (var attrIdx = 0; attrIdx < attrCount; attrIdx++)
             {
+                var attrCtx = new SchemaContext
+                {
+                    Scheme = importedScheme,
+                    AttributeName = attributes[attrIdx].AttributeName,
+                };
+                
                 var potentialDataTypes = new HashSet<DataType>(DataType.BuiltInTypes);
                 foreach (var dataEntry in rawDataEntries)
                 {
@@ -104,7 +114,9 @@ namespace Schema.Core.Serialization
                     var enumerator = potentialDataTypes.GetEnumerator();
                     while (enumerator.MoveNext())
                     {
-                        if (!enumerator.Current.ConvertData(rawData).Try(out var convertedData))
+                        var testType = enumerator.Current;
+                        if (!testType.ConvertData(rawData, attrCtx).Try(out var convertedData) ||
+                            !testType.CheckIfValidData(convertedData, attrCtx).Passed)
                         {
                             potentialDataTypes.Remove(enumerator.Current);
                         }
@@ -147,11 +159,17 @@ namespace Schema.Core.Serialization
                 var entry = new DataEntry();
                 for (var attrIdx = 0; attrIdx < attrCount; attrIdx++)
                 {
+                    var attrCtx = new SchemaContext
+                    {
+                        Scheme = importedScheme,
+                        AttributeName = attributes[attrIdx].AttributeName,
+                    };
+                    
                     var rawData = rawDataEntry[attrIdx];
                     var dataType = attributes[attrIdx].DataType;
                     var attributeName = attributes[attrIdx].AttributeName;
 
-                    if (!dataType.ConvertData(rawData).Try(out var convertedData))
+                    if (!dataType.ConvertData(rawData, attrCtx).Try(out var convertedData))
                     {
                         return SchemaResult<DataScheme>.Fail($"Could not convert entry {rawDataEntry} to type {dataType}", context: this);
                     }

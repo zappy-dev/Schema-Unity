@@ -10,8 +10,23 @@ namespace Schema.Core.Data
 
         #region Attribute Mutations
 
+        public SchemaResult<AttributeDefinition> AddAttribute( 
+            string attributeName, DataType dataType, 
+            string attributeToolTip = null,
+            object defaultValue = null,
+            bool isIdentifier = false)
+        {
+            var newAttribute = new AttributeDefinition(this, attributeName, dataType, attributeToolTip, defaultValue,
+                isIdentifier);
+
+            var result = AddAttribute(newAttribute);
+            
+            return CheckIf(result.Passed, newAttribute, result.Message, "Created new attribute", Context);
+        }
+        
         public SchemaResult AddAttribute(AttributeDefinition newAttribute)
         {
+            // Validate
             if (newAttribute == null)
             {
                 return SchemaResult.Fail("Attribute cannot be null", this);
@@ -34,6 +49,8 @@ namespace Schema.Core.Data
                 return SchemaResult.Fail("Attribute data type cannot be null.", this);
             }
             
+            // Commit
+            newAttribute._scheme = this;
             attributes.Add(newAttribute);
             IsDirty = true;
 
@@ -60,7 +77,7 @@ namespace Schema.Core.Data
                 {
                     var entryData = entry.GetData(attribute).Result;
 
-                    if (!DataType.ConvertData(entryData, attribute.DataType, newType).Try(out convertedData))
+                    if (!DataType.ConvertData(entryData, attribute.DataType, newType, attribute.Context).Try(out convertedData))
                     {
                         return SchemaResult.Fail($"Cannot convert attribute {attributeName} to type {newType}", this);
                     }
@@ -221,6 +238,11 @@ namespace Schema.Core.Data
         #endregion
         
         #region Attribute Ordering Operations
+
+        public SchemaResult MoveAttributeRank(AttributeDefinition attribute, int moveRank)
+        {
+            return Move(attribute, moveRank, attributes);
+        }
         
         public SchemaResult IncreaseAttributeRank(AttributeDefinition attribute)
         {
