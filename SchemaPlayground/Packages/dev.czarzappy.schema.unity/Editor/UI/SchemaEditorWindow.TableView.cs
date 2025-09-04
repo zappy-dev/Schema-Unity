@@ -999,7 +999,18 @@ namespace Schema.Unity.Editor
             
             if (attribute.IsIdentifier)
             {
-                if (scheme.GetIdentifierValues().Any(otherAttributeName => otherAttributeName.Equals(newValue)))
+                // sanitize identifier input
+                if (newValue == null)
+                {
+                    newValue = string.Empty;
+                }
+                
+                if (string.IsNullOrWhiteSpace(newValue.ToString()))
+                {
+                    return;
+                }
+                
+                if (scheme.GetIdentifierValues().Any(otherAttributeName => Equals(otherAttributeName, newValue)))
                 {
                     EditorUtility.DisplayDialog("Schema", $"Attribute '{attribute.AttributeName}' with value '{newValue}' already exists.", "OK");
                     return;
