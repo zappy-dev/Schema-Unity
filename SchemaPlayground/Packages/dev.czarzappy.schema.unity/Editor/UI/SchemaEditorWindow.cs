@@ -336,11 +336,23 @@ namespace Schema.Unity.Editor
             GUILayout.Label("Scheme Editor", EditorStyles.largeLabel, 
                 ExpandWidthOptions);
             
+            if (!LatestManifestLoadResponse.Passed)
+            {
+                EditorGUILayout.HelpBox("Welcome to Schema! Would you like to Create an Empty Project or Load an Existing Project Manifest", MessageType.Info);
+                if (GUILayout.Button("Create Empty Project"))
+                {
+                    // TODO: Handle this better? move to Schema Core?
+                    LatestResponse = SaveManifest();
+                    LatestManifestLoadResponse = SchemaResult<ManifestLoadStatus>.CheckIf(LatestResponse.Passed, 
+                        ManifestLoadStatus.FULLY_LOADED, 
+                        LatestResponse.Message,
+                        "Loaded template manifest", Context);
+                }
+            }
             
+            GUILayout.Label("Manifest Path");
             using (new EditorGUILayout.HorizontalScope())
             {
-                GUILayout.Label("Manifest Path");
-                
                 using (new EditorGUI.DisabledScope())
                 {
                     EditorGUILayout.TextField("Manifest Import Path", ManifestImportPath);
@@ -350,23 +362,24 @@ namespace Schema.Unity.Editor
 #endif
                 }
 
-                if (GUILayout.Button("Load"))
+                if (GUILayout.Button("Load", DoNotExpandWidthOptions))
                 {
                     OnLoadManifest("On User Load");
                 }
 
-                if (GUILayout.Button("Open", ExpandWidthOptions))
+                if (GUILayout.Button("Open", DoNotExpandWidthOptions))
                 {
                     EditorUtility.RevealInFinder(ManifestImportPath);
                 }
 
                 // save schemes to manifest
-                if (GUILayout.Button("Save Manifest"))
+                if (GUILayout.Button("Save Manifest", DoNotExpandWidthOptions))
                 {
                     LatestResponse = SaveManifest();
                 }
             }
-            
+
+#if SCHEMA_DEBUG
             if (LatestManifestLoadResponse.Message != null)
             {
                 EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestManifestLoadResponse.Result}: {LatestManifestLoadResponse.Message}", LatestManifestLoadResponse.MessageType());
@@ -376,25 +389,14 @@ namespace Schema.Unity.Editor
             {
                 EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestResponse.Message}", LatestResponse.MessageType());
             }
+#endif
 
+            // Do not render more until we have valid manifest loaded
+            if (LatestManifestLoadResponse.Failed) return;
+            
             // NEW: Undo/Redo controls and progress display
             DrawUndoRedoPanel();
             DrawProgressBar();
-
-            if (!LatestManifestLoadResponse.Passed)
-            {
-                EditorGUILayout.HelpBox("Hello! Would you like to Create an Empty Project or Load an Existing Project Manifest", MessageType.Info);
-                if (GUILayout.Button("Start Empty Project"))
-                {
-                    // TODO: Handle this better? move to Schema Core?
-                    LatestResponse = SaveManifest();
-                    LatestManifestLoadResponse = SchemaResult<ManifestLoadStatus>.CheckIf(LatestResponse.Passed, 
-                        ManifestLoadStatus.FULLY_LOADED, 
-                        LatestResponse.Message,
-                        "Loaded template manifest", Context);
-                }
-                return;
-            }
 
             EditorGUILayout.HelpBox(tooltipOfTheDay, MessageType.Info);
 

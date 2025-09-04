@@ -189,7 +189,7 @@ namespace Schema.Core
         /// </summary>
         /// <param name="schemeName">The name of the scheme to look up in the manifest.</param>
         /// <returns>A <see cref="SchemaResult{DataEntry}"/> indicating success or failure, and the manifest entry if successful.</returns>
-        internal static SchemaResult<ManifestEntry> GetManifestEntryForScheme(string schemeName)
+        public static SchemaResult<ManifestEntry> GetManifestEntryForScheme(string schemeName)
         {
             var res = SchemaResult<ManifestEntry>.New(schemeName);
             

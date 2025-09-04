@@ -44,7 +44,6 @@ namespace Schema.Unity.Editor
 
                     foreach (var loadedScheme in LoadedSchemes)
                     {
-                        
                         EditorGUILayout.TextField(loadedScheme.Key);
                     }
                 }

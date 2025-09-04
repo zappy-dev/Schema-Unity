@@ -42,10 +42,10 @@ namespace Schema.Core
             lock (manifestOperationLock)
             {
                 // clear out previous data in case it is stagnant
-                var prevDataSchemes = Schema.LoadedSchemes;
+                var prevDataSchemes = Schema.loadedSchemes;
                 
                 Logger.LogDbgVerbose($"Schema: Unloading all schemes");
-                Schema.LoadedSchemes.Clear();
+                Schema.loadedSchemes.Clear();
             
                 progress?.Report((0f, $"Loading: {manifestLoadPath}..."));
                 Logger.Log($"Loading manifest from file: {manifestLoadPath}...", "Manifest");
@@ -240,7 +240,7 @@ namespace Schema.Core
                 return Fail("Schema name is invalid: " + schemeName, context: scheme);
             }
             
-            if (LoadedSchemes.ContainsKey(schemeName) && !overwriteExisting)
+            if (loadedSchemes.ContainsKey(schemeName) && !overwriteExisting)
             {
                 return Fail("Schema already exists: " + schemeName, context: scheme);
             }
@@ -293,7 +293,7 @@ namespace Schema.Core
             }
         
             Logger.LogDbgVerbose($"Schema: Loading scheme {scheme.SchemeName}");
-            LoadedSchemes[schemeName] = scheme;
+            loadedSchemes[schemeName] = scheme;
             if (scheme.IsManifest)
             {
                 IsTemplateManifestLoaded = false;
@@ -330,7 +330,7 @@ namespace Schema.Core
         public static SchemaResult UnloadScheme(string schemeName)
         {
             Logger.LogDbgWarning($"Unloading Scheme: {schemeName}");
-            bool wasRemoved = LoadedSchemes.Remove(schemeName);
+            bool wasRemoved = loadedSchemes.Remove(schemeName);
 
             return CheckIf(wasRemoved, "Scheme was not unloaded", context: Context.System, successMessage: "Scheme was unloaded.");
         }

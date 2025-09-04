@@ -22,7 +22,8 @@ namespace Schema.Core
             public const string System = "System";
         }
 
-        internal static readonly Dictionary<string, DataScheme> LoadedSchemes = new Dictionary<string, DataScheme>();
+        private static readonly Dictionary<string, DataScheme> loadedSchemes = new Dictionary<string, DataScheme>();
+        public static IReadOnlyDictionary<string, DataScheme> LoadedSchemes => loadedSchemes;
         
         /// <summary>
         /// Returns all the available valid scheme names.
@@ -81,7 +82,7 @@ namespace Schema.Core
         {
             Logger.LogDbgWarning("Schema: Resetting...");
             IsInitialized = false;
-            LoadedSchemes.Clear();
+            loadedSchemes.Clear();
             manifestImportPath = String.Empty;
             nextManifestScheme = null;
             loadedManifestScheme = null;
@@ -97,7 +98,7 @@ namespace Schema.Core
 
         public static bool DoesSchemeExist(string schemeName)
         {
-            return LoadedSchemes.ContainsKey(schemeName);
+            return loadedSchemes.ContainsKey(schemeName);
         }
 
         // TODO support async
@@ -108,7 +109,7 @@ namespace Schema.Core
                 return SchemaResult<DataScheme>.Fail("Scheme not initialized!", context);
             }
             
-            var success = LoadedSchemes.TryGetValue(schemeName, out var scheme);
+            var success = loadedSchemes.TryGetValue(schemeName, out var scheme);
             return SchemaResult<DataScheme>.CheckIf(success, scheme, 
                 errorMessage: $"Scheme '{schemeName}' is not loaded.",
                 successMessage: $"Scheme '{schemeName}' is loaded.", context);
@@ -122,7 +123,7 @@ namespace Schema.Core
                 return false;
             }
             
-            ownerScheme = LoadedSchemes.Values.FirstOrDefault(scheme =>
+            ownerScheme = loadedSchemes.Values.FirstOrDefault(scheme =>
             {
                 return scheme.GetAttribute(attr => attr.Equals(searchAttr)).Try(out _);
             });
