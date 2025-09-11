@@ -441,17 +441,7 @@ namespace Schema.Unity.Editor
                     {
                         if (AddButton("Create New Schema"))
                         {
-                            var newSchema = new DataScheme(newSchemeName);
-                            
-                            // Create a relative path for the new schema file
-                            string fileName = $"{newSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}";
-                            string relativePath = fileName; // Default to just the filename (relative to Content folder)
-                            
-                            // Get the full path for actual file creation
-                            string fullPath = GetContentPath(fileName);
-                            
-                            SubmitAddSchemeRequest(newSchema, importFilePath: relativePath).FireAndForget();
-                            newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name
+                            CreateNewScheme();
                         }
                     }
                 }
@@ -523,6 +513,40 @@ namespace Schema.Unity.Editor
                     }
                 }
             }
+        }
+
+        private SchemaResult CreateNewScheme()
+        {
+            var newSchema = new DataScheme(newSchemeName);
+            
+            // Initialize with some starting data
+            var newAttrRes = newSchema.AddAttribute("ID", DataType.Text, defaultValue: string.Empty, isIdentifier: true);
+            if (!newAttrRes.Try(out var newIdAttr))
+            {
+                return Fail(newAttrRes.Message, newAttrRes.Context);
+            }
+
+            var addEntryRes = newSchema.AddEntry(new DataEntry
+            {
+                { newIdAttr.AttributeName, string.Empty }
+            });
+
+            if (addEntryRes.Failed)
+            {
+                return Fail(newAttrRes.Message, newAttrRes.Context);
+            }
+                            
+            // Create a relative path for the new schema file
+            string fileName = $"{newSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}";
+            string relativePath = fileName; // Default to just the filename (relative to Content folder)
+                            
+            // Get the full path for actual file creation
+            string fullPath = GetContentPath(fileName);
+                            
+            SubmitAddSchemeRequest(newSchema, importFilePath: relativePath).FireAndForget();
+            newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name
+
+            return Pass($"Created new Scheme: {newSchemeName}", Context);
         }
 
         public static void DrawUILine(Color color, int thickness = 2, int padding = 10)
