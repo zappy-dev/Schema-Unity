@@ -184,7 +184,8 @@ namespace Schema.Core.Commands
                             if (conversionResult.Failed)
                             {
                                 // Allow file path types to load even if file doesn't exist
-                                if (attribute.DataType != DataType.FilePath)
+                                if (attribute.DataType != DataType.FilePath &&
+                                    attribute.DataType != DataType.Folder)
                                 {
                                     Fail(
                                         $"Failed to convert data for attribute '{attribute.AttributeName}': {conversionResult.Message}");

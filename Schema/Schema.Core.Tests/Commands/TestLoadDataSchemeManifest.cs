@@ -56,7 +56,7 @@ public class TestLoadDataSchemeManifest
         await cmd2.ExecuteAsync(CancellationToken.None);
 
         var manifestEntryResult = Schema.GetManifestEntryForScheme(SchemeName);
-        Assert.IsTrue(manifestEntryResult.Passed, manifestEntryResult.Message);
+        manifestEntryResult.AssertPassed();
         Assert.That(manifestEntryResult.Result.FilePath, Is.EqualTo(filePath2));
     }
 } 

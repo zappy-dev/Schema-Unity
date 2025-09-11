@@ -61,7 +61,7 @@ namespace Schema.Core.Tests.Commands
         [Test]
         public async Task CommandHistory_ExecuteUndoRedo_WorkCorrectly()
         {
-            var history = new CommandHistory();
+            var history = new CommandProcessor();
             var cmd = new SetDataOnEntryCommand(_scheme, _entry, AttributeName, "Eve");
 
             // Execute
