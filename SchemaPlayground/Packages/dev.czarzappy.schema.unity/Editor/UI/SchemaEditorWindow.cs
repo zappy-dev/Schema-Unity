@@ -542,7 +542,8 @@ namespace Schema.Unity.Editor
                             
             // Create a relative path for the new schema file
             string fileName = $"{newSchemeName}.{Schema.Core.Schema.Storage.DefaultSchemaStorageFormat.Extension}";
-            string relativePath = fileName; // Default to just the filename (relative to Content folder)
+            string relativePath = $"{DefaultContentDirectory}/{fileName}";
+            // string relativePath = fileName; // Default to just the filename (relative to Content folder)
                             
             SubmitAddSchemeRequest(newSchema, importFilePath: relativePath).FireAndForget();
             newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name

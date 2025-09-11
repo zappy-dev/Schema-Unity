@@ -8,8 +8,6 @@ namespace Schema.Unity.Editor
 {
     public static class EditorStorageUtility
     {
-        public static string DefaultContentDirectory = "Content";
-        
         public static void Export(this IStorageFormat<DataScheme> format, DataScheme scheme)
         {
             var extParts = format.Extension.Split('.');
@@ -31,7 +29,7 @@ namespace Schema.Unity.Editor
             //     DefaultContentDirectory;
             string saveDirectory = (format is CSharpStorageFormat) ? 
                 manifestEntry.CSharpExportPath : 
-                DefaultContentDirectory;
+                Schema.Core.Schema.DefaultContentDirectory;
 
             string outputFilePath;
             if (format is CSharpStorageFormat cSharpStorageFormat)
@@ -61,7 +59,7 @@ namespace Schema.Unity.Editor
 
         public static bool TryImport(this IStorageFormat<DataScheme> format, out DataScheme scheme, out string importFilePath)
         {
-            importFilePath = EditorUtility.OpenFilePanel($"Import from {format.Extension.ToUpper()}", DefaultContentDirectory, format.Extension);
+            importFilePath = EditorUtility.OpenFilePanel($"Import from {format.Extension.ToUpper()}", Schema.Core.Schema.DefaultContentDirectory, format.Extension);
 
             if (string.IsNullOrEmpty(importFilePath))
             {

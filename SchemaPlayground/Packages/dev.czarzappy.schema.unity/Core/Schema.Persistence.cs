@@ -372,7 +372,8 @@ namespace Schema.Core
                 var previousManifestPath = ManifestSelfEntry.FilePath;
                 try
                 {
-                    var manifestRelativeLoadPath = PathUtility.MakeRelativePath(ManifestImportPath, ContentLoadPath);
+                    // TODO: Unify with FS Data Type
+                    var manifestRelativeLoadPath = PathUtility.MakeRelativePath(ManifestImportPath, ProjectPath);
                     ManifestSelfEntry.FilePath = manifestRelativeLoadPath;
 
                     if (_storage.DefaultManifestStorageFormat.SerializeToFile(ManifestImportPath, GetManifestScheme().Result._).Passed)
@@ -452,11 +453,12 @@ namespace Schema.Core
                 // Get the file path from the manifest entry
                 savePath = schemeManifestEntry.FilePath;
                 
+                // TODO: Unify with FS Data Type
                 // Resolve relative path if needed
                 string resolvedPath = savePath;
                 if (!PathUtility.IsAbsolutePath(savePath) && !string.IsNullOrEmpty(ManifestImportPath))
                 {
-                    resolvedPath = PathUtility.MakeAbsolutePath(savePath, ContentLoadPath);
+                    resolvedPath = PathUtility.MakeAbsolutePath(savePath, ProjectPath);
                     
                     // Ensure the directory exists
                     string directory = Path.GetDirectoryName(resolvedPath);

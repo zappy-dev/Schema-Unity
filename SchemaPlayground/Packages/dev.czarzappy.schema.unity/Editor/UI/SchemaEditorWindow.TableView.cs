@@ -195,7 +195,7 @@ namespace Schema.Unity.Editor
                         if (string.IsNullOrEmpty(selectedSchemeLoadPath) && GetManifestEntryForScheme(scheme).Try(out var schemeManifestEntry))
                         {
                             selectedSchemeLoadPath = schemeManifestEntry.FilePath;
-                            selectedSchemeLoadPath = PathUtility.MakeAbsolutePath(selectedSchemeLoadPath, ContentLoadPath);
+                            selectedSchemeLoadPath = PathUtility.MakeAbsolutePath(selectedSchemeLoadPath, ProjectPath);
                         }
 
                         EditorGUILayout.TextField(selectedSchemeLoadPath);
@@ -334,7 +334,8 @@ namespace Schema.Unity.Editor
                 }
                 
                 // add new entry form
-                if (scheme.AttributeCount > 0)
+                // Special case manifest entry creation, we want to set it with valid data, wizard flow to prompt creation
+                if (scheme.AttributeCount > 0 && !scheme.IsManifest)
                 {
                     if (AddButton("Create New Entry", expandWidth: true, height: 50f))
                     {
