@@ -232,8 +232,13 @@ namespace Schema.Unity.Editor
                     {
                         GenericMenu menu = new GenericMenu();
 
-                        foreach (var storageFormat in Storage.AllFormats)
+                        foreach (var storageFormat in Core.Schema.Storage.AllFormats)
                         {
+                            // do not allow exporting of Manifest Codegen for projects..
+                            if (storageFormat is CSharpStorageFormat && scheme.IsManifest)
+                            {
+                                continue;
+                            }
                             menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), false,
                                 () => { storageFormat.Export(scheme); });
                         }

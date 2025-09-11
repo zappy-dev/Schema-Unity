@@ -2,7 +2,7 @@
   "dependencies": {
     "com.needle.compilation-visualizer": "https://github.com/needle-tools/compilation-visualizer.git",
     "com.quickeye.icon-browser": "https://github.com/ErnSur/unity-editor-icons.git",
-    "com.unity.ide.rider": "3.0.21",
+    "com.unity.ide.rider": "3.0.36",
     "com.unity.memoryprofiler": "0.7.1-preview.1",
     "com.unity.nuget.newtonsoft-json": "3.2.1",
     "com.unity.test-framework": "1.1.33",

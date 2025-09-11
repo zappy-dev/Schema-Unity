@@ -56,7 +56,7 @@ namespace Schema.Core
         public static SchemaResult Fail(string errorMessage, object context = null) => 
             new SchemaResult(status: RequestStatus.Failed, message: errorMessage, context: context?.ToString());
 
-        public static SchemaResult Pass(string successMessage, object context = null) =>
+        public static SchemaResult Pass(string successMessage = "", object context = null) =>
             new SchemaResult(status: RequestStatus.Passed, message: successMessage, context: context?.ToString());
 
         public static SchemaResult CheckIf(bool conditional, string errorMessage, object context = null, string successMessage = null)
@@ -120,10 +120,10 @@ namespace Schema.Core
         public static SchemaResult<TResult> Fail(string errorMessage, object context) => 
             new SchemaResult<TResult>(status: RequestStatus.Failed, message: errorMessage, result: default, context: context?.ToString());
 
-        public static SchemaResult<TResult> Pass(TResult result, string successMessage, object context) =>
+        public static SchemaResult<TResult> Pass(TResult result, string successMessage = "", object context = null) =>
             new SchemaResult<TResult>(status: RequestStatus.Passed, message: successMessage, result: result, context: context?.ToString());
         
-        public static SchemaResult<TResult> CheckIf(bool conditional, TResult result, string errorMessage, string successMessage, object context = null)
+        public static SchemaResult<TResult> CheckIf(bool conditional, TResult result, string errorMessage, string successMessage = "", object context = null)
         {
             return conditional ? Pass(result: result, successMessage: successMessage, context: context) : Fail(errorMessage: errorMessage, context: context);
         }
@@ -131,6 +131,13 @@ namespace Schema.Core
         public bool Try(out TResult result)
         {
             result = this.result;
+            return Passed;
+        }
+
+        public bool Try(out TResult result, out SchemaResult<TResult> res)
+        {
+            result = this.result;
+            res = this;
             return Passed;
         }
 
@@ -144,12 +151,12 @@ namespace Schema.Core
             return Fail(errorMessage, context);
         }
 
-        public SchemaResult<TResult> Pass(TResult result, string successMessage)
+        public SchemaResult<TResult> Pass(TResult result, string successMessage = "")
         {
             return Pass(result, successMessage, context: context);
         }
         
-        public SchemaResult<TResult> CheckIf(bool conditional, TResult result, string errorMessage, string successMessage)
+        public SchemaResult<TResult> CheckIf(bool conditional, TResult result, string errorMessage, string successMessage = "")
         {
             return conditional ? Pass(result: result, successMessage: successMessage, context: context) : Fail(errorMessage: errorMessage, context: context);
         }

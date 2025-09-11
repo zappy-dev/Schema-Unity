@@ -17,7 +17,7 @@ namespace Schema.Core.Data
             
         }
 
-        public TextDataType(string text) : base(text)
+        public TextDataType(string defaultValue) : base(defaultValue)
         {
             
         }

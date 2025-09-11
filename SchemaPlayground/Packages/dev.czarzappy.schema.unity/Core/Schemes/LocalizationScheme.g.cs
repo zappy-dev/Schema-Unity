@@ -35,21 +35,21 @@ namespace Schema.Core.Schemes
         {
         }
 
-        public string LocID => _dataEntry.GetDataAsString("LocID");
-        public string EnUS => _dataEntry.GetDataAsString("en-US");
+        public string LocID => DataEntry.GetDataAsString("LocID");
+        public string EnUS => DataEntry.GetDataAsString("en-US");
         /// <summary>
         /// Details about where this localized string appears to help the Localization team.
         /// </summary>
-        public string Context => _dataEntry.GetDataAsString("Context");
-        public bool ReadyForTranslations => _dataEntry.GetDataAsBool("ReadyForTranslations");
-        public string EsES => _dataEntry.GetDataAsString("es-ES");
-        public string FrFR => _dataEntry.GetDataAsString("fr-FR");
-        public string DeDE => _dataEntry.GetDataAsString("de-DE");
-        public string ItIT => _dataEntry.GetDataAsString("it-IT");
-        public string JaJP => _dataEntry.GetDataAsString("ja-JP");
-        public string ZhCN => _dataEntry.GetDataAsString("zh-CN");
-        public string KoKR => _dataEntry.GetDataAsString("ko-KR");
-        public string RuRU => _dataEntry.GetDataAsString("ru-RU");
-        public string PtBR => _dataEntry.GetDataAsString("pt-BR");
+        public string Context => DataEntry.GetDataAsString("Context");
+        public bool ReadyForTranslations => DataEntry.GetDataAsBool("ReadyForTranslations");
+        public string EsES => DataEntry.GetDataAsString("es-ES");
+        public string FrFR => DataEntry.GetDataAsString("fr-FR");
+        public string DeDE => DataEntry.GetDataAsString("de-DE");
+        public string ItIT => DataEntry.GetDataAsString("it-IT");
+        public string JaJP => DataEntry.GetDataAsString("ja-JP");
+        public string ZhCN => DataEntry.GetDataAsString("zh-CN");
+        public string KoKR => DataEntry.GetDataAsString("ko-KR");
+        public string RuRU => DataEntry.GetDataAsString("ru-RU");
+        public string PtBR => DataEntry.GetDataAsString("pt-BR");
     }
 }

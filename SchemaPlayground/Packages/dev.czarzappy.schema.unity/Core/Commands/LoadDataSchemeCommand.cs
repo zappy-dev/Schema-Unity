@@ -258,7 +258,8 @@ namespace Schema.Core.Commands
                     // Add or update manifest entry
                     if (!manifestScheme.TryGetEntryForSchemeName(scheme.SchemeName, out var manifestEntry))
                     {
-                        manifestScheme.AddManifestEntry(scheme.SchemeName).Try(out manifestEntry);
+                        manifestScheme.AddManifestEntry(scheme.SchemeName,
+                            publishTarget: ManifestScheme.PublishTarget.DEFAULT).Try(out manifestEntry);
                     }
                     
                     // Get the FilePath attribute definition to access its DataType

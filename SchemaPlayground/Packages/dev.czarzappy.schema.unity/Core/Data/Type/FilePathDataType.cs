@@ -125,9 +125,7 @@ namespace Schema.Core.Data
             // Resolve the path to absolute for file system check
             string resolvedPath = ResolvePath(filePath);
             
-            return CheckIf(Serialization.Storage.FileSystem.FileExists(resolvedPath), 
-                errorMessage: "File does not exist",
-                successMessage: "File exists", context);
+            return Schema.Storage.FileSystem.FileExists(resolvedPath);
         }
 
         public override SchemaResult<object> ConvertData(object value, SchemaContext context)
@@ -144,7 +142,7 @@ namespace Schema.Core.Data
             string resolvedPath = ResolvePath(filePath);
             
             bool fileExists = !string.IsNullOrWhiteSpace(resolvedPath) && 
-                              Serialization.Storage.FileSystem.FileExists(resolvedPath);
+                              Schema.Storage.FileSystem.FileExists(resolvedPath).Passed;
             
             return CheckIf<object>(
                 fileExists || allowEmptyPath && string.IsNullOrEmpty(resolvedPath), 

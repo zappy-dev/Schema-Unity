@@ -28,6 +28,6 @@ namespace Schema.Core.Schemes
         /// <summary>
         /// Schema's Tooltip messages that appear at the top of the Scheme Editor
         /// </summary>
-        public string Message => _dataEntry.GetDataAsString("Message");
+        public string Message => DataEntry.GetDataAsString("Message");
     }
 }

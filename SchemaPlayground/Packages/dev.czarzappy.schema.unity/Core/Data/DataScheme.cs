@@ -349,7 +349,7 @@ namespace Schema.Core.Data
                 return SchemaResult.Fail($"Direct mutation of identifier attribute '{attributeName}' is not allowed. Use Schema.UpdateIdentifierValue instead.");
             }
 
-            // Logger.LogDbgVerbose($"SetDataOnEntry, entry: {entry}, {attributeName}=>{value}", context: Context);
+            Logger.LogDbgVerbose($"SetDataOnEntry, entry: {entry}, {attributeName}=>{value}", context: Context);
             IsDirty = true;
             return entry.SetData(attributeName, value);
         }

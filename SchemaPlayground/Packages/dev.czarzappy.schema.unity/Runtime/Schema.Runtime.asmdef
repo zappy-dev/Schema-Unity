@@ -1,18 +1,15 @@
 {
-    "name": "Schema.Unity.Editor",
-    "rootNamespace": "Schema.Unity.Editor",
+    "name": "Schema.Runtime",
+    "rootNamespace": "Schema.Runtime",
     "references": [
-        "Schema.Core",
-        "Schema.Runtime"
+        "Schema.Core"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
-    "autoReferenced": false,
+    "autoReferenced": true,
     "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false

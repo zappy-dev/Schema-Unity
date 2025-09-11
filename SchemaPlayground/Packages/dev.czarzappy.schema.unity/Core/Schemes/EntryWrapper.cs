@@ -2,17 +2,33 @@ using Schema.Core.Data;
 
 namespace Schema.Core.Schemes
 {
+    [System.Serializable]
     public class EntryWrapper
     {
-        private protected DataEntry _dataEntry;
-        public DataEntry _ => _dataEntry;
+        protected readonly DataEntry DataEntry;
+        public DataEntry _ => DataEntry;
         
-        private protected DataScheme _dataScheme;
+        private protected DataScheme DataScheme;
 
         public EntryWrapper(DataScheme dataScheme, DataEntry entry)
         {
-            _dataScheme = dataScheme;
-            _dataEntry = entry;
+            DataScheme = dataScheme;
+            DataEntry = entry;
+        }
+
+        public override string ToString()
+        {
+            return DataEntry.ToString();
+        }
+
+        public override bool Equals(object obj)
+        {
+            return DataEntry.Equals(obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return DataEntry.GetHashCode();
         }
     }
 }

@@ -29,18 +29,18 @@ namespace Schema.Core.Schemes
 
         public string SchemeName
         {
-            get => _dataEntry.GetDataAsString("SchemeName");
-            set => _dataScheme.SetDataOnEntry(_dataEntry, "SchemeName", value);
+            get => DataEntry.GetDataAsString("SchemeName");
+            set => DataScheme.SetDataOnEntry(DataEntry, "SchemeName", value);
         }
         public string FilePath
         {
-            get => _dataEntry.GetDataAsString("FilePath");
-            set => _dataScheme.SetDataOnEntry(_dataEntry, "FilePath", value);
+            get => DataEntry.GetDataAsString("FilePath");
+            set => DataScheme.SetDataOnEntry(DataEntry, "FilePath", value);
         }
         public string PublishTarget
         {
-            get => _dataEntry.GetDataAsString("PublishTarget");
-            set => _dataScheme.SetDataOnEntry(_dataEntry, "PublishTarget", value);
+            get => DataEntry.GetDataAsString("PublishTarget");
+            set => DataScheme.SetDataOnEntry(DataEntry, "PublishTarget", value);
         }
     }
 }

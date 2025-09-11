@@ -20,11 +20,12 @@ namespace Schema.Unity.Editor
             Debug.Log($"lastExt {lastExt}");
             
             // TODO: Set a different target directory preference for csharp code?
-            string saveDirectory = (format is CSharpStorageFormat) ? "Packages/dev.czarzappy.schema.unity/Core/Schemes" : DefaultContentDirectory;
+            string saveDirectory = (format is CSharpStorageFormat) ? "Packages/dev.czarzappy.schema.unity/Runtime/Schemes" : DefaultContentDirectory;
 
             string outputFilePath;
             if (format is CSharpStorageFormat)
             {
+                
                 outputFilePath = Path.Combine(saveDirectory, exportFileName);
             }
             else
