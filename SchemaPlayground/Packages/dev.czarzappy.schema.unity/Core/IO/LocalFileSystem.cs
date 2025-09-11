@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Schema.Core.Logging;
 
 namespace Schema.Core.IO
 {
@@ -18,6 +19,7 @@ namespace Schema.Core.IO
 
         public SchemaResult WriteAllText(string filePath, string fileContent)
         {
+            Logger.LogDbgVerbose($"Writing file {filePath}, size: {fileContent.Length}");
             File.WriteAllText(filePath, fileContent);
             return SchemaResult.Pass();
         }

@@ -36,6 +36,7 @@ namespace Schema.Unity.Editor
             editAttribute.AttributeToolTip = EditorGUILayout.TextArea(editAttribute.AttributeToolTip);
 
             // Support Reference DataType default value selection
+            // TODO: Unify this with the Table Cell rendering
             if (editAttribute.DataType is ReferenceDataType refType)
             {
                 ReferenceDropdown.Draw("Default Value", editAttribute.DefaultValue, refType, newValue =>

@@ -36,6 +36,7 @@ namespace Schema.Unity.Editor
                             $"expected a valid type from {nameof(ManifestScheme.PublishTarget)}.");
             }
             
+            // publishing data
             bool isSuccess = true;
             switch (publishTarget)
             {
@@ -61,6 +62,9 @@ namespace Schema.Unity.Editor
                 } 
                     break;
             }
+            
+            // Publish code
+            Storage.CSharpStorageFormat.Export(schemeToPublish);
             
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();

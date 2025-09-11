@@ -37,7 +37,7 @@ namespace Schema.Unity.Editor
         private static ProfilerMarker _explorerViewMarker = new ProfilerMarker("SchemaEditor:ExplorerView");
         private static ProfilerMarker _tableViewMarker = new ProfilerMarker("SchemaEditor:TableView");
 
-        private static string _defaultContentPath;
+        // TODO: Move to Schema Core?
         private static string _defaultManifestLoadPath;
         
         #endregion
@@ -161,12 +161,13 @@ namespace Schema.Unity.Editor
             newAttributeName = string.Empty;
 
             SetStorage(StorageFactory.GetEditorStorage());
-            _defaultContentPath = Path.Combine(Path.GetFullPath(Application.dataPath + "/.."), "Content");
-            _defaultManifestLoadPath = GetContentPath("Manifest.json");
 
+            ProjectPath = Path.GetFullPath(Application.dataPath + "/..");
+            // _defaultContentPath = Path.Combine(Path.GetFullPath(Application.dataPath + "/.."), "Content");
+            _defaultManifestLoadPath = GetContentPath("Manifest.json");
             // if (!IsInitialized)
             // {
-                ManifestImportPath = _defaultManifestLoadPath;
+            ManifestImportPath = _defaultManifestLoadPath;
             // }
             // return;
             LatestResponse = OnLoadManifest("On Editor Startup");
@@ -187,12 +188,6 @@ namespace Schema.Unity.Editor
             }
 
             isInitialized = true;
-        }
-
-
-        private string GetContentPath(string schemeFileName)
-        {
-            return Path.Combine(_defaultContentPath, schemeFileName);
         }
 
         #region Manifest File Changing Handling
@@ -351,6 +346,8 @@ namespace Schema.Unity.Editor
                         "Loaded template manifest", Context);
                 }
             }
+            
+            EditorGUILayout.TextField("Project Path", ProjectPath);
             
             GUILayout.Label("Manifest Path");
             using (new EditorGUILayout.HorizontalScope())
@@ -546,9 +543,6 @@ namespace Schema.Unity.Editor
             // Create a relative path for the new schema file
             string fileName = $"{newSchemeName}.{Schema.Core.Schema.Storage.DefaultSchemaStorageFormat.Extension}";
             string relativePath = fileName; // Default to just the filename (relative to Content folder)
-                            
-            // Get the full path for actual file creation
-            string fullPath = GetContentPath(fileName);
                             
             SubmitAddSchemeRequest(newSchema, importFilePath: relativePath).FireAndForget();
             newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name

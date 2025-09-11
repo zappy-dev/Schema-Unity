@@ -19,7 +19,7 @@ namespace Schema.Core.Data
         
         public override SchemaResult CheckIfValidData(object value, SchemaContext context)
         {
-            return CheckIf(value is float, 
+            return CheckIf(value is float || value is double, 
                 errorMessage: "Value is not an floating point number.",
                 successMessage: "Value is an floating point number.", context);
         }
@@ -28,7 +28,7 @@ namespace Schema.Core.Data
         {
             try
             {
-                var intData = Convert.ToSingle(fromData);
+                var intData = Convert.ToDouble(fromData);
                 return Pass<object>(intData,
                     successMessage: $"Value {fromData} is an floating point number.", context: context);
             }

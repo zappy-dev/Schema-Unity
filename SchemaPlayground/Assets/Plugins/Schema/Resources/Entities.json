@@ -1,0 +1,35 @@
+{
+  "SchemeName": "Entities",
+  "Attributes": [
+    {
+      "AttributeName": "ID",
+      "AttributeToolTip": null,
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "TypeName": "String",
+        "DefaultValue": ""
+      },
+      "ColumnWidth": 150,
+      "IsIdentifier": true,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "MoveSpeed",
+      "AttributeToolTip": null,
+      "DataType": {
+        "$type": "Schema.Core.Data.FloatingPointDataType, Schema.Core",
+        "TypeName": "Float",
+        "DefaultValue": 0.0
+      },
+      "ColumnWidth": 150,
+      "IsIdentifier": false,
+      "DefaultValue": 0.0
+    }
+  ],
+  "Entries": [
+    {
+      "ID": "Player",
+      "MoveSpeed": 1.0
+    }
+  ]
+}

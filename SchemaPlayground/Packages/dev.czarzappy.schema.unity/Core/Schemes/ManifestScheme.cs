@@ -60,7 +60,9 @@ namespace Schema.Core.Schemes
             return success;
         }
 
-        public SchemaResult<ManifestEntry> AddManifestEntry(string schemeName, PublishTarget publishTarget, string importFilePath = null)
+        public SchemaResult<ManifestEntry> AddManifestEntry(string schemeName, 
+            PublishTarget publishTarget = PublishTarget.DEFAULT, 
+            string importFilePath = null)
         {
             var newSchemeManifestEntry = ManifestDataEntryFactory.Build(this, schemeName, publishTarget, importFilePath);
             var res = _dataScheme.AddEntry(newSchemeManifestEntry._, runDataValidation: false);

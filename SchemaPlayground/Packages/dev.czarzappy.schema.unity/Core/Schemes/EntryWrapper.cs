@@ -8,7 +8,7 @@ namespace Schema.Core.Schemes
         protected readonly DataEntry DataEntry;
         public DataEntry _ => DataEntry;
         
-        private protected DataScheme DataScheme;
+        protected readonly DataScheme DataScheme;
 
         public EntryWrapper(DataScheme dataScheme, DataEntry entry)
         {

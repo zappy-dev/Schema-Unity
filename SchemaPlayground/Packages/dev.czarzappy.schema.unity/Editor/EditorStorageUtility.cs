@@ -1,5 +1,4 @@
 using System.IO;
-using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Serialization;
 using UnityEditor;
@@ -19,13 +18,25 @@ namespace Schema.Unity.Editor
             Debug.Log($"Export {exportFileName}");
             Debug.Log($"lastExt {lastExt}");
             
+            
+            if (Core.Schema.GetManifestEntryForScheme(scheme).Try(out var manifestEntry))
+            {
+                // manifestEntry
+            }
+            
             // TODO: Set a different target directory preference for csharp code?
-            string saveDirectory = (format is CSharpStorageFormat) ? "Packages/dev.czarzappy.schema.unity/Runtime/Schemes" : DefaultContentDirectory;
+            // string saveDirectory = (format is CSharpStorageFormat) ? "Packages/dev.czarzappy.schema.unity/Runtime/Schemes" : DefaultContentDirectory;
+            // string saveDirectory = (format is CSharpStorageFormat) ? 
+            //     "Packages/dev.czarzappy.schema.unity/Core/Schemes" : 
+            //     DefaultContentDirectory;
+            string saveDirectory = (format is CSharpStorageFormat) ? 
+                manifestEntry.CSharpExportPath : 
+                DefaultContentDirectory;
 
             string outputFilePath;
-            if (format is CSharpStorageFormat)
+            if (format is CSharpStorageFormat cSharpStorageFormat)
             {
-                
+                cSharpStorageFormat.ManifestEntry = manifestEntry;
                 outputFilePath = Path.Combine(saveDirectory, exportFileName);
             }
             else

@@ -216,10 +216,11 @@ namespace Schema.Core
             }
             
             // Resolve relative path if needed
+            // TODO: Unify logic to FS Data Type
             string resolvedPath = schemeFilePath;
             if (!PathUtility.IsAbsolutePath(schemeFilePath) && !string.IsNullOrEmpty(ManifestImportPath))
             {
-                resolvedPath = PathUtility.MakeAbsolutePath(schemeFilePath, ContentLoadPath);
+                resolvedPath = PathUtility.MakeAbsolutePath(schemeFilePath, ProjectPath);
             }
             
             if (_storage.FileSystem.FileExists(resolvedPath).Failed)

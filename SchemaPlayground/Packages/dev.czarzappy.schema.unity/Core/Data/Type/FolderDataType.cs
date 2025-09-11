@@ -1,20 +1,19 @@
-using System;
+﻿using Newtonsoft.Json;
 using Schema.Core.IO;
 using Schema.Core.Logging;
 
 namespace Schema.Core.Data
 {
-    [Serializable]
-    public class FilePathDataType : FSDataType
+    public class FolderDataType : FSDataType
     {
-        public override SchemaContext Context => new SchemaContext()
+        public override SchemaContext Context => new SchemaContext
         {
-            DataType = nameof(FilePathDataType),
+            DataType = nameof(FolderDataType)
         };
-        
-        public override string TypeName => "FilePath";
 
-        public FilePathDataType(bool allowEmptyPath = true, bool useRelativePaths = false, string basePath = null) 
+        public override string TypeName => "Folder";
+        
+        public FolderDataType(bool allowEmptyPath = true, bool useRelativePaths = false, string basePath = null) 
             : base(allowEmptyPath, useRelativePaths, basePath)
         {
         }
@@ -25,7 +24,7 @@ namespace Schema.Core.Data
             {
                 return Fail("Value is not a file path", context);
             }
-
+            
             if (string.IsNullOrWhiteSpace(filePath))
             {
                 return CheckIf(allowEmptyPath, errorMessage: "File path is empty", successMessage: "File path is set", context);
@@ -39,7 +38,7 @@ namespace Schema.Core.Data
             // Resolve the path to absolute for file system check
             string resolvedPath = ResolvePath(filePath);
             
-            return Schema.Storage.FileSystem.FileExists(resolvedPath);
+            return Schema.Storage.FileSystem.DirectoryExists(resolvedPath);
         }
 
         public override SchemaResult<object> ConvertData(object value, SchemaContext context)
@@ -57,14 +56,15 @@ namespace Schema.Core.Data
             string resolvedPath = ResolvePath(filePath);
             Logger.LogDbgVerbose($"Resolved path: {resolvedPath}");
             
-            bool fileExists = !string.IsNullOrWhiteSpace(resolvedPath) && 
-                              Schema.Storage.FileSystem.FileExists(resolvedPath).Passed;
+            bool directoryExists = !string.IsNullOrWhiteSpace(resolvedPath) && 
+                              Schema.Storage.FileSystem.DirectoryExists(resolvedPath).Passed;
+            
             
             return CheckIf<object>(
-                fileExists || allowEmptyPath && string.IsNullOrEmpty(resolvedPath), 
+                directoryExists || allowEmptyPath && string.IsNullOrEmpty(resolvedPath), 
                 result: formattedPath,
-                errorMessage: $"File '{resolvedPath}' does not exist",
-                successMessage: fileExists ? $"File '{resolvedPath}' exists" : "Empty path allowed", 
+                errorMessage: $"Directory '{resolvedPath}' does not exist",
+                successMessage: directoryExists ? $"Directory '{resolvedPath}' exists" : "Empty path allowed", 
                 context: context);
         }
     }

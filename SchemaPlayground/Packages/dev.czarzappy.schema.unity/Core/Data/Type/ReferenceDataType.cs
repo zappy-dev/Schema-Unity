@@ -141,7 +141,8 @@ namespace Schema.Core.Data
             // First, convert the value to the same data type as a reference's attribute
             if (!Schema.GetScheme(ReferenceSchemeName).Try(out var refSchema))
             {
-                if (context.Scheme.SchemeName == ReferenceSchemeName)
+                if (context.Scheme != null && 
+                    context.Scheme.SchemeName == ReferenceSchemeName)
                 {
                     refSchema = context.Scheme;
                 }

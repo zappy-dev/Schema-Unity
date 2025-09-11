@@ -61,7 +61,7 @@ namespace Schema.Core.Data
             get => isDirty;
             set
             {
-                // Logger.LogDbgVerbose($"IsDirty=>true", Context);
+                Logger.LogDbgVerbose($"IsDirty=>{value}", Context);
                 isDirty = value;
             }
         }
