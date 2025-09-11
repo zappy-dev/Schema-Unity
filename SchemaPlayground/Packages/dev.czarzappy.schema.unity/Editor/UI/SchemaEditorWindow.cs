@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Schema.Core;
 using Schema.Core.Data;
+using Schema.Core.IO;
 using Schema.Core.Serialization;
 using Unity.Profiling;
 using UnityEditor;
@@ -36,7 +37,7 @@ namespace Schema.Unity.Editor
         private static ProfilerMarker _explorerViewMarker = new ProfilerMarker("SchemaEditor:ExplorerView");
         private static ProfilerMarker _tableViewMarker = new ProfilerMarker("SchemaEditor:TableView");
 
-        private static string _defaultContentPath;
+        // TODO: Move to Schema Core?
         private static string _defaultManifestLoadPath;
         
         #endregion
@@ -151,20 +152,22 @@ namespace Schema.Unity.Editor
         private void InitializeSafely()
         {
             if (isInitialized) return;
+            // Only unsubscribe if initialized failed? also prevent attempting to initialize more than once?
             EditorApplication.update -= InitializeSafely;
             LogDbgVerbose("InitializeSafely", this);
             
-            // return;
             selectedSchemaIndex = -1;
             SelectedSchemeName = string.Empty;
             newAttributeName = string.Empty;
 
-            _defaultContentPath = Path.Combine(Path.GetFullPath(Application.dataPath + "/.."), "Content");
-            _defaultManifestLoadPath = GetContentPath("Manifest.json");
+            SetStorage(StorageFactory.GetEditorStorage());
 
+            ProjectPath = Path.GetFullPath(Application.dataPath + "/..");
+            // _defaultContentPath = Path.Combine(Path.GetFullPath(Application.dataPath + "/.."), "Content");
+            _defaultManifestLoadPath = GetContentPath("Manifest.json");
             // if (!IsInitialized)
             // {
-                ManifestImportPath = _defaultManifestLoadPath;
+            ManifestImportPath = _defaultManifestLoadPath;
             // }
             // return;
             LatestResponse = OnLoadManifest("On Editor Startup");
@@ -185,12 +188,6 @@ namespace Schema.Unity.Editor
             }
 
             isInitialized = true;
-        }
-
-
-        private string GetContentPath(string schemeFileName)
-        {
-            return Path.Combine(_defaultContentPath, schemeFileName);
         }
 
         #region Manifest File Changing Handling
@@ -350,6 +347,8 @@ namespace Schema.Unity.Editor
                 }
             }
             
+            EditorGUILayout.TextField("Project Path", ProjectPath);
+            
             GUILayout.Label("Manifest Path");
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -373,9 +372,14 @@ namespace Schema.Unity.Editor
                 }
 
                 // save schemes to manifest
-                if (GUILayout.Button("Save Manifest", DoNotExpandWidthOptions))
+                if (GUILayout.Button("Save All", DoNotExpandWidthOptions))
                 {
                     LatestResponse = SaveManifest();
+                }
+                
+                if (GUILayout.Button("Publish All", DoNotExpandWidthOptions))
+                {
+                    LatestResponse = PublishAllSchemes();
                 }
             }
 
@@ -441,17 +445,7 @@ namespace Schema.Unity.Editor
                     {
                         if (AddButton("Create New Schema"))
                         {
-                            var newSchema = new DataScheme(newSchemeName);
-                            
-                            // Create a relative path for the new schema file
-                            string fileName = $"{newSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}";
-                            string relativePath = fileName; // Default to just the filename (relative to Content folder)
-                            
-                            // Get the full path for actual file creation
-                            string fullPath = GetContentPath(fileName);
-                            
-                            SubmitAddSchemeRequest(newSchema, importFilePath: relativePath).FireAndForget();
-                            newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name
+                            CreateNewScheme();
                         }
                     }
                 }
@@ -464,7 +458,7 @@ namespace Schema.Unity.Editor
                 {
                     GenericMenu menu = new GenericMenu();
 
-                    foreach (var storageFormat in Storage.AllFormats)
+                    foreach (var storageFormat in Schema.Core.Schema.Storage.AllFormats)
                     {
                         if (!storageFormat.IsImportSupported)
                         {
@@ -523,6 +517,37 @@ namespace Schema.Unity.Editor
                     }
                 }
             }
+        }
+
+        private SchemaResult CreateNewScheme()
+        {
+            var newSchema = new DataScheme(newSchemeName);
+            
+            // Initialize with some starting data
+            var newAttrRes = newSchema.AddAttribute("ID", DataType.Text, defaultValue: string.Empty, isIdentifier: true);
+            if (!newAttrRes.Try(out var newIdAttr))
+            {
+                return Fail(newAttrRes.Message, newAttrRes.Context);
+            }
+
+            var addEntryRes = newSchema.AddEntry(new DataEntry
+            {
+                { newIdAttr.AttributeName, string.Empty }
+            });
+
+            if (addEntryRes.Failed)
+            {
+                return Fail(newAttrRes.Message, newAttrRes.Context);
+            }
+                            
+            // Create a relative path for the new schema file
+            string fileName = $"{newSchemeName}.{Schema.Core.Schema.Storage.DefaultSchemaStorageFormat.Extension}";
+            string relativePath = fileName; // Default to just the filename (relative to Content folder)
+                            
+            SubmitAddSchemeRequest(newSchema, importFilePath: relativePath).FireAndForget();
+            newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name
+
+            return Pass($"Created new Scheme: {newSchemeName}", Context);
         }
 
         public static void DrawUILine(Color color, int thickness = 2, int padding = 10)
@@ -623,7 +648,7 @@ namespace Schema.Unity.Editor
                             }
                                                     
                             // finally save new data scheme
-                            string enumSchemeFileName = $"{enumSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}";
+                            string enumSchemeFileName = $"{enumSchemeName}.{Schema.Core.Schema.Storage.DefaultSchemaStorageFormat.Extension}";
                             SubmitAddSchemeRequest(enumScheme, importFilePath: enumSchemeFileName).FireAndForget();
                         }
                     }
@@ -740,124 +765,8 @@ namespace Schema.Unity.Editor
             }
 
             progress.Progress($"Loading final Data Scheme", 0.9f);
-            string fileName = $"{newSOSchemeName}.{Storage.DefaultSchemaStorageFormat.Extension}";
+            string fileName = $"{newSOSchemeName}.{Schema.Core.Schema.Storage.DefaultSchemaStorageFormat.Extension}";
             SubmitAddSchemeRequest(dataScheme, importFilePath: fileName).FireAndForget();
-        }
-
-        private SchemaResult PublishScheme(string schemeName)
-        {
-            LogDbgVerbose($"Publishing {schemeName}");
-            var schemeEntry = GetManifestEntryForScheme(schemeName);
-            if (!schemeEntry.Try(out ManifestEntry manifestEntry) ||
-                !GetScheme(schemeName).Try(out var schemeToPublish))
-            {
-                return Fail($"Could not find manifest entry for scheme to publish, scheme: {schemeName}");
-            }
-
-            // TODO: Figure out how to better enumerate this, enforce Manifest scheme attribute is valid
-            // Problem: Manifest Scheme loads first, before any other scheme, so if it has a reference data type attribute to another scheme, that is invalid
-            // could skip validation and validate after load?
-            // But seems hacky
-            switch (manifestEntry.PublishTarget)
-            {
-                case "SCRIPTABLE_OBJECT":
-
-                    // HACK: Assumes ID column is the asset guid for an underlying scriptable object to publish to
-                    if (!schemeToPublish.GetIdentifierAttribute().Try(out var idAttr))
-                    {
-                        return Fail("No identifier attribute found for scheme to publish", schemeToPublish.Context);
-                    }
-                    
-                    foreach (var entry in schemeToPublish.AllEntries)
-                    {
-                        PublishScriptableObjectEntry(schemeToPublish, entry, idAttr);
-                    }
-                    break;
-                default:
-                    break;
-            }
-            
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            return Pass("Published assets");
-        }
-
-        private SchemaResult PublishScriptableObjectEntry(DataScheme schemeToPublish, DataEntry entry, AttributeDefinition idAttr)
-        {
-            var assetGuid = entry.GetDataAsGuid(idAttr.AttributeName);
-
-            if (!AssetUtils.TryLoadAssetFromGUID(assetGuid, out var currentAsset))
-            {
-                return Fail($"Not asset found with guid: {assetGuid}");
-            }
-                        
-            var assetType = currentAsset.GetType();
-
-            var soFields = TypeUtils.GetSerializedFieldsForType(assetType);
-            var fieldMap = schemeToPublish.GetAttributes()
-                .ToDictionary(attr => attr.AttributeName, attr => soFields.FirstOrDefault(field => field.Name == attr.AttributeName));
-            
-            // BUG: Referenced Data Type stops matching Reference'd Data Type
-            foreach (var kvp in entry)
-            {
-                var attrName = kvp.Key;
-                var value = kvp.Value;
-                
-                // HACK: Skip Asset GUID Id field
-                if (attrName == idAttr.AttributeName) continue;
-                            
-                var field = fieldMap[attrName];
-                if (!schemeToPublish.GetAttribute(attrName).Try(out var attr))
-                {
-                    LogError($"No attribute found for entry key: {attrName}");
-                    continue;
-                }
-                            
-                try
-                {
-                    object mappedValue = null;
-                    if (field.FieldType.IsEnum)
-                    {
-                        mappedValue = Enum.Parse(field.FieldType, value?.ToString() ?? string.Empty);
-                    }
-                    else
-                    {
-                        switch (attr.DataType)
-                        {
-                            // HACK: I know in this case the one reference data type we have is an asset guid reference, just resolve that reference
-                            case ReferenceDataType refDataType:
-
-                                if (!schemeToPublish.TryGetEntry(searchEntry =>
-                                        searchEntry.GetData(refDataType.ReferenceAttributeName) == value, out var refEntry))
-                                {
-                                    LogDbgError($"Failed to find referenced entry for value: {value} ({value?.GetType()})");
-                                    continue;
-                                }
-
-                                var refGuid = refEntry.GetDataAsGuid(refDataType.ReferenceAttributeName);
-                                if (AssetUtils.TryLoadAssetFromGUID(refGuid, out var refAsset))
-                                {
-                                    mappedValue = refAsset;
-                                }
-                                break;
-                            default:
-                                mappedValue = value;
-                                break;
-                        }
-                    }
-                    field.SetValue(currentAsset, mappedValue);
-                    LogDbgVerbose($"{field.Name}=>{mappedValue}");
-                }
-                catch (Exception e)
-                {
-                    LogError(e.Message);
-                }
-            }
-            
-            LogDbgVerbose($"Saving changes to asset: {currentAsset}");
-            EditorUtility.SetDirty(currentAsset);
-
-            return Pass($"Saving changes to asset: {currentAsset}");
         }
     }
 }

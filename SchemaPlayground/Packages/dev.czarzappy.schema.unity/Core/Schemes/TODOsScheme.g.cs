@@ -25,12 +25,12 @@ namespace Schema.Core.Schemes
         {
         }
 
-        public string Title => _dataEntry.GetDataAsString("Title");
-        public string Description => _dataEntry.GetDataAsString("Description");
-        public string Status => _dataEntry.GetDataAsString("Status");
-        public string TargetVersion => _dataEntry.GetDataAsString("TargetVersion");
-        public bool AddedTooltips => _dataEntry.GetDataAsBool("Added Tooltips?");
-        public string ItemType => _dataEntry.GetDataAsString("Item Type");
-        public string ProjectArea => _dataEntry.GetDataAsString("Project Area");
+        public string Title => DataEntry.GetDataAsString("Title");
+        public string Description => DataEntry.GetDataAsString("Description");
+        public string Status => DataEntry.GetDataAsString("Status");
+        public string TargetVersion => DataEntry.GetDataAsString("TargetVersion");
+        public bool AddedTooltips => DataEntry.GetDataAsBool("Added Tooltips?");
+        public string ItemType => DataEntry.GetDataAsString("Item Type");
+        public string ProjectArea => DataEntry.GetDataAsString("Project Area");
     }
 }

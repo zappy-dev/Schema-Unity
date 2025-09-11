@@ -8,7 +8,7 @@ namespace Schema.Core.Commands
     /// <summary>
     /// Interface for managing command execution history and undo/redo operations
     /// </summary>
-    public interface ICommandProcessor
+    public interface ICommandProcessor : IDisposable
     {
         /// <summary>
         /// Executes a command and adds it to the history if successful
@@ -56,6 +56,7 @@ namespace Schema.Core.Commands
         /// Gets the redo history (read-only)
         /// </summary>
         IReadOnlyList<ISchemaCommand> RedoHistory { get; }
+        public int MaxHistorySize { get; set; }
         
         /// <summary>
         /// Clears all command history

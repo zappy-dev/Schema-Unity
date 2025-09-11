@@ -36,7 +36,11 @@ namespace Schema.Core.Serialization
         public SchemaResult<DataScheme> DeserializeFromFile(string filePath)
         {
             var schemeName = Path.GetFileNameWithoutExtension(filePath);
-            var rows = fileSystem.ReadAllLines(filePath);
+            var readLinesRes = fileSystem.ReadAllLines(filePath);
+            if (!readLinesRes.Try(out var rows))
+            {
+                return readLinesRes.CastError<DataScheme>();
+            }
 
             return LoadFromRows(schemeName, rows);
         }

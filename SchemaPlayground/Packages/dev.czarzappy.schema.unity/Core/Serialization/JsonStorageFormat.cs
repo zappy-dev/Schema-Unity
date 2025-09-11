@@ -41,7 +41,12 @@ namespace Schema.Core.Serialization
         
         public SchemaResult<T> DeserializeFromFile(string filePath)
         {
-            string jsonData = fileSystem.ReadAllText(filePath);
+            var readRes = fileSystem.ReadAllText(filePath);
+            
+            if (!readRes.Try(out string jsonData))
+            {
+                return readRes.CastError<T>();
+            }
 
             return Deserialize(jsonData);
         }
@@ -71,7 +76,8 @@ namespace Schema.Core.Serialization
             var directoryPath = Path.GetDirectoryName(filePath);
 
             // Check if the directory exists, and if not, create it
-            if (!fileSystem.DirectoryExists(directoryPath))
+            var dirExistsRes = fileSystem.DirectoryExists(directoryPath);
+            if (!dirExistsRes.Failed)
             {
                 fileSystem.CreateDirectory(directoryPath);
             }

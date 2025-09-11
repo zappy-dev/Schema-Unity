@@ -1,5 +1,7 @@
+using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Schemes;
+using static Schema.Core.Schema;
 
 namespace Schema.Core.Schemes
 {
@@ -9,6 +11,18 @@ namespace Schema.Core.Schemes
     /// </summary>
     public partial class ManifestScheme : SchemeWrapper<ManifestEntry>
     {
+        public const string SCHEMA_NAME = "Manifest";
+        
+        public static SchemaResult<ManifestScheme> Get()
+        {
+            if (GetScheme(SCHEMA_NAME).Try(out var scheme, out var error))
+            {
+                return SchemaResult<ManifestScheme>.Pass(new ManifestScheme(scheme));
+            }
+            
+            return error.CastError<ManifestScheme>();
+        }
+
 
         public ManifestScheme(DataScheme dataScheme) : base(dataScheme)
         {
@@ -29,18 +43,28 @@ namespace Schema.Core.Schemes
 
         public string SchemeName
         {
-            get => _dataEntry.GetDataAsString("SchemeName");
-            set => _dataScheme.SetDataOnEntry(_dataEntry, "SchemeName", value);
+            get => DataEntry.GetDataAsString("SchemeName");
+            set => DataScheme.SetDataOnEntry(DataEntry, "SchemeName", value);
         }
         public string FilePath
         {
-            get => _dataEntry.GetDataAsString("FilePath");
-            set => _dataScheme.SetDataOnEntry(_dataEntry, "FilePath", value);
+            get => DataEntry.GetDataAsString("FilePath");
+            set => DataScheme.SetDataOnEntry(DataEntry, "FilePath", value);
         }
         public string PublishTarget
         {
-            get => _dataEntry.GetDataAsString("PublishTarget");
-            set => _dataScheme.SetDataOnEntry(_dataEntry, "PublishTarget", value);
+            get => DataEntry.GetDataAsString("PublishTarget");
+            set => DataScheme.SetDataOnEntry(DataEntry, "PublishTarget", value);
+        }
+        public string CSharpExportPath
+        {
+            get => DataEntry.GetDataAsString("CSharpExportPath");
+            set => DataScheme.SetDataOnEntry(DataEntry, "CSharpExportPath", value);
+        }
+        public string CSharpNamespace
+        {
+            get => DataEntry.GetDataAsString("CSharpNamespace");
+            set => DataScheme.SetDataOnEntry(DataEntry, "CSharpNamespace", value);
         }
     }
 }

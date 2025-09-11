@@ -184,7 +184,8 @@ namespace Schema.Core.Commands
                             if (conversionResult.Failed)
                             {
                                 // Allow file path types to load even if file doesn't exist
-                                if (attribute.DataType != DataType.FilePath)
+                                if (attribute.DataType != DataType.FilePath &&
+                                    attribute.DataType != DataType.Folder)
                                 {
                                     Fail(
                                         $"Failed to convert data for attribute '{attribute.AttributeName}': {conversionResult.Message}");
@@ -258,7 +259,8 @@ namespace Schema.Core.Commands
                     // Add or update manifest entry
                     if (!manifestScheme.TryGetEntryForSchemeName(scheme.SchemeName, out var manifestEntry))
                     {
-                        manifestScheme.AddManifestEntry(scheme.SchemeName).Try(out manifestEntry);
+                        manifestScheme.AddManifestEntry(scheme.SchemeName,
+                            publishTarget: ManifestScheme.PublishTarget.DEFAULT).Try(out manifestEntry);
                     }
                     
                     // Get the FilePath attribute definition to access its DataType

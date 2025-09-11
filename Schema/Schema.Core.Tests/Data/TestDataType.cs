@@ -26,10 +26,11 @@ public class TestDataType
     {
         Schema.Reset();
         _mockFileSystem = new Mock<IFileSystem>();
-        Core.Serialization.Storage.SetFileSystem(_mockFileSystem.Object);
+        
+        Schema.SetStorage(new Storage(_mockFileSystem.Object));
 
-        _mockFileSystem.Setup(m => m.FileExists(VALID_FILE_PATH)).Returns(true);
-        _mockFileSystem.Setup(m => m.FileExists(INVALID_FILE_PATH)).Returns(false);
+        _mockFileSystem.Setup(m => m.FileExists(VALID_FILE_PATH)).Returns(SchemaResult.Pass());
+        _mockFileSystem.Setup(m => m.FileExists(INVALID_FILE_PATH)).Returns(SchemaResult.Fail(""));
 
         // pre-load data schemes
         var validScheme = new DataScheme(VALID_SCHEME_NAME);

@@ -6,6 +6,14 @@ namespace Schema.Core.Schemes
 {
     public partial class ManifestScheme
     {
+        public enum PublishTarget
+        {
+            RESOURCES,
+            SCRIPTABLE_OBJECT,
+            
+            DEFAULT = RESOURCES,
+        }
+        
         private ManifestEntry _selfEntry;
         public ManifestEntry SelfEntry
         {
@@ -52,9 +60,11 @@ namespace Schema.Core.Schemes
             return success;
         }
 
-        public SchemaResult<ManifestEntry> AddManifestEntry(string schemeName, string importFilePath = null)
+        public SchemaResult<ManifestEntry> AddManifestEntry(string schemeName, 
+            PublishTarget publishTarget = PublishTarget.DEFAULT, 
+            string importFilePath = null)
         {
-            var newSchemeManifestEntry = ManifestDataEntryFactory.Build(this, schemeName, importFilePath);
+            var newSchemeManifestEntry = ManifestDataEntryFactory.Build(this, schemeName, publishTarget, importFilePath);
             var res = _dataScheme.AddEntry(newSchemeManifestEntry._, runDataValidation: false);
             
             return SchemaResult<ManifestEntry>.CheckIf(res.Passed, newSchemeManifestEntry, res.Message, res.Message);

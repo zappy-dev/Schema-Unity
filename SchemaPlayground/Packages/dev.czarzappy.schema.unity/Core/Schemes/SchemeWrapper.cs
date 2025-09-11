@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Schema.Core.Data;
@@ -18,9 +19,15 @@ namespace Schema.Core.Schemes
 
         protected abstract TEntry EntryFactory(DataScheme dataScheme, DataEntry dataEntry);
 
-        public TEntry GetEntry(int randomIdx)
+        public TEntry GetEntry(int entryIndex)
         {
-            return EntryFactory(_dataScheme, _dataScheme.GetEntry(randomIdx));
+            return EntryFactory(_dataScheme, _dataScheme.GetEntry(entryIndex));
+        }
+        
+        public SchemaResult<TEntry> GetEntry(Func<TEntry, bool> entryFilter)
+        {
+            TEntry foundEntry = GetEntries().FirstOrDefault(entryFilter);
+            return SchemaResult<TEntry>.CheckIf(foundEntry != default, foundEntry, "Entry not found");
         }
 
         public IEnumerable<TEntry> GetEntries()

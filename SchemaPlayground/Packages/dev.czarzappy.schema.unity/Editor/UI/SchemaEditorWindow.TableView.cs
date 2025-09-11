@@ -201,16 +201,16 @@ namespace Schema.Unity.Editor
                         EditorGUILayout.TextField(selectedSchemeLoadPath);
                     }
 
+                    if (GUILayout.Button("Open", ExpandWidthOptions))
+                    {
+                        EditorUtility.RevealInFinder(selectedSchemeLoadPath);
+                    }
+
                     var saveButtonText = scheme.IsDirty ? "Save*" : "Save";
 
                     if (GUILayout.Button(saveButtonText, ExpandWidthOptions))
                     {
                         LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
-                    }
-
-                    if (GUILayout.Button("Open", ExpandWidthOptions))
-                    {
-                        EditorUtility.RevealInFinder(selectedSchemeLoadPath);
                     }
 
                     if (GUILayout.Button("Publish", ExpandWidthOptions))
@@ -232,10 +232,23 @@ namespace Schema.Unity.Editor
                     {
                         GenericMenu menu = new GenericMenu();
 
-                        foreach (var storageFormat in Storage.AllFormats)
+                        foreach (var storageFormat in Core.Schema.Storage.AllFormats)
                         {
+                            // do not allow exporting of Manifest Codegen for projects..
+                            // This is only true for the base project...
+                            // weird, so the Manifest that Schema itself uses may differ from the Manifest that developers will author...
+                            // I need to publish my manifest seperately from the manifest that is built for a project...
+                            
+                            // Okay, csharp code gen is part of publishing flow
+                            if (storageFormat is CSharpStorageFormat)
+                            {
+                                continue;
+                            }
                             menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), false,
-                                () => { storageFormat.Export(scheme); });
+                                () =>
+                                {
+                                    storageFormat.Export(scheme);
+                                });
                         }
 
                         menu.ShowAsContext();
@@ -512,7 +525,7 @@ namespace Schema.Unity.Editor
                     using (new GUILayout.HorizontalScope())
                     {
                         // Filters are already in-memory; avoid reloading here
-                        EditorGUILayout.LabelField("", RightAlignedLabelStyle,
+                        EditorGUILayout.LabelField("Filters:", RightAlignedLabelStyle,
                             GUILayout.Width(SETTINGS_WIDTH),
                             GUILayout.ExpandWidth(false));
                         // GUILayout.Space(SETTINGS_WIDTH); // for the row number column
@@ -811,6 +824,10 @@ namespace Schema.Unity.Editor
                     RenderFilePathCell(cellRect, entryValue.ToString(), cellStyle, value => 
                         UpdateEntryValue(entry, attribute, value, scheme));
                     break;
+                case FolderDataType _:
+                    RenderFolderCell(cellRect, entryValue.ToString(), cellStyle, value => 
+                        UpdateEntryValue(entry, attribute, value, scheme));
+                    break;
                 case ReferenceDataType refDataType:
                     RenderReferenceCell(cellRect, entryValue, refDataType, cellStyle, value => 
                         UpdateEntryValue(entry, attribute, value, scheme));
@@ -916,18 +933,49 @@ namespace Schema.Unity.Editor
         private void RenderFilePathCell(Rect cellRect, string filePath, CellStyle cellStyle, Action<string> onValueChanged)
         {
             var filePreview = Path.GetFileName(filePath);
+            var previewPath = string.Empty;
             if (string.IsNullOrEmpty(filePreview))
             {
                 filePreview = "...";
+            }
+            else
+            {
+                previewPath = Path.GetDirectoryName(filePath);
             }
             
             var fileContent = new GUIContent(filePreview, tooltip: filePath);
             if (GUI.Button(cellRect, fileContent, cellStyle.ButtonStyle))
             {
-                var selectedFilePath = EditorUtility.OpenFilePanel("Schema - File Selection", "", "");
+                var selectedFilePath = EditorUtility.OpenFilePanel("Schema - File Selection", previewPath, "");
                 if (!string.IsNullOrEmpty(selectedFilePath))
                 {
                     onValueChanged?.Invoke(selectedFilePath);
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Renders a Folder path cell
+        /// </summary>
+        private void RenderFolderCell(Rect cellRect, string folderPath, CellStyle cellStyle, Action<string> onValueChanged)
+        {
+            string folderPreview = folderPath;
+            if (string.IsNullOrEmpty(folderPreview))
+            {
+                folderPreview = "...";
+            }
+            else
+            {
+                folderPreview = Path.GetFileName(folderPreview);
+            }
+            
+            var folderContent = new GUIContent(folderPreview, tooltip: folderPath);
+            if (GUI.Button(cellRect, folderContent, cellStyle.ButtonStyle))
+            {
+                var selectedFolder = EditorUtility.OpenFolderPanel("Schema - Folder Selection", folderPreview, "");
+                if (!string.IsNullOrEmpty(selectedFolder))
+                {
+                    onValueChanged?.Invoke(selectedFolder);
                 }
             }
         }

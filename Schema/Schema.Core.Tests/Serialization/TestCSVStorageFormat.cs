@@ -77,7 +77,7 @@ public class TestCSVStorageFormat
         Console.WriteLine(csvContent);
         var csvLines = CSVStorageFormat.SplitToRows(csvContent);
         mockFileSystem.Setup(fs => fs.ReadAllLines(schemeFilePath))
-            .Returns(csvLines).Verifiable();
+            .Returns(SchemaResult<string[]>.Pass(csvLines)).Verifiable();
 
         storageFormat.DeserializeFromFile(schemeFilePath).TryAssert(out DataScheme loadedScheme);
         

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Schema.Core.Data;
 using Schema.Core.Logging;
 using Schema.Core.Schemes;
@@ -47,14 +48,16 @@ namespace Schema.Core
             }
         }
 
-        public static string ContentLoadPath
+        public static string ProjectPath { get; set; }
+        
+        private static string DefaultContentPath => Path.Combine(ProjectPath, "Content");
+
+        public static string GetContentPath(string schemeFileName)
         {
-            get
-            {
-                string manifestDir = System.IO.Path.GetDirectoryName(ManifestImportPath);
-                return manifestDir;
-            }
+            return Path.Combine(DefaultContentPath, schemeFileName);
         }
+        
+        public static string ContentLoadPath => DefaultContentPath;
         // private static DataScheme ManifestScheme
         // {
         //     get

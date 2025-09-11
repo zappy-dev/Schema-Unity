@@ -1,108 +1,22 @@
 using System;
-using System.IO;
-using Newtonsoft.Json;
 using Schema.Core.IO;
+using Schema.Core.Logging;
 
 namespace Schema.Core.Data
 {
     [Serializable]
-    public class FilePathDataType : DataType
+    public class FilePathDataType : FSDataType
     {
         public override SchemaContext Context => new SchemaContext()
         {
             DataType = nameof(FilePathDataType),
         };
         
-        [JsonProperty("AllowEmptyPath")]
-        private bool allowEmptyPath;
-        
-        [JsonProperty("UseRelativePaths")]
-        private bool useRelativePaths;
-        
-        [JsonProperty("BasePath")]
-        private string basePath;
-        
-        [JsonIgnore]
-        public bool AllowEmptyPath => allowEmptyPath;
-        
-        [JsonIgnore]
-        public bool UseRelativePaths => useRelativePaths;
-        
-        [JsonIgnore]
-        public string BasePath => basePath;
-        
         public override string TypeName => "FilePath";
 
-        public FilePathDataType(bool allowEmptyPath = true, bool useRelativePaths = false, string basePath = null) : base(string.Empty)
+        public FilePathDataType(bool allowEmptyPath = true, bool useRelativePaths = false, string basePath = null) 
+            : base(allowEmptyPath, useRelativePaths, basePath)
         {
-            this.allowEmptyPath = allowEmptyPath;
-            this.useRelativePaths = useRelativePaths;
-            this.basePath = basePath;
-        }
-        
-        /// <summary>
-        /// Gets the content base path, either from the provided base path or from the default content path
-        /// </summary>
-        protected virtual string GetContentBasePath()
-        {
-            if (!string.IsNullOrEmpty(basePath))
-                return basePath;
-                
-            // Try to get the default content path from Schema
-            if (!Schema.IsInitialized)
-            {
-                return null;
-            }
-            
-            var manifestPath = Schema.ManifestImportPath;
-            if (!string.IsNullOrEmpty(manifestPath))
-            {
-                return Path.GetDirectoryName(manifestPath);
-            }
-            
-            return null;
-        }
-        
-        /// <summary>
-        /// Converts a path to the appropriate format (relative or absolute) based on the data type settings
-        /// </summary>
-        protected virtual string FormatPath(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                return path;
-                
-            if (!useRelativePaths)
-                return path;
-                
-            var contentBasePath = GetContentBasePath();
-            if (string.IsNullOrEmpty(contentBasePath))
-                return path;
-                
-            // If the path is absolute, convert it to relative
-            if (PathUtility.IsAbsolutePath(path))
-            {
-                return PathUtility.MakeRelativePath(path, contentBasePath);
-            }
-            
-            return path;
-        }
-        
-        /// <summary>
-        /// Resolves a path to its absolute form for file system operations
-        /// </summary>
-        protected string ResolvePath(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                return path;
-                
-            if (PathUtility.IsAbsolutePath(path))
-                return path;
-                
-            var contentBasePath = GetContentBasePath();
-            if (string.IsNullOrEmpty(contentBasePath))
-                return path;
-                
-            return PathUtility.MakeAbsolutePath(path, contentBasePath);
         }
         
         public override SchemaResult CheckIfValidData(object value, SchemaContext context)
@@ -125,9 +39,7 @@ namespace Schema.Core.Data
             // Resolve the path to absolute for file system check
             string resolvedPath = ResolvePath(filePath);
             
-            return CheckIf(Serialization.Storage.FileSystem.FileExists(resolvedPath), 
-                errorMessage: "File does not exist",
-                successMessage: "File exists", context);
+            return Schema.Storage.FileSystem.FileExists(resolvedPath);
         }
 
         public override SchemaResult<object> ConvertData(object value, SchemaContext context)
@@ -139,12 +51,14 @@ namespace Schema.Core.Data
             
             // Format the path according to our settings (relative/absolute)
             string formattedPath = FormatPath(filePath);
+            Logger.LogDbgVerbose($"Formatted path: {formattedPath}");
             
             // For validation, we need to resolve to absolute path
             string resolvedPath = ResolvePath(filePath);
+            Logger.LogDbgVerbose($"Resolved path: {resolvedPath}");
             
             bool fileExists = !string.IsNullOrWhiteSpace(resolvedPath) && 
-                              Serialization.Storage.FileSystem.FileExists(resolvedPath);
+                              Schema.Storage.FileSystem.FileExists(resolvedPath).Passed;
             
             return CheckIf<object>(
                 fileExists || allowEmptyPath && string.IsNullOrEmpty(resolvedPath), 

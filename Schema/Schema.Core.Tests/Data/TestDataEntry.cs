@@ -147,7 +147,7 @@ public class TestDataEntry
     public void Test_GetDataAsString_VariousCases()
     {
         var entry = new DataEntry();
-        Assert.That(entry.GetDataAsString("missing"), Is.Null);
+        Assert.That(entry.GetDataAsString("missing"), Is.Empty);
 
         entry.Add("string", "hello");
         Assert.That(entry.GetDataAsString("string"), Is.EqualTo("hello"));

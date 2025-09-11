@@ -1,0 +1,16 @@
+{
+    "name": "Schema.Runtime",
+    "rootNamespace": "Schema.Runtime",
+    "references": [
+        "Schema.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

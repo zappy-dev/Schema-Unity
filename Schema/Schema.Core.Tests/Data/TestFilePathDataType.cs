@@ -15,14 +15,14 @@ public class TestFilePathDataType
     {
         _mockFileSystem = new Mock<IFileSystem>();
         
-        Core.Serialization.Storage.SetFileSystem(_mockFileSystem.Object);
+        Schema.SetStorage(new Storage(_mockFileSystem.Object));
     }
     
     [Test]
     public void ConvertData_AbsoluteFilePath_To_RelativeFilePath()
     {
         string absolutePath = "/Users/zappy/src/Schema-Unity/SchemaPlayground/Content/TODOs.json";
-        _mockFileSystem.Setup(fs => fs.FileExists(absolutePath)).Returns(true);
+        _mockFileSystem.Setup(fs => fs.FileExists(absolutePath)).Returns(SchemaResult.Pass());
         
         var fileType = new FilePathDataType(allowEmptyPath: true, useRelativePaths: true,
             basePath: "/Users/zappy/src/Schema-Unity/SchemaPlayground/Content");

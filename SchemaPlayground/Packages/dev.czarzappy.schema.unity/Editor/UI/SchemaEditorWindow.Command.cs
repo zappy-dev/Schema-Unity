@@ -100,7 +100,7 @@ namespace Schema.Unity.Editor
                 var result = await commandProcessor.ExecuteAsync(request.Command, _cancellationTokenSource.Token);
                 request.OnRequestComplete(result);
                 OnSelectedSchemeChanged?.Invoke();
-                Save();
+                // Save();
             }
             catch (OperationCanceledException) { }
             finally
@@ -283,7 +283,7 @@ namespace Schema.Unity.Editor
                     else
                     {
                         // Persist change
-                        SaveDataScheme(scheme, false);
+                        // SaveDataScheme(scheme, false);
                     }
                 }
                 

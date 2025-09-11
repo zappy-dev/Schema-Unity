@@ -1,46 +1,49 @@
 using System;
 using System.IO;
+using Schema.Core.Logging;
 
 namespace Schema.Core.IO
 {
     public class LocalFileSystem : IFileSystem
     {
         #region File Operations
-        public string ReadAllText(string filePath)
+        public SchemaResult<string> ReadAllText(string filePath)
         {
-            return File.ReadAllText(filePath);
+            return SchemaResult<string>.Pass(File.ReadAllText(filePath));
         }
 
-        public string[] ReadAllLines(string filePath)
+        public SchemaResult<string[]> ReadAllLines(string filePath)
         {
-            return File.ReadAllLines(filePath);
+            return SchemaResult<string[]>.Pass(File.ReadAllLines(filePath));
         }
 
-        public void WriteAllText(string filePath, string fileContent)
+        public SchemaResult WriteAllText(string filePath, string fileContent)
         {
+            Logger.LogDbgVerbose($"Writing file {filePath}, size: {fileContent.Length}");
             File.WriteAllText(filePath, fileContent);
+            return SchemaResult.Pass();
         }
 
-        public bool FileExists(string filePath)
+        public SchemaResult FileExists(string filePath)
         {
-            return File.Exists(filePath);
+            return SchemaResult.CheckIf(File.Exists(filePath), "File does not exist");
         }
         
         #endregion
         
         #region Directory Operations
         
-        public bool DirectoryExists(string directoryPath)
+        public SchemaResult DirectoryExists(string directoryPath)
         {
             if (string.IsNullOrWhiteSpace(directoryPath))
             {
                 throw new ArgumentNullException(nameof(directoryPath));
             }
             
-            return Directory.Exists(directoryPath);
+            return SchemaResult.CheckIf(Directory.Exists(directoryPath),  "Directory does not exist");
         }
 
-        public void CreateDirectory(string directoryPath)
+        public SchemaResult CreateDirectory(string directoryPath)
         {
             if (string.IsNullOrWhiteSpace(directoryPath))
             {
@@ -48,12 +51,14 @@ namespace Schema.Core.IO
             }
 
             // Directory already exists, move on
-            if (DirectoryExists(directoryPath))
+            if (DirectoryExists(directoryPath).Passed)
             {
-                return;
+                return SchemaResult.Fail("Directory already exists");
             }
             
             Directory.CreateDirectory(directoryPath);
+            
+            return SchemaResult.Pass();
         }
         
         #endregion

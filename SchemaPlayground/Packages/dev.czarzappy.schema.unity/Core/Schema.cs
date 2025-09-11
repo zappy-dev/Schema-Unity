@@ -144,8 +144,8 @@ namespace Schema.Core
             // 1. Update the identifier value in the specified scheme
             if (!GetScheme(schemeName).Try(out var targetScheme))
                 return Fail($"Scheme '{schemeName}' not found.");
-            
-            var entry = targetScheme.AllEntries.FirstOrDefault(e => Equals(e.GetDataAsString(identifierAttribute), oldValue?.ToString()));
+
+            var entry = targetScheme.AllEntries.FirstOrDefault(e => Equals(e.GetData(identifierAttribute), oldValue));
             if (entry == null)
                 return Fail($"Entry with {identifierAttribute} == '{oldValue}' not found in scheme '{schemeName}'.");
             

@@ -1,12 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Moq;
-using NUnit.Framework;
 using Schema.Core.Commands;
-using Schema.Core.Data;
 using Schema.Core.Logging;
 
 
@@ -15,37 +8,43 @@ namespace Schema.Core.Tests.Commands
     [TestFixture]
     public class TestCommandHistory
     {
-        private CommandHistory _commandHistory;
+        private ICommandProcessor _commandHistory;
         private Mock<ILogger> _mockLogger;
-        private Mock<ISchemaCommand<string>> _mockCommand;
-        private Mock<ISchemaCommand<int>> _mockCommand2;
-        private Mock<ISchemaCommand<bool>> _mockNonUndoableCommand;
+        private Mock<ISchemaCommand> _mockCommand;
+        private Mock<ISchemaCommand> _mockCommand2;
+        private Mock<ISchemaCommand> _mockNonUndoableCommand;
 
         [SetUp]
         public void Setup()
         {
             _mockLogger = new Mock<ILogger>();
-            _commandHistory = new CommandHistory(_mockLogger.Object);
+            _commandHistory = new CommandProcessor(_mockLogger.Object);
             
             // Setup mock commands
-            _mockCommand = new Mock<ISchemaCommand<string>>();
+            _mockCommand = new Mock<ISchemaCommand>();
             _mockCommand.Setup(c => c.Description).Returns("Test Command");
             _mockCommand.Setup(c => c.CanUndo).Returns(true);
             
-            _mockCommand2 = new Mock<ISchemaCommand<int>>();
+            _mockCommand2 = new Mock<ISchemaCommand>();
             _mockCommand2.Setup(c => c.Description).Returns("Test Command 2");
             _mockCommand2.Setup(c => c.CanUndo).Returns(true);
             
-            _mockNonUndoableCommand = new Mock<ISchemaCommand<bool>>();
+            _mockNonUndoableCommand = new Mock<ISchemaCommand>();
             _mockNonUndoableCommand.Setup(c => c.Description).Returns("Non-Undoable Command");
             _mockNonUndoableCommand.Setup(c => c.CanUndo).Returns(false);
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            _commandHistory?.Dispose();
         }
 
         [Test]
         public void Constructor_WithLogger_UsesProvidedLogger()
         {
             // Act
-            var history = new CommandHistory(_mockLogger.Object);
+            var history = new CommandProcessor(_mockLogger.Object);
 
             // Assert
             Assert.IsNotNull(history);
@@ -55,7 +54,7 @@ namespace Schema.Core.Tests.Commands
         public void Constructor_WithoutLogger_UsesNullLogger()
         {
             // Act
-            var history = new CommandHistory();
+            var history = new CommandProcessor();
 
             // Assert
             Assert.IsNotNull(history);
@@ -79,7 +78,7 @@ namespace Schema.Core.Tests.Commands
         public async Task ExecuteAsync_ValidCommand_Succeeds()
         {
             // Arrange
-            var expectedResult = CommandResult<string>.Success("test result", "Success");
+            var expectedResult = CommandResult.Pass("test result", "Success");
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(expectedResult);
 
@@ -88,7 +87,7 @@ namespace Schema.Core.Tests.Commands
 
             // Assert
             Assert.IsTrue(result.IsSuccess);
-            Assert.That(result.Result, Is.EqualTo("test result"));
+            Assert.That(result.Value, Is.EqualTo("test result"));
             Assert.That(_commandHistory.Count, Is.EqualTo(1));
             Assert.That(_commandHistory.CanUndo, Is.True);
             Assert.That(_commandHistory.CanRedo, Is.False);
@@ -100,14 +99,14 @@ namespace Schema.Core.Tests.Commands
         {
             // Act & Assert
             Assert.ThrowsAsync<ArgumentNullException>(async () =>
-                await _commandHistory.ExecuteAsync<string>(null));
+                await _commandHistory.ExecuteAsync(null));
         }
 
         [Test]
         public async Task ExecuteAsync_CommandFails_DoesNotAddToHistory()
         {
             // Arrange
-            var failedResult = CommandResult<string>.Failure("Command failed");
+            var failedResult = CommandResult.Fail("Command failed");
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(failedResult);
 
@@ -125,7 +124,7 @@ namespace Schema.Core.Tests.Commands
         public async Task ExecuteAsync_NonUndoableCommand_DoesNotAddToUndoStack()
         {
             // Arrange
-            var successResult = CommandResult<bool>.Success(true, "Success");
+            var successResult = CommandResult.Pass(true, "Success");
             _mockNonUndoableCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
 
@@ -144,14 +143,14 @@ namespace Schema.Core.Tests.Commands
         {
             Logger.Level = Logger.LogLevel.VERBOSE;
             // Arrange
-            var successResult1 = CommandResult<string>.Success("result1", "Success");
-            var successResult2 = CommandResult<int>.Success(42, "Success");
+            var successResult1 = CommandResult.Pass("result1", "Success");
+            var successResult2 = CommandResult.Pass(42, "Success");
             
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult1);
             // Undo first command to populate redo stack
             _mockCommand.Setup(c => c.UndoAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(CommandResult.Success("Undone"));
+                .ReturnsAsync(CommandResult.Pass("Undone"));
             
             _mockCommand2.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult2);
@@ -173,7 +172,7 @@ namespace Schema.Core.Tests.Commands
         {
             // Arrange
             _commandHistory.MaxHistorySize = 2;
-            var successResult = CommandResult<string>.Success("result", "Success");
+            var successResult = CommandResult.Pass("result", "Success");
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
 
@@ -191,8 +190,8 @@ namespace Schema.Core.Tests.Commands
         public async Task UndoAsync_ValidCommand_Succeeds()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
-            var undoResult = CommandResult.Success("Undone");
+            var successResult = CommandResult.Pass("result", "Success");
+            var undoResult = CommandResult.Pass("Undone");
             
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
@@ -227,8 +226,8 @@ namespace Schema.Core.Tests.Commands
         public async Task UndoAsync_UndoFails_PutsCommandBackOnUndoStack()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
-            var undoFailureResult = CommandResult.Failure("Undo failed");
+            var successResult = CommandResult.Pass("result", "Success");
+            var undoFailureResult = CommandResult.Fail("Undo failed");
             
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
@@ -252,15 +251,15 @@ namespace Schema.Core.Tests.Commands
         public async Task RedoAsync_ValidCommand_Succeeds()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
-            var undoResult = CommandResult.Success("Undone");
+            var successResult = CommandResult.Pass("result", "Success");
+            var undoResult = CommandResult.Pass("Undone");
             
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
             _mockCommand.Setup(c => c.UndoAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(undoResult);
             _mockCommand.Setup(c => c.RedoAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(successResult.ToCommandResult);
+                .ReturnsAsync(successResult);
 
             await _commandHistory.ExecuteAsync(_mockCommand.Object);
             await _commandHistory.UndoAsync();
@@ -291,16 +290,16 @@ namespace Schema.Core.Tests.Commands
         public async Task RedoAsync_RedoFails_PutsCommandBackOnRedoStack()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
-            var undoResult = CommandResult.Success("Undone");
-            var redoFailureResult = CommandResult<string>.Failure("Redo failed");
+            var successResult = CommandResult.Pass("result", "Success");
+            var undoResult = CommandResult.Pass("Undone");
+            var redoFailureResult = CommandResult.Fail("Redo failed");
             
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
             _mockCommand.Setup(c => c.UndoAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(undoResult);
             _mockCommand.Setup(c => c.RedoAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(redoFailureResult.ToCommandResult);
+                .ReturnsAsync(redoFailureResult);
 
             await _commandHistory.ExecuteAsync(_mockCommand.Object);
             await _commandHistory.UndoAsync();
@@ -320,7 +319,7 @@ namespace Schema.Core.Tests.Commands
         public void ClearHistory_ClearsAllStacks()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
+            var successResult = CommandResult.Pass("result", "Success");
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
 
@@ -341,7 +340,7 @@ namespace Schema.Core.Tests.Commands
         public async Task ExecuteAsync_RaisesCommandExecutedEvent()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
+            var successResult = CommandResult.Pass("result", "Success");
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
 
@@ -362,8 +361,8 @@ namespace Schema.Core.Tests.Commands
         public async Task UndoAsync_RaisesCommandUndoneEvent()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
-            var undoResult = CommandResult.Success("Undone");
+            var successResult = CommandResult.Pass("result", "Success");
+            var undoResult = CommandResult.Pass("Undone");
             
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
@@ -389,15 +388,15 @@ namespace Schema.Core.Tests.Commands
         public async Task RedoAsync_RaisesCommandRedoneEvent()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
-            var undoResult = CommandResult.Success("Undone");
+            var successResult = CommandResult.Pass("result", "Success");
+            var undoResult = CommandResult.Pass("Undone");
             
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
             _mockCommand.Setup(c => c.UndoAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(undoResult);
             _mockCommand.Setup(c => c.RedoAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(successResult.ToCommandResult);
+                .ReturnsAsync(successResult);
 
             await _commandHistory.ExecuteAsync(_mockCommand.Object);
             await _commandHistory.UndoAsync();
@@ -469,11 +468,11 @@ namespace Schema.Core.Tests.Commands
         public async Task ConcurrentExecution_IsThreadSafe()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
+            var successResult = CommandResult.Pass("result", "Success");
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
 
-            var tasks = new List<Task<CommandResult<string>>>();
+            var tasks = new List<Task<CommandResult>>();
 
             // Act - Execute multiple commands concurrently
             for (int i = 0; i < 10; i++)
@@ -493,23 +492,23 @@ namespace Schema.Core.Tests.Commands
         public async Task MultipleUndoRedoOperations_WorkCorrectly()
         {
             // Arrange
-            var successResult1 = CommandResult<string>.Success("result1", "Success");
-            var successResult2 = CommandResult<int>.Success(42, "Success");
-            var undoResult = CommandResult.Success("Undone");
+            var successResult1 = CommandResult.Pass("result1", "Success");
+            var successResult2 = CommandResult.Pass(42, "Success");
+            var undoResult = CommandResult.Pass("Undone");
             
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult1);
             _mockCommand.Setup(c => c.UndoAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(undoResult);
             _mockCommand.Setup(c => c.RedoAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(successResult1.ToCommandResult);
+                .ReturnsAsync(successResult1);
             
             _mockCommand2.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult2);
             _mockCommand2.Setup(c => c.UndoAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(undoResult);
             _mockCommand2.Setup(c => c.RedoAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(successResult2.ToCommandResult);
+                .ReturnsAsync(successResult2);
 
             // Act
             await _commandHistory.ExecuteAsync(_mockCommand.Object);
@@ -549,7 +548,7 @@ namespace Schema.Core.Tests.Commands
         {
             // Arrange
             _commandHistory.MaxHistorySize = 3;
-            var successResult = CommandResult<string>.Success("result", "Success");
+            var successResult = CommandResult.Pass("result", "Success");
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
 
@@ -570,8 +569,8 @@ namespace Schema.Core.Tests.Commands
         {
             // Arrange
             _commandHistory.MaxHistorySize = 2;
-            var successResult = CommandResult<string>.Success("result", "Success");
-            var undoResult = CommandResult.Success("Undone");
+            var successResult = CommandResult.Pass("result", "Success");
+            var undoResult = CommandResult.Pass("Undone");
             
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
@@ -605,7 +604,7 @@ namespace Schema.Core.Tests.Commands
         public async Task History_ReturnsReadOnlyList()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
+            var successResult = CommandResult.Pass("result", "Success");
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
 
@@ -620,7 +619,7 @@ namespace Schema.Core.Tests.Commands
         public async Task UndoHistory_ReturnsReadOnlyList()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
+            var successResult = CommandResult.Pass("result", "Success");
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
 
@@ -635,8 +634,8 @@ namespace Schema.Core.Tests.Commands
         public async Task RedoHistory_ReturnsReadOnlyList()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
-            var undoResult = CommandResult.Success("Undone");
+            var successResult = CommandResult.Pass("result", "Success");
+            var undoResult = CommandResult.Pass("Undone");
             
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
@@ -655,8 +654,8 @@ namespace Schema.Core.Tests.Commands
         public async Task LastCommand_ReturnsMostRecentCommand()
         {
             // Arrange
-            var successResult1 = CommandResult<string>.Success("result1", "Success");
-            var successResult2 = CommandResult<int>.Success(42, "Success");
+            var successResult1 = CommandResult.Pass("result1", "Success");
+            var successResult2 = CommandResult.Pass(42, "Success");
             
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult1);
@@ -675,7 +674,7 @@ namespace Schema.Core.Tests.Commands
         public async Task Count_ReflectsTotalCommands()
         {
             // Arrange
-            var successResult = CommandResult<string>.Success("result", "Success");
+            var successResult = CommandResult.Pass("result", "Success");
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult);
 
@@ -691,24 +690,24 @@ namespace Schema.Core.Tests.Commands
         public async Task IntegrationTest_ComplexScenario()
         {
             // Arrange
-            var successResult1 = CommandResult<string>.Success("result1", "Success");
-            var successResult2 = CommandResult<int>.Success(42, "Success");
-            var successResult3 = CommandResult<bool>.Success(true, "Success");
-            var undoResult = CommandResult.Success("Undone");
+            var successResult1 = CommandResult.Pass("result1", "Success");
+            var successResult2 = CommandResult.Pass(42, "Success");
+            var successResult3 = CommandResult.Pass(true, "Success");
+            var undoResult = CommandResult.Pass("Undone");
             
             _mockCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult1);
             _mockCommand.Setup(c => c.UndoAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(undoResult);
             _mockCommand.Setup(c => c.RedoAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(successResult1.ToCommandResult);
+                .ReturnsAsync(successResult1);
             
             _mockCommand2.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult2);
             _mockCommand2.Setup(c => c.UndoAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(undoResult);
             _mockCommand2.Setup(c => c.RedoAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(successResult2.ToCommandResult);
+                .ReturnsAsync(successResult2);
             
             _mockNonUndoableCommand.Setup(c => c.ExecuteAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(successResult3);

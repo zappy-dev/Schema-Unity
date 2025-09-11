@@ -12,13 +12,18 @@ namespace Schema.Core.Tests;
 public class TestSchema
 {
     private Mock<IFileSystem> _mockFileSystem;
-    
+
+    private static readonly SchemaContext Context = new SchemaContext
+    {
+        Driver = nameof(TestSchema),
+    };
+
     [SetUp]
     public void Setup()
     {
         _mockFileSystem = new Mock<IFileSystem>();
         
-        Core.Serialization.Storage.SetFileSystem(_mockFileSystem.Object);
+        Schema.SetStorage(new Storage(_mockFileSystem.Object));
         Schema.Reset();
     }
 
@@ -55,7 +60,7 @@ public class TestSchema
     [TestCase("missing.json")]
     public void Test_LoadManifest_BadPath(string? badManifestPath)
     {
-        var loadResponse = Schema.LoadManifestFromPath(badManifestPath);
+        var loadResponse = Schema.LoadManifestFromPath(badManifestPath, Context);
         Assert.IsFalse(loadResponse.Passed);
     }
     
@@ -66,12 +71,12 @@ public class TestSchema
         
         // Arrange
         _mockFileSystem.Setup(fs => fs.FileExists(malformedFilePath))
-            .Returns(true);
+            .Returns(SchemaResult.Pass());
         _mockFileSystem.Setup(fs => fs.ReadAllText(malformedFilePath))
-            .Returns("malformedContent");
+            .Returns(SchemaResult<string>.Pass("malformedContent"));
         
         // Act
-        var loadResponse = Schema.LoadManifestFromPath(malformedFilePath);
+        var loadResponse = Schema.LoadManifestFromPath(malformedFilePath, Context);
         
         // Assert
         Assert.IsFalse(loadResponse.Passed);
@@ -91,7 +96,7 @@ public class TestSchema
         MockPersistScheme(manifestSavePath, manifestScheme);
         
         // Act
-        var loadResponse = Schema.LoadManifestFromPath(manifestSavePath);
+        var loadResponse = Schema.LoadManifestFromPath(manifestSavePath, Context);
         
         // Assert
         Assert.IsTrue(loadResponse.Passed);
@@ -104,19 +109,19 @@ public class TestSchema
 
     private void MockPersistScheme(string filePath, DataScheme scheme, bool mockRead = true, bool mockWrite = false)
     {
-        _mockFileSystem.Setup(m => m.FileExists(filePath)).Returns(true).Verifiable();
+        _mockFileSystem.Setup(m => m.FileExists(filePath)).Returns(SchemaResult.Pass()).Verifiable();
 
         if (mockRead)
         {
             _mockFileSystem.Setup(m => m.ReadAllText(filePath))
-                .Returns(Core.Serialization.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed()).Verifiable();
+                .Returns(SchemaResult<string>.Pass(Schema.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
         }
 
         if (mockWrite)
         {
-            _mockFileSystem.Setup(m => m.DirectoryExists("")).Returns(true).Verifiable();
-            _mockFileSystem.Setup(m => m.FileExists(filePath)).Returns(true).Verifiable();
-            _mockFileSystem.Setup(m => m.WriteAllText(filePath, Core.Serialization.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
+            _mockFileSystem.Setup(m => m.DirectoryExists("")).Returns(SchemaResult.Pass()).Verifiable();
+            _mockFileSystem.Setup(m => m.FileExists(filePath)).Returns(SchemaResult.Pass()).Verifiable();
+            _mockFileSystem.Setup(m => m.WriteAllText(filePath, Schema.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
         }
     }
 
@@ -141,12 +146,12 @@ public class TestSchema
         MockPersistScheme(testDataSchemeFilePath, testDataScheme);
 
         // add test data scheme manifest entry
-        manifestScheme.AddManifestEntry(testDataSchemeName, testDataSchemeFilePath).AssertPassed();
+        manifestScheme.AddManifestEntry(testDataSchemeName, importFilePath: testDataSchemeFilePath).AssertPassed();
 
         MockPersistScheme(manifestFilePath, manifestScheme);
 
         // Act
-        Schema.LoadManifestFromPath(manifestFilePath).AssertPassed();
+        Schema.LoadManifestFromPath(manifestFilePath, Context).AssertPassed();
         Schema.GetManifestEntryForScheme(testDataScheme).TryAssert(out var testDataEntry);
         
         // Assert
@@ -300,11 +305,11 @@ public class TestSchema
     [Test]
     public void Test_Save_OneDirtyScheme_SavesAndClearsDirtyFlag()
     {
-        _mockFileSystem.Setup(fs => fs.DirectoryExists("")).Returns(true).Verifiable();
+        _mockFileSystem.Setup(fs => fs.DirectoryExists("")).Returns(SchemaResult.Pass()).Verifiable();
         
         // Arrange
         var scheme = new DataScheme("Dirty");
-        _mockFileSystem.Setup(fs => fs.WriteAllText("Dirty.json", Core.Serialization.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
+        _mockFileSystem.Setup(fs => fs.WriteAllText("Dirty.json", Schema.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
         
         Schema.LoadDataScheme(scheme, true, importFilePath: "Dirty.json");
         scheme.IsDirty = true;
@@ -328,7 +333,7 @@ public class TestSchema
         scheme.IsDirty = true;
         // Mock manifest entry
         var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema();
-        manifestScheme.AddManifestEntry(scheme.SchemeName, "Failing.json");
+        manifestScheme.AddManifestEntry(scheme.SchemeName, importFilePath: "Failing.json");
         Schema.LoadDataScheme(manifestScheme._, true);
     }
 
@@ -344,8 +349,8 @@ public class TestSchema
         scheme2.IsDirty = true;
         // Mock manifest entries
         var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema();
-        manifestScheme.AddManifestEntry(scheme1.SchemeName, "Dirty1.json");
-        manifestScheme.AddManifestEntry(scheme2.SchemeName, "Dirty2.json");
+        manifestScheme.AddManifestEntry(scheme1.SchemeName, importFilePath: "Dirty1.json");
+        manifestScheme.AddManifestEntry(scheme2.SchemeName, importFilePath: "Dirty2.json");
         Schema.LoadDataScheme(manifestScheme._, true);
         // As above, patching SaveDataScheme to fail for one scheme is not trivial without refactor
         // Placeholder for the failure path
