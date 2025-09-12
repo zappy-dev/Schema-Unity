@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
 using Newtonsoft.Json;
 using Schema.Core.Ext;
@@ -103,7 +102,7 @@ namespace Schema.Core.Data
 
         public override string ToString()
         {
-#if DEBUG_BUILD
+#if SCHEMA_DEBUG
             return ToString(true);
 #else
             return ToString(false);
@@ -326,8 +325,11 @@ namespace Schema.Core.Data
                     }
                 }
             }
-            
-            IsDirty = updated > 0;
+
+            if (updated > 0)
+            {
+                isDirty = true;
+            }
             return updated;
         }
 

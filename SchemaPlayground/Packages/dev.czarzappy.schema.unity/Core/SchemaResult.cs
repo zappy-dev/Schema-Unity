@@ -32,12 +32,12 @@ namespace Schema.Core
 
             // TODO: Maybe create a preference for whether schema results automatically create a log?
             // TODO: Handle logging when creating an empty result
-// #if SCHEMA_DEBUG
-//             string logMsg = $"[Context={context}] {message}";
-//             if (status == RequestStatus.Passed)
-//             {
-//                 Logger.LogDbgVerbose(logMsg);
-//             }
+#if SCHEMA_DEBUG
+             string logMsg = $"[Context={context}] {message}";
+             if (status == RequestStatus.Failed)
+             {
+                 Logger.LogDbgError(logMsg);
+             }
 //             else
 //             {
 //                 if (Logger.Level <= Logger.LogLevel.VERBOSE)
@@ -45,7 +45,7 @@ namespace Schema.Core
 //                     Logger.LogDbgError(logMsg);
 //                 }
 //             }
-// #endif
+#endif
         }
         
         public override string ToString()

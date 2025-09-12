@@ -219,9 +219,11 @@ namespace Schema.Unity.Editor
                 {
                     if (result.IsSuccess)
                     {
-                        OnSelectScheme(newSchema.SchemeName, "Added schema");
-                        // Persist changes
+                        // persist data to file first
                         Save(true);
+                        
+                        // then select the new scheme
+                        OnSelectScheme(newSchema.SchemeName, "Added schema");
                     }
                     else
                     {
@@ -264,7 +266,7 @@ namespace Schema.Unity.Editor
             // }
         }
 
-        private async Task ExecuteSetDataOnEntryAsync(DataScheme scheme, DataEntry entry, string attributeName, object value)
+        private Task ExecuteSetDataOnEntryAsync(DataScheme scheme, DataEntry entry, string attributeName, object value)
         {
             // if (_operationInProgress) return;
             // _operationInProgress = true;
@@ -288,6 +290,7 @@ namespace Schema.Unity.Editor
                 }
                 
             });
+            return Task.CompletedTask;
             // try
             // {
             //     var progress = new Progress<CommandProgress>(UpdateProgress);

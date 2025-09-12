@@ -174,10 +174,10 @@ namespace Schema.Core
                     
                     Logger.LogDbgVerbose(loadRes.Message, loadRes.Context);
                 }
-
+                
                 if (!success)
                 {
-                    loadedManifestScheme = nextManifestScheme;
+                    LoadedManifestScheme = nextManifestScheme;
                     nextManifestScheme = null;
                     return SchemaResult<ManifestLoadStatus>.Pass(ManifestLoadStatus.FAILED_TO_LOAD_ENTRIES, $"Failed to load all schemes found in manifest, errors: {sb}", context: "Manifest");
                 }
@@ -185,7 +185,7 @@ namespace Schema.Core
                 // overwrite existing manifest
                 loadStopwatch.Stop();
 
-                loadedManifestScheme = nextManifestScheme;
+                LoadedManifestScheme = nextManifestScheme;
                 nextManifestScheme = null;
                 return SchemaResult<ManifestLoadStatus>.Pass(ManifestLoadStatus.FULLY_LOADED, $"Loaded {schemeCount} schemes from manifest in {loadStopwatch.ElapsedMilliseconds:N0} ms", context: "Manifest");
             }
@@ -281,10 +281,20 @@ namespace Schema.Core
                     }
                     else
                     {
+                        // Prompt users that there's an issue, maybe cause a failure in downstream publishing, but allow for editor fixes
+                        
                         var fieldData = entryData.Result;
                         var validateData = attribute.CheckIfValidData(fieldData);
                         if (validateData.Failed) // Try to force the manifest to be loaded, TODO: better handli
                         {
+                            //for manifest, handle partial load failures, if a manifest entry refers to a file that doesn't exist
+                            Logger.LogDbgWarning($"Entry {entry} failed attribute validate {attribute} in scheme: {scheme}");
+                            if (scheme.IsManifest && (attribute.DataType is FilePathDataType || attribute.DataType is FolderDataType))
+                            {
+                                Logger.LogWarning($"Error validating Manifest data for attribute: {attribute}, {fieldData}, error: {validateData.Message}");
+                                continue;
+                            }
+                            
                             var conversion = attribute.ConvertData(fieldData);
                             if (conversion.Failed)
                             {
@@ -312,7 +322,7 @@ namespace Schema.Core
                 }
             }
         
-            Logger.LogDbgVerbose($"Schema: Loading scheme {scheme.SchemeName}");
+            Logger.LogDbgVerbose($"Loading scheme {scheme}");
             loadedSchemes[schemeName] = scheme;
             if (scheme.IsManifest)
             {

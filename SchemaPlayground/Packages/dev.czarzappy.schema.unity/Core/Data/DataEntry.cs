@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Newtonsoft.Json;
 using Schema.Core.Logging;
@@ -344,7 +345,7 @@ namespace Schema.Core.Data
         public string Print(int numAttributesToPrint = -1)
         {
             var sb = new StringBuilder();
-            sb.Append("DataEntry=[");
+            sb.Append($"DataEntry({RuntimeHelpers.GetHashCode(this)})=[");
             int entryIndex = 0;
             int numEntriesToPrint = numAttributesToPrint == -1 ? entryData.Count : numAttributesToPrint;
             foreach (var kvp in entryData.Take(numEntriesToPrint))

@@ -14,6 +14,7 @@ using UnityEngine;
 using static Schema.Core.Schema;
 using static Schema.Core.Logging.Logger;
 using static Schema.Unity.Editor.SchemaLayout;
+using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Unity.Editor
 {
@@ -101,6 +102,7 @@ namespace Schema.Unity.Editor
                 return;
             }
             
+            Logger.LogDbgVerbose($"Refreshing Table Entries for scheme: {scheme}");
             var sortOrder = GetSortOrderForScheme(scheme);
             var realAllEntries = scheme.GetEntries(sortOrder);
             
@@ -189,7 +191,13 @@ namespace Schema.Unity.Editor
 
                 using (new GUILayout.HorizontalScope())
                 {
-                    EditorGUILayout.LabelField("Storage Path", DoNotExpandWidthOptions);
+                    string pathLabel = string.Empty;
+#if SCHEMA_DEBUG
+                    pathLabel = $"Storage Path ({RuntimeHelpers.GetHashCode(scheme)})";
+#else
+                    pathLabel = "Storage Path";
+#endif
+                    EditorGUILayout.LabelField(pathLabel, DoNotExpandWidthOptions);
                     using (new EditorGUI.DisabledScope())
                     {
                         if (string.IsNullOrEmpty(selectedSchemeLoadPath) && GetManifestEntryForScheme(scheme).Try(out var schemeManifestEntry))
@@ -860,7 +868,7 @@ namespace Schema.Unity.Editor
             if (AssetUtils.TryLoadAssetFromGUID(entryValue, out var asset))
             {
                 var assetType = asset.GetType();
-                EditorGUI.ObjectField(cellRect, asset, assetType);
+                EditorGUI.ObjectField(cellRect, asset, assetType, allowSceneObjects: false);
             }
             else
             {
@@ -1064,15 +1072,19 @@ namespace Schema.Unity.Editor
                     EditorUtility.DisplayDialog("Schema", $"Attribute '{attribute.AttributeName}' with value '{newValue}' already exists.", "OK");
                     return;
                 }
-                
-                UpdateIdentifierValue(scheme.SchemeName, attributeName, entry.GetData(attributeName), newValue);
+
+                var oldValue = entry.GetData(attributeName);
+                Logger.LogDbgVerbose($"{scheme}, {entry}, old Value: {oldValue} for attribute: {attributeName}");
+                var idRes = UpdateIdentifierValue(scheme.SchemeName, attributeName, oldValue, newValue);
+                if (idRes.Failed)
+                {
+                    Logger.LogDbgError(idRes.Message, idRes.Context);
+                }
             }
             else
             {
                 _ = ExecuteSetDataOnEntryAsync(scheme, entry, attributeName, newValue);
             }
-            
-            LatestResponse = Save();
         }
         
         /// <summary>

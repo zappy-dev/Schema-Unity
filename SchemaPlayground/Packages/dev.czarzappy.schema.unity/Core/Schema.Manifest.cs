@@ -12,9 +12,24 @@ namespace Schema.Core
     /// </summary>
     public partial class Schema
     {
-        private static ManifestScheme loadedManifestScheme;
+        public static event Action ManifestUpdated;
+        private static ManifestScheme _loadedManifestScheme;
         private static ManifestScheme nextManifestScheme;
-        public static ManifestScheme LoadedManifestScheme => loadedManifestScheme;
+
+        public static ManifestScheme LoadedManifestScheme
+        {
+            get => _loadedManifestScheme;
+            private set
+            {
+                if (_loadedManifestScheme != null && _loadedManifestScheme == value)
+                {
+                    return;
+                }
+                _loadedManifestScheme = value;
+
+                ManifestUpdated?.Invoke();
+            }
+        }
         public static bool IsManifestLoadInProgress => nextManifestScheme != null;
 
         private static string manifestImportPath;
@@ -153,9 +168,9 @@ namespace Schema.Core
                 return res.Pass(nextManifestScheme, "Using next manifest in load");
             }
 
-            if (loadedManifestScheme != null)
+            if (_loadedManifestScheme != null)
             {
-                return res.Pass(loadedManifestScheme, "Manifest scheme is already loaded");
+                return res.Pass(_loadedManifestScheme, "Manifest scheme is already loaded");
             }
 
             var dataSchemeRes = GetScheme(Manifest.MANIFEST_SCHEME_NAME);
@@ -166,7 +181,7 @@ namespace Schema.Core
             }
 
             var manifestScheme = new ManifestScheme(dataSchemeRes.Result);
-            loadedManifestScheme = manifestScheme;
+            LoadedManifestScheme = manifestScheme;
             
             return res.Pass(manifestScheme, "Manifest scheme is loaded");
         }

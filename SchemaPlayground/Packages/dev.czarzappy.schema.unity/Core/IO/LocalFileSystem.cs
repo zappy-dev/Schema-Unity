@@ -53,7 +53,7 @@ namespace Schema.Core.IO
             // Directory already exists, move on
             if (DirectoryExists(directoryPath).Passed)
             {
-                return SchemaResult.Fail("Directory already exists");
+                return SchemaResult.Pass("Directory already exists");
             }
             
             Directory.CreateDirectory(directoryPath);

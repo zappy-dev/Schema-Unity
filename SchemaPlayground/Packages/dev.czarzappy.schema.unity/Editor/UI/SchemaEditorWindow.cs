@@ -127,6 +127,7 @@ namespace Schema.Unity.Editor
             // Initialize virtual scrolling
             _virtualTableView = new VirtualTableView();
 
+            ManifestUpdated += RefreshTableEntriesForSelectedScheme;
             OnAttributeFiltersUpdated += RefreshTableEntriesForSelectedScheme;
             OnSelectedSchemeChanged += RefreshTableEntriesForSelectedScheme;
             OnSelectedSchemeChanged += () =>
@@ -197,6 +198,7 @@ namespace Schema.Unity.Editor
         {
             if (manifestWatcher == null)
             {
+                LogDbgVerbose($"Initializing file watch for path: {Path.GetDirectoryName(ManifestImportPath)}", this);
                 manifestWatcher = new FileSystemWatcher 
                 {
                     Path = Path.GetDirectoryName(ManifestImportPath),
@@ -210,9 +212,14 @@ namespace Schema.Unity.Editor
 
         private void OnManifestFileChanged(object sender, FileSystemEventArgs e)
         {
+            LogDbgVerbose($"Manifest File Changed");
             DateTime now = DateTime.Now;
 
-            if (now - lastManifestReloadTime < debounceTime) return;
+            if (now - lastManifestReloadTime < debounceTime)
+            {
+                LogDbgWarning($"Skipping re-loading manifest, allowing again in {now - lastManifestReloadTime}");
+                return;
+            }
 
             lastManifestReloadTime = now;
 
@@ -349,16 +356,29 @@ namespace Schema.Unity.Editor
             
             EditorGUILayout.TextField("Project Path", ProjectPath);
             
+            
+            if (LatestManifestLoadResponse.Message != null &&
+                LatestManifestLoadResponse.Failed)
+            {
+                EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestManifestLoadResponse.Result}: {LatestManifestLoadResponse.Message}", LatestManifestLoadResponse.MessageType());
+            }
+            
             GUILayout.Label("Manifest Path");
             using (new EditorGUILayout.HorizontalScope())
             {
                 using (new EditorGUI.DisabledScope())
                 {
-                    EditorGUILayout.TextField("Manifest Import Path", ManifestImportPath);
+                    if (isInitialized)
+                    {
+                        string path = string.Empty;
 #if SCHEMA_DEBUG
-                    EditorGUILayout.IntField("Loaded Manifest Scheme Hash",
-                        RuntimeHelpers.GetHashCode(LoadedManifestScheme._));
+                        path = $"({RuntimeHelpers.GetHashCode(LoadedManifestScheme._)}) {ManifestImportPath}";
+#else
+                    path = ManifestImportPath;
 #endif
+                        
+                        EditorGUILayout.TextField("Manifest Import Path", path);
+                    }
                 }
 
                 if (GUILayout.Button("Load", DoNotExpandWidthOptions))
@@ -503,11 +523,18 @@ namespace Schema.Unity.Editor
                     }
                     
                     var schemeNames = GetSchemes()
-                        .Select(s => (DisplayName: DisplayName(s), SchemeName: s.SchemeName)).ToArray();
+                        .Select(s => (DisplayName: DisplayName(s), SchemeName: s.SchemeName, Scheme: s)).ToArray();
 
                     using (var schemeChange = new EditorGUI.ChangeCheckScope())
                     {
-                        selectedSchemaIndex = GUILayout.SelectionGrid(selectedSchemaIndex, schemeNames.Select(s => s.DisplayName).ToArray(), 1, LeftAlignedButtonStyle);
+                        selectedSchemaIndex = GUILayout.SelectionGrid(selectedSchemaIndex, schemeNames.Select(s =>
+                        {
+#if SCHEMA_DEBUG
+                            return $"{s.DisplayName} ({RuntimeHelpers.GetHashCode(s.Scheme)})";
+#else
+                            return s.DisplayName;
+#endif
+                        }).ToArray(), 1, LeftAlignedButtonStyle);
                         
                         if (schemeChange.changed)
                         {

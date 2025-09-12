@@ -85,7 +85,7 @@ namespace Schema.Core
             loadedSchemes.Clear();
             manifestImportPath = String.Empty;
             nextManifestScheme = null;
-            loadedManifestScheme = null;
+            _loadedManifestScheme = null;
 
             var initResult = InitializeTemplateManifestScheme();
             IsInitialized = initResult.Passed;
@@ -147,7 +147,7 @@ namespace Schema.Core
 
             var entry = targetScheme.AllEntries.FirstOrDefault(e => Equals(e.GetData(identifierAttribute), oldValue));
             if (entry == null)
-                return Fail($"Entry with {identifierAttribute} == '{oldValue}' not found in scheme '{schemeName}'.");
+                return Fail($"Entry with {identifierAttribute} == '{oldValue}' not found in scheme '{targetScheme}'.");
             
             var idUpdateResult = targetScheme.SetDataOnEntry(entry, identifierAttribute, newValue, allowIdentifierUpdate: true);
             if (idUpdateResult.Failed)
