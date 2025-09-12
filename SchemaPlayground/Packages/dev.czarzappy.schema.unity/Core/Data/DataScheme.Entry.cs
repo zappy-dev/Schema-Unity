@@ -26,7 +26,7 @@ namespace Schema.Core.Data
 
         public SchemaResult AddEntry(DataEntry newEntry, bool runDataValidation = true)
         {
-            Logger.Log($"Adding {newEntry}...", this);
+            Logger.LogDbgVerbose($"Adding {newEntry}...", this);
             if (newEntry is null)
             {
                 return SchemaResult.Fail("Entry cannot be null", this);

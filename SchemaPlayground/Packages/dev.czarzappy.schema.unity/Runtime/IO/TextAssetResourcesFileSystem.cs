@@ -28,11 +28,9 @@ namespace Schema.Runtime.IO
             }
 
             // remove extensions
-            if (Path.HasExtension(resourcePath))
-            {
-                var ext = Path.GetExtension(resourcePath);
-                resourcePath = resourcePath.Substring(0, resourcePath.Length - ext.Length);
-            }
+            // Also do not use folder paths if present, only the file name
+
+            resourcePath = Path.GetFileNameWithoutExtension(resourcePath);
             
             return res.Pass(resourcePath, Context);
         }
@@ -59,7 +57,7 @@ namespace Schema.Runtime.IO
 
         public SchemaResult WriteAllText(string filePath, string fileContent)
         {
-            throw new System.NotImplementedException("Writing to files is not allowed for Resources files.");
+            return SchemaResult.Fail("Cannot write text file in Resources folder.");
         }
 
         public SchemaResult FileExists(string filePath)
@@ -87,12 +85,12 @@ namespace Schema.Runtime.IO
 
         public SchemaResult DirectoryExists(string directoryPath)
         {
-            throw new System.NotImplementedException("Unable to access folder information from Resources");
+            return SchemaResult.Fail("Directory does not exist in Resources folder.");
         }
 
         public SchemaResult CreateDirectory(string directoryPath)
         {
-            throw new System.NotImplementedException("Creating a Resources directory during Runtime is not allowed");
+            return SchemaResult.Fail("Unable to create directory in Resources folder.");
         }
     }
 }

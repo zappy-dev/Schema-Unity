@@ -1,6 +1,7 @@
 using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Schemes;
+using UnityEngine;
 using static Schema.Core.Schema;
 
 namespace ExampleProject.Schemes
@@ -35,6 +36,7 @@ namespace ExampleProject.Schemes
 
     }
 
+     [SerializeField]
     public partial class EntitiesEntry : EntryWrapper
     {
         public EntitiesEntry(DataScheme dataScheme, DataEntry entry) : base(dataScheme, entry)

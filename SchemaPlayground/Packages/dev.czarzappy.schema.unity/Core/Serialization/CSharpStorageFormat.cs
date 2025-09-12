@@ -45,6 +45,7 @@ namespace Schema.Core.Serialization
 $@"using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Schemes;
+using UnityEngine;
 using static Schema.Core.Schema;
 
 namespace {ManifestEntry.CSharpNamespace}
@@ -104,6 +105,7 @@ $"");
             sb.AppendLine();
             
             // Generate Entry class
+            sb.AppendLine("     [SerializeField]");
             sb.AppendLine($"    public partial class {entryClassName} : EntryWrapper");
             sb.AppendLine("    {");
             sb.AppendLine($"        public {entryClassName}(DataScheme dataScheme, DataEntry entry) : base(dataScheme, entry)");

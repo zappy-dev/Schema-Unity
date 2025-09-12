@@ -71,7 +71,7 @@
   "Entries": [
     {
       "SchemeName": "Manifest",
-      "FilePath": "Content/Manifest.json",
+      "FilePath": "Content\\Manifest.json",
       "PublishTarget": "DEFAULT",
       "CSharpExportPath": "Assets\\Scripts\\Schemes",
       "CSharpNamespace": "ExampleProject.Schemes"

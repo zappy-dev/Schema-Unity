@@ -48,7 +48,7 @@ namespace Schema.Core
             }
             
             progress?.Report((0f, $"Loading: {manifestLoadPath}..."));
-            Logger.Log($"Loading manifest from file: {manifestLoadPath}...", "Manifest");
+            Logger.LogDbgVerbose($"Loading manifest from file: {manifestLoadPath}...", "Manifest");
             var loadResult =
                 _storage.DefaultManifestStorageFormat.DeserializeFromFile(manifestLoadPath);
             if (!loadResult.Try( out var manifestDataScheme))
@@ -91,7 +91,7 @@ namespace Schema.Core
                     return SchemaResult<ManifestLoadStatus>.Fail(saveManifestResponse.Message, context: Context.Manifest);
                 }
                 
-                Logger.Log($"Loaded {manifestDataScheme}, scheme count: {schemeCount}", manifestDataScheme);
+                Logger.LogDbgVerbose($"Loaded {manifestDataScheme}, scheme count: {schemeCount}", manifestDataScheme);
 
                 var sb = new StringBuilder();
                 bool success = true;
@@ -113,7 +113,7 @@ namespace Schema.Core
                 foreach (var manifestEntry in nextManifestScheme.GetEntries())
                 {
                     currentSchema++;
-                    Logger.Log($"Loading manifest entry {manifestEntry._}...", manifestDataScheme);
+                    Logger.LogDbgVerbose($"Loading manifest entry {manifestEntry._}...", manifestDataScheme);
 
                     if (manifestEntry.SchemeName.Equals(Manifest.MANIFEST_SCHEME_NAME))
                     {
@@ -342,7 +342,7 @@ namespace Schema.Core
                     {
                         // add manifest record for new scheme
                     
-                        Logger.Log($"Adding manifest entry for {schemeName} with import path: {importFilePath}...", Context.Manifest);
+                        Logger.LogDbgVerbose($"Adding manifest entry for {schemeName} with import path: {importFilePath}...", Context.Manifest);
                         var manifest = GetManifestScheme();
                         if (!manifest.Try(out var manifestScheme))
                         {
@@ -370,7 +370,7 @@ namespace Schema.Core
         #region Save Operations
         public static SchemaResult SaveManifest(IProgress<float> progress = null)
         {
-            Logger.Log($"Saving manifest to file: {ManifestImportPath}...", "Manifest");
+            Logger.LogDbgVerbose($"Saving manifest to file: {ManifestImportPath}...", "Manifest");
             if (string.IsNullOrWhiteSpace(ManifestImportPath))
             {
                 return Fail("Manifest path is invalid: " + ManifestImportPath, "Manifest");
@@ -427,7 +427,7 @@ namespace Schema.Core
 
         public static SchemaResult SaveDataScheme(DataScheme scheme, bool alsoSaveManifest)
         {
-            Logger.Log($"Saving {scheme} to file...", "Storage");
+            Logger.LogDbgVerbose($"Saving {scheme} to file...", "Storage");
             if (scheme == null)
             {
                 return Fail("Attempted to save an invalid Data scheme");
@@ -479,7 +479,7 @@ namespace Schema.Core
                     }
                 }
                 
-                Logger.Log($"Saving {scheme} to file {resolvedPath} (from path {savePath})", "Storage");
+                Logger.LogDbgVerbose($"Saving {scheme} to file {resolvedPath} (from path {savePath})", "Storage");
                 result = _storage.DefaultSchemaStorageFormat.SerializeToFile(resolvedPath, scheme);
             }
 
@@ -508,14 +508,14 @@ namespace Schema.Core
                 }
                 
                 savePath = ManifestImportPath;
-                Logger.Log($"Saving manifest {scheme} to file {ManifestImportPath}", "Storage");
+                Logger.LogDbgVerbose($"Saving manifest {scheme} to file {ManifestImportPath}", "Storage");
                 result = SaveManifest();
             }
             saveStopwatch.Stop();
 
             if (result.Passed)
             {
-                Logger.Log($"Saved {scheme} to file {savePath} in {saveStopwatch.ElapsedMilliseconds:N0} ms", context: "Storage");
+                Logger.LogDbgVerbose($"Saved {scheme} to file {savePath} in {saveStopwatch.ElapsedMilliseconds:N0} ms", context: "Storage");
                 scheme.IsDirty = false;
             }
             return result;

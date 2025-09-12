@@ -249,7 +249,7 @@ namespace Schema.Unity.Editor
                 return;
             }
             
-            Log($"Opening Schema '{schemeName}' for editing, {context}...");
+            LogDbgVerbose($"Opening Schema '{schemeName}' for editing, {context}...");
             SelectedSchemeName = schemeName;
             selectedSchemaIndex = prevSelectedIndex;
             EditorPrefs.SetString(EDITORPREFS_KEY_SELECTEDSCHEME, schemeName);
@@ -271,7 +271,7 @@ namespace Schema.Unity.Editor
         
         private void SetColumnSort(DataScheme scheme, AttributeDefinition attribute, SortOrder sortOrder)
         {
-            Log($"Set column sort '{sortOrder}' for schema '{scheme.SchemeName}'.", this);
+            LogDbgVerbose($"Set column sort '{sortOrder}' for schema '{scheme.SchemeName}'.", this);
             primarySchemeSort[scheme.SchemeName] = new AttributeSortOrder(attribute.AttributeName, sortOrder);
         }
 

@@ -318,7 +318,7 @@ namespace Schema.Core.Data
         /// <param name="attributeName">The attribute name to set.</param>
         /// <param name="value">The value to set.</param>
         /// <returns>A SchemaResult indicating success or failure.</returns>
-        [Obsolete("Do not call SetData directly. Use DataScheme.SetDataOnEntry instead to ensure identifier safety.", false)]
+        // [Obsolete("Do not call SetData directly. Use DataScheme.SetDataOnEntry instead to ensure identifier safety.", false)]
         public SchemaResult SetData(string attributeName, object value)
         {
             if (string.IsNullOrWhiteSpace(attributeName))
