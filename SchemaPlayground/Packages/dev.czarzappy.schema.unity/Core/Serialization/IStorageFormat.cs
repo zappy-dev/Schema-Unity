@@ -8,9 +8,9 @@ namespace Schema.Core.Serialization
 
         bool IsImportSupported { get; }
         bool IsExportSupported { get; }
-        SchemaResult<T> DeserializeFromFile(string filePath);
-        SchemaResult<T> Deserialize(string content);
-        SchemaResult SerializeToFile(string filePath, T data);
+        SchemaResult<T> DeserializeFromFile(SchemaContext context, string filePath);
+        SchemaResult<T> Deserialize(SchemaContext context, string content);
+        SchemaResult SerializeToFile(SchemaContext context, string filePath, T data);
         SchemaResult<string> Serialize(T data);
     }
 }

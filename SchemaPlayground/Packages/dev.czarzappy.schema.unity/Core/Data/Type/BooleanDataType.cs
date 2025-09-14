@@ -5,12 +5,14 @@ namespace Schema.Core.Data
     [Serializable]
     public class BooleanDataType : DataType
     {
-        public override SchemaContext Context => new SchemaContext()
-        {
-            DataType = nameof(BooleanDataType),
-        };
-        
         public override string TypeName => "Boolean";
+        public override object Clone()
+        {
+            return new BooleanDataType
+            {
+                DefaultValue = DefaultValue
+            };
+        }
 
         public BooleanDataType(bool defaultValue = false) : base(defaultValue)
         {
@@ -20,14 +22,14 @@ namespace Schema.Core.Data
         {
         }
 
-        public override SchemaResult CheckIfValidData(object value, SchemaContext context)
+        public override SchemaResult CheckIfValidData(SchemaContext context, object value)
         {
             return CheckIf(value is bool, 
                 errorMessage: "Value is not a boolean.",
                 successMessage: "Value is a boolean.", context);
         }
 
-        public override SchemaResult<object> ConvertData(object fromData, SchemaContext context)
+        public override SchemaResult<object> ConvertData(SchemaContext context, object fromData)
         {
             try
             {

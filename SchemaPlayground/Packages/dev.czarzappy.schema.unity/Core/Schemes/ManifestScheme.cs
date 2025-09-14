@@ -15,64 +15,66 @@ namespace Schema.Core.Schemes
         }
         
         private ManifestEntry _selfEntry;
-        public ManifestEntry SelfEntry
+        public SchemaResult<ManifestEntry> GetSelfEntry(SchemaContext context)
         {
-            get
+            if (_selfEntry != null)
             {
-                if (_selfEntry != null)
-                {
-                    return _selfEntry;
-                }
-
-                if (!_dataScheme.TryGetEntry(e =>
-                            Manifest.MANIFEST_SCHEME_NAME.Equals(e.GetDataAsString(nameof(ManifestEntry.SchemeName))),
-                        out var selfEntry))
-                {
-                    return null;
-                }
-
-                _selfEntry = new ManifestEntry(_, selfEntry);
-                return _selfEntry;
+                return SchemaResult<ManifestEntry>.Pass(_selfEntry);
             }
+
+            if (!DataScheme.GetEntry(e =>
+                        Manifest.MANIFEST_SCHEME_NAME.Equals(e.GetDataAsString(nameof(ManifestEntry.SchemeName))), context)
+                    .Try(out var selfEntry, out var selfError))
+            {
+                return selfError.CastError<ManifestEntry>();
+            }
+
+            _selfEntry = EntryFactory(_, selfEntry);
+            return SchemaResult<ManifestEntry>.Pass(_selfEntry);
         }
 
-        public bool IsDirty
+        public bool IsDirty => DataScheme.IsDirty;
+
+        public void SetDirty(SchemaContext context, bool isDirty)
         {
-            set => _dataScheme.IsDirty = value;
-            get => _dataScheme.IsDirty;
+            DataScheme.SetDirty(context, isDirty);
         }
 
-        public string SchemeName => _dataScheme.SchemeName;
+        public string SchemeName => DataScheme.SchemeName;
 
         public IEnumerable<string> GetAllSchemeNames()
         {
-            return _dataScheme.GetValuesForAttribute(nameof(ManifestEntry.SchemeName))
+            return DataScheme.GetValuesForAttribute(nameof(ManifestEntry.SchemeName))
                     .Select(a => a?.ToString())
                     .Where(a => !string.IsNullOrWhiteSpace(a))
                 ;
         }
 
-        public bool TryGetEntryForSchemeName(string schemeName, out ManifestEntry manifestEntry)
+        public SchemaResult<ManifestEntry> GetEntryForSchemeName(SchemaContext context, string schemeName)
         {
-            bool success = _dataScheme.TryGetEntry(e => string.Equals(schemeName, e.GetDataAsString(nameof(ManifestEntry.SchemeName))),
-                out var matchEntry);
-            manifestEntry = new ManifestEntry(_, matchEntry);
-            return success;
+            if (!DataScheme
+                    .GetEntry(e => string.Equals(schemeName, e.GetDataAsString(nameof(ManifestEntry.SchemeName))), context)
+                    .Try(out var matchEntry, out var matchError))
+            {
+                return matchError.CastError<ManifestEntry>();
+            }
+            
+            return SchemaResult<ManifestEntry>.Pass(EntryFactory(_, matchEntry));
         }
 
-        public SchemaResult<ManifestEntry> AddManifestEntry(string schemeName, 
+        public SchemaResult<ManifestEntry> AddManifestEntry(SchemaContext context, string schemeName, 
             PublishTarget publishTarget = PublishTarget.DEFAULT, 
             string importFilePath = null)
         {
-            var newSchemeManifestEntry = ManifestDataEntryFactory.Build(this, schemeName, publishTarget, importFilePath);
-            var res = _dataScheme.AddEntry(newSchemeManifestEntry._, runDataValidation: false);
+            var newSchemeManifestEntry = ManifestDataEntryFactory.Build(context, this, schemeName, publishTarget, importFilePath);
+            var res = DataScheme.AddEntry(context, newSchemeManifestEntry._, runDataValidation: false);
             
             return SchemaResult<ManifestEntry>.CheckIf(res.Passed, newSchemeManifestEntry, res.Message, res.Message);
         }
 
-        public void DeleteEntry(ManifestEntry manifestEntry)
+        public void DeleteEntry(SchemaContext context, ManifestEntry manifestEntry)
         {
-            _dataScheme.DeleteEntry(manifestEntry._);
+            DataScheme.DeleteEntry(context, manifestEntry._);
         }
     }
 }

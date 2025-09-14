@@ -3,26 +3,28 @@
   "Attributes": [
     {
       "AttributeName": "ID",
-      "AttributeToolTip": null,
       "DataType": {
         "$type": "Schema.Core.Data.TextDataType, Schema.Core",
         "TypeName": "String",
         "DefaultValue": ""
       },
-      "ColumnWidth": 150,
       "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "",
+      "ColumnWidth": 150,
       "DefaultValue": ""
     },
     {
       "AttributeName": "MoveSpeed",
-      "AttributeToolTip": null,
       "DataType": {
         "$type": "Schema.Core.Data.FloatingPointDataType, Schema.Core",
         "TypeName": "Float",
         "DefaultValue": 0.0
       },
-      "ColumnWidth": 150,
       "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Move speed of the entity",
+      "ColumnWidth": 150,
       "DefaultValue": 0.0
     }
   ],

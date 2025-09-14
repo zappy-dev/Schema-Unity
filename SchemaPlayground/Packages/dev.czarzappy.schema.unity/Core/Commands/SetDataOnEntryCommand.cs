@@ -22,11 +22,12 @@ namespace Schema.Core.Commands
         private bool _hasCapturedOldValue;
 
         public SetDataOnEntryCommand(
+            SchemaContext context,
             DataScheme scheme,
             DataEntry entry,
             string attributeName,
             object newValue,
-            bool allowIdentifierUpdate = false)
+            bool allowIdentifierUpdate = false) : base(context)
         {
             _scheme = scheme ?? throw new ArgumentNullException(nameof(scheme));
             _entry = entry ?? throw new ArgumentNullException(nameof(entry));
@@ -48,7 +49,7 @@ namespace Schema.Core.Commands
                 _hasCapturedOldValue = true;
             }
 
-            var result = _scheme.SetDataOnEntry(_entry, _attributeName, _newValue, _allowIdentifierUpdate);
+            var result = _scheme.SetDataOnEntry(_entry, _attributeName, _newValue, _allowIdentifierUpdate, Context);
 
             var cmdResult = result.Passed
                 ? Pass(result)
@@ -59,7 +60,7 @@ namespace Schema.Core.Commands
 
         protected override Task<CommandResult> UndoInternalAsync(CancellationToken cancellationToken)
         {
-            var result = _scheme.SetDataOnEntry(_entry, _attributeName, _oldValue, allowIdentifierUpdate: true);
+            var result = _scheme.SetDataOnEntry(_entry, _attributeName, _oldValue, allowIdentifierUpdate: true, context: Context);
             return Task.FromResult(result.Passed ? Pass("Undo successful") : Fail(result.Message));
         }
     }

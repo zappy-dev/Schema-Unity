@@ -28,10 +28,11 @@ namespace Schema.Core.Commands
         public override string Description => $"Load data scheme '{_scheme.SchemeName}'{(_importFilePath != null ? $" from '{_importFilePath}'" : "")}";
         
         public LoadDataSchemeCommand(
+            SchemaContext context,
             DataScheme scheme, 
             bool overwriteExisting, 
             string importFilePath = null,
-            IProgress<CommandProgress> progress = null)
+            IProgress<CommandProgress> progress = null) : base(context)
         {
             _scheme = scheme ?? throw new ArgumentNullException(nameof(scheme));
             _overwriteExisting = overwriteExisting;
@@ -116,7 +117,7 @@ namespace Schema.Core.Commands
                     Logger.LogDbgVerbose($"Restoring previous scheme '{_previousScheme.SchemeName}'", this);
                     
                     // Use the synchronous method for now - this will be replaced when Schema interface is updated
-                    var restoreResult = Schema.LoadDataScheme(_previousScheme, overwriteExisting: true);
+                    var restoreResult = Schema.LoadDataScheme(Context, _previousScheme, overwriteExisting: true);
                     
                     if (restoreResult.Failed)
                     {
@@ -170,22 +171,22 @@ namespace Schema.Core.Commands
                     if (entryData.Failed)
                     {
                         // Set default value
-                        scheme.SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue());
+                        scheme.SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue(), context: Context);
                     }
                     else
                     {
                         // Validate and potentially convert data
                         var fieldData = entryData.Result;
-                        var validateResult = attribute.CheckIfValidData(fieldData);
+                        var validateResult = attribute.CheckIfValidData(Context, fieldData);
                         
                         if (validateResult.Failed && !scheme.IsManifest)
                         {
-                            var conversionResult = attribute.ConvertData(fieldData);
+                            var conversionResult = attribute.ConvertData(Context, fieldData);
                             if (conversionResult.Failed)
                             {
                                 // Allow file path types to load even if file doesn't exist
-                                if (attribute.DataType != DataType.FilePath &&
-                                    attribute.DataType != DataType.Folder)
+                                if (attribute.DataType != DataType.FilePath_RelativePaths &&
+                                    attribute.DataType != DataType.Folder_RelativePaths)
                                 {
                                     Fail(
                                         $"Failed to convert data for attribute '{attribute.AttributeName}': {conversionResult.Message}");
@@ -194,7 +195,7 @@ namespace Schema.Core.Commands
                             }
                             else
                             {
-                                scheme.SetDataOnEntry(entry, attribute.AttributeName, conversionResult.Result);
+                                scheme.SetDataOnEntry(entry, attribute.AttributeName, conversionResult.Result, context: Context);
                             }
                         }
                     }
@@ -218,9 +219,9 @@ namespace Schema.Core.Commands
             // This is a temporary implementation - will be replaced when Schema interface is updated
             await Task.Run(() =>
             {
-                scheme.IsDirty = true;
+                scheme.SetDirty(Context, true);
                 // Use the existing LoadDataScheme method until the Schema interface is fully converted
-                var result = Schema.LoadDataScheme(scheme, _overwriteExisting);
+                var result = Schema.LoadDataScheme(Context, scheme, _overwriteExisting);
                 if (result.Failed)
                 {
                     Logger.LogError(result.Message, result.Context);
@@ -239,7 +240,7 @@ namespace Schema.Core.Commands
             // This is a temporary implementation - will be replaced when Schema interface is updated
             await Task.Run(() =>
             {
-                var result = Schema.UnloadScheme(schemeName);
+                var result = Schema.UnloadScheme(Context, schemeName);
                 if (result.Failed)
                 {
                     throw new InvalidOperationException($"Failed to unload scheme: {result.Message}");
@@ -257,9 +258,9 @@ namespace Schema.Core.Commands
                 if (Schema.GetManifestScheme().Try(out var manifestScheme))
                 {
                     // Add or update manifest entry
-                    if (!manifestScheme.TryGetEntryForSchemeName(scheme.SchemeName, out var manifestEntry))
+                    if (!manifestScheme.GetEntryForSchemeName(Context, scheme.SchemeName).Try(out var manifestEntry))
                     {
-                        manifestScheme.AddManifestEntry(scheme.SchemeName,
+                        manifestScheme.AddManifestEntry(Context, scheme.SchemeName,
                             publishTarget: ManifestScheme.PublishTarget.DEFAULT).Try(out manifestEntry);
                     }
                     
@@ -268,7 +269,7 @@ namespace Schema.Core.Commands
                         filePathAttr.DataType is FilePathDataType)
                     {
                         // Let the FilePathDataType handle the path conversion
-                        var convertResult = filePathAttr.ConvertData(importFilePath);
+                        var convertResult = filePathAttr.ConvertData(Context, importFilePath);
                         if (convertResult.Try(out var convertedPath))
                         {
                             manifestEntry.FilePath = convertedPath as string;
@@ -287,7 +288,7 @@ namespace Schema.Core.Commands
                         manifestEntry.FilePath = importFilePath;
                     }
                     
-                    manifestScheme.IsDirty = true;
+                    manifestScheme.SetDirty(Context, true);
                 }
             }, cancellationToken);
         }
@@ -300,10 +301,10 @@ namespace Schema.Core.Commands
             {
                 if (Schema.GetManifestScheme().Try(out var manifestScheme))
                 {
-                    if (manifestScheme.TryGetEntryForSchemeName(schemeName, out var manifestEntry))
+                    if (manifestScheme.GetEntryForSchemeName(Context, schemeName).Try(out var manifestEntry))
                     {
-                        manifestScheme.DeleteEntry(manifestEntry);
-                        manifestScheme.IsDirty = true;
+                        manifestScheme.DeleteEntry(Context, manifestEntry);
+                        manifestScheme.SetDirty(Context, true);
                     }
                 }
             }, cancellationToken);

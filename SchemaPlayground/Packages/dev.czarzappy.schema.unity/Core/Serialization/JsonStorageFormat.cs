@@ -39,19 +39,19 @@ namespace Schema.Core.Serialization
             };
         }
         
-        public SchemaResult<T> DeserializeFromFile(string filePath)
+        public SchemaResult<T> DeserializeFromFile(SchemaContext context, string filePath)
         {
-            var readRes = fileSystem.ReadAllText(filePath);
+            var readRes = fileSystem.ReadAllText(context, filePath);
             
             if (!readRes.Try(out string jsonData))
             {
                 return readRes.CastError<T>();
             }
 
-            return Deserialize(jsonData);
+            return Deserialize(context, jsonData);
         }
 
-        public SchemaResult<T> Deserialize(string content)
+        public SchemaResult<T> Deserialize(SchemaContext context, string content)
         {
             // TODO: Handle a non-scheme formatted file, converting into scheme format
             try
@@ -65,25 +65,15 @@ namespace Schema.Core.Serialization
             }
         }
 
-        public SchemaResult SerializeToFile(string filePath, T data)
+        public SchemaResult SerializeToFile(SchemaContext context, string filePath, T data)
         {
             if (!Serialize(data).Try(out var jsonData))
             {
-                return Fail("Failed to deserialize JSON", this);
+                return Fail(context, "Failed to deserialize JSON");
             }
             
-            // Extract the directory path from the file path
-            var directoryPath = Path.GetDirectoryName(filePath);
-
-            // Check if the directory exists, and if not, create it
-            var dirExistsRes = fileSystem.DirectoryExists(directoryPath);
-            if (!dirExistsRes.Failed)
-            {
-                fileSystem.CreateDirectory(directoryPath);
-            }
-            
-            fileSystem.WriteAllText(filePath, jsonData);
-            return Pass($"Wrote {data} to file {filePath}", this);
+            fileSystem.WriteAllText(context, filePath, jsonData);
+            return Pass($"Wrote {data} to file {filePath}", context);
         }
 
         public SchemaResult<string> Serialize(T data)

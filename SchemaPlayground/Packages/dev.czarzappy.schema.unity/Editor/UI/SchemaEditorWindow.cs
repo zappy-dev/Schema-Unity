@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
+using System.Text;
 using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.IO;
@@ -13,6 +13,7 @@ using UnityEditor;
 using UnityEngine;
 using Random = System.Random;
 using Schema.Core.Schemes;
+using Schema.Runtime;
 using Schema.Unity.Editor.Ext;
 using static Schema.Core.Logging.Logger;
 using static Schema.Core.Schema;
@@ -26,11 +27,6 @@ namespace Schema.Unity.Editor
     internal partial class SchemaEditorWindow : EditorWindow
     {
         #region Static Fields and Constants
-
-        private static readonly SchemaContext Context = new SchemaContext
-        {
-            Driver = "Editor",
-        };
 
         private const string EDITORPREFS_KEY_SELECTEDSCHEME = "Schema:SelectedSchemeName";
         
@@ -50,6 +46,10 @@ namespace Schema.Unity.Editor
         public SchemaResult<ManifestLoadStatus> LatestManifestLoadResponse { get; set; }
         private List<SchemaResult> responseHistory = new List<SchemaResult>();
         private DateTime latestResponseTime;
+        
+        /// <summary>
+        /// Latest Response from a user-initiated scheme action
+        /// </summary>
         private SchemaResult LatestResponse
         {
             get => responseHistory.LastOrDefault();
@@ -171,7 +171,10 @@ namespace Schema.Unity.Editor
             ManifestImportPath = _defaultManifestLoadPath;
             // }
             // return;
-            LatestResponse = OnLoadManifest("On Editor Startup");
+            LatestResponse = OnLoadManifest(new SchemaContext
+            {
+                Driver = "Editor_Initialization",
+            });
             if (LatestResponse.Passed)
             {
                 // manifest should be loaded at this point
@@ -228,7 +231,10 @@ namespace Schema.Unity.Editor
             {
                 // You can now safely interact with Unity API on the main thread here
                 
-                OnLoadManifest($"On Manifest File Changed ");
+                OnLoadManifest(new SchemaContext
+                {
+                    Driver = "Editor_Detected_Manifest_File_Change",
+                });
                 Repaint();
             };
         }
@@ -259,14 +265,219 @@ namespace Schema.Unity.Editor
             _virtualTableView?.ClearCache();
         }
 
-        private SchemaResult OnLoadManifest(string context)
+        private SchemaResult OnLoadManifest(SchemaContext context)
         {
             LogDbgVerbose($"Loading Manifest", context);
             // TODO: Figure out why progress reporting is making the Unity Editor unhappy
             // using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
-            LatestManifestLoadResponse = LoadManifestFromPath(ManifestImportPath, Context);
-            LatestResponse = CheckIf(LatestManifestLoadResponse.Passed, LatestManifestLoadResponse.Message, LatestManifestLoadResponse.Context);
+            LatestManifestLoadResponse = LoadManifestFromPath(context, ManifestImportPath);
+            LatestResponse = LatestManifestLoadResponse.Cast();
+
+            if (LatestManifestLoadResponse.Passed)
+            {
+                RunManifestMigrationWizard();
+            }
             return LatestResponse;
+        }
+
+        private void RunManifestMigrationWizard()
+        {
+            var context = new SchemaContext
+            {
+                Driver = "Manifest Migration Wizard"
+            };
+            // validate manifest is up-to-date with latest template
+            var templateManifest = ManifestDataSchemeFactory.BuildTemplateManifestSchema(context, SchemaRuntime.DEFAULT_SCRIPTS_PUBLISH_PATH);
+
+            var loadedManifestAttributes = LoadedManifestScheme._.GetAttributes();
+            var templateAttributes = templateManifest._.GetAttributes();
+            // TODO: Should just check if attributes are equal...
+            if (loadedManifestAttributes.SequenceEqual(templateAttributes)) return;
+            
+            // auto-report differences
+            var sb = BuildAttributeDiffReport(LoadedManifestScheme._, templateManifest._);
+            bool shouldUpgrade = EditorUtility.DisplayDialog("Schema - Manifest Out-Of-Data",
+                sb.ToString(), "Upgrade", "Skip");
+            
+            if (!shouldUpgrade) return;
+
+            // TODO: Need to migrate attributes...
+            var loadedAttributesLookup = loadedManifestAttributes.ToDictionary(a => a.AttributeName);
+            var templateAttributesLookup = templateAttributes.ToDictionary(a => a.AttributeName);
+
+            foreach (var kvp in loadedAttributesLookup)
+            {
+                var attributeName = kvp.Key;
+                var loadedAttribute = kvp.Value;
+
+                if (!templateAttributesLookup.TryGetValue(attributeName, out var templateAttribute))
+                {
+                    continue;
+                }
+
+                loadedAttribute.ColumnWidth = templateAttribute.ColumnWidth;
+                loadedAttribute.AttributeToolTip = templateAttribute.AttributeToolTip;
+                loadedAttribute.ShouldPublish = templateAttribute.ShouldPublish;
+                loadedAttribute.IsIdentifier = templateAttribute.IsIdentifier;
+                loadedAttribute.DefaultValue = templateAttribute.CloneDefaultValue();
+                loadedAttribute.DataType = templateAttribute.DataType.Clone() as DataType;
+            }
+            
+            var migrateRes = BulkResult(
+                entries: LoadedManifestScheme.GetEntries(),
+                operation: (entry) =>
+                {
+                    if (entry.SchemeName == Manifest.MANIFEST_SCHEME_NAME)
+                    {
+                        if (templateManifest.GetSelfEntry(context).Try(out var manifestEntry))
+                        {
+                            manifestEntry.CSharpExportPath = entry.CSharpExportPath;
+                            manifestEntry.SchemeName = entry.SchemeName;
+                            manifestEntry.CSharpNamespace = entry.CSharpNamespace;
+                            manifestEntry.FilePath = entry.FilePath;
+                            manifestEntry.PublishTarget = entry.PublishTarget;
+                        }
+                        // skip manifest...
+                        // TODO: What manifest changes could exist in a project's manifest?
+                        // Additional attribute values?
+                        // merge new changes, with 
+                        return Pass();
+                    }
+                    else
+                    {
+                        return templateManifest._.AddEntry(context, entry._);
+                    }
+                },
+                errorMessage: "Failed to migrate existing entries.",
+                context: context);
+
+            if (migrateRes.Failed)
+            {
+                EditorUtility.DisplayDialog("Schema - Manifest Migration Failed", migrateRes.Message, "Ok");
+                return;
+            }
+
+            LatestManifestLoadResponse = LoadManifest(context, templateManifest._);
+            LatestResponse = CheckIf(context, LatestManifestLoadResponse.Passed, LatestManifestLoadResponse.Message);
+        }
+
+        /// <summary>
+        /// Builds a human-readable report of differences between two manifests' attribute sets.
+        /// Reports: added, removed, and modified attributes (per-field deltas).
+        /// </summary>
+        private StringBuilder BuildAttributeDiffReport(DataScheme currentManifest, DataScheme templateManifest)
+        {
+            var currentAttributes = currentManifest.GetAttributes().ToDictionary(a => a.AttributeName);
+            var templateAttributes = templateManifest.GetAttributes().ToDictionary(a => a.AttributeName);
+
+            var sb = new StringBuilder();
+            sb.AppendLine("Your project is using an out-of-date Manifest version. Would you like to upgrade?");
+            sb.AppendLine();
+
+            // Removed (exist in current, not in template)
+            var removed = currentAttributes.Keys.Except(templateAttributes.Keys).OrderBy(k => k).ToList();
+            if (removed.Count > 0)
+            {
+                sb.AppendLine("Removed attributes:");
+                foreach (var name in removed)
+                {
+                    var a = currentAttributes[name];
+                    sb.AppendLine($"\t- {a.AttributeName} ({a.DataType.TypeName})");
+                }
+                sb.AppendLine();
+            }
+
+            // Added (exist in template, not in current)
+            var added = templateAttributes.Keys.Except(currentAttributes.Keys).OrderBy(k => k).ToList();
+            if (added.Count > 0)
+            {
+                sb.AppendLine("Added attributes:");
+                foreach (var name in added)
+                {
+                    var b = templateAttributes[name];
+                    sb.AppendLine($"\t+ {b.AttributeName} ({b.DataType.TypeName})");
+                }
+                sb.AppendLine();
+            }
+
+            // Modified (exist in both by name but differ in fields)
+            var common = currentAttributes.Keys.Intersect(templateAttributes.Keys).OrderBy(k => k);
+            var anyModified = false;
+            foreach (var name in common)
+            {
+                var a = currentAttributes[name];
+                var b = templateAttributes[name];
+
+                if (a.Equals(b))
+                {
+                    continue;
+                }
+
+                anyModified = true;
+                sb.AppendLine($"Modified attribute: {name}");
+
+                if (!a.DataType.Equals(b.DataType))
+                {
+                    // TODO: More in-depth attribute diff report?
+                    sb.AppendLine($"\t{nameof(AttributeDefinition.DataType)}: {a.DataType?.TypeName} -> {b.DataType?.TypeName}");
+                }
+
+                if (a.IsIdentifier != b.IsIdentifier)
+                {
+                    sb.AppendLine($"\t{nameof(AttributeDefinition.IsIdentifier)}: {a.IsIdentifier} -> {b.IsIdentifier}");
+                }
+
+                if (a.ShouldPublish != b.ShouldPublish)
+                {
+                    sb.AppendLine($"\t{nameof(AttributeDefinition.ShouldPublish)}: {a.ShouldPublish} -> {b.ShouldPublish}");
+                }
+
+                // UI fields (informational)
+                if (a.AttributeToolTip != b.AttributeToolTip)
+                {
+                    sb.AppendLine($"\t{nameof(AttributeDefinition.AttributeToolTip)}: '{a.AttributeToolTip}' -> '{b.AttributeToolTip}'");
+                }
+
+                if (a.ColumnWidth != b.ColumnWidth)
+                {
+                    sb.AppendLine($"\t{nameof(AttributeDefinition.ColumnWidth)}: {a.ColumnWidth} -> {b.ColumnWidth}");
+                }
+
+                // Default value comparison (best-effort string rep)
+                var aDefault = a.DefaultValue?.ToString();
+                var bDefault = b.DefaultValue?.ToString();
+                if (!string.Equals(aDefault, bDefault, StringComparison.Ordinal))
+                {
+                    sb.AppendLine($"\t{nameof(AttributeDefinition.DefaultValue)}: '{aDefault}' -> '{bDefault}'");
+                }
+
+                // Reference data type details if applicable
+                if (a.DataType is ReferenceDataType ar && b.DataType is ReferenceDataType br)
+                {
+                    if (ar.ReferenceSchemeName != br.ReferenceSchemeName)
+                    {
+                        sb.AppendLine($"\tReference Scheme: {ar.ReferenceSchemeName} -> {br.ReferenceSchemeName}");
+                    }
+                    if (ar.ReferenceAttributeName != br.ReferenceAttributeName)
+                    {
+                        sb.AppendLine($"\tReference Attribute: {ar.ReferenceAttributeName} -> {br.ReferenceAttributeName}");
+                    }
+                    if (ar.SupportsEmptyReferences != br.SupportsEmptyReferences)
+                    {
+                        sb.AppendLine($"\tAllow Empty Refs: {ar.SupportsEmptyReferences} -> {br.SupportsEmptyReferences}");
+                    }
+                }
+
+                sb.AppendLine();
+            }
+
+            if (!anyModified && removed.Count == 0 && added.Count == 0)
+            {
+                sb.AppendLine("No differences detected.");
+            }
+
+
+            return sb;
         }
         
         private void SetColumnSort(DataScheme scheme, AttributeDefinition attribute, SortOrder sortOrder)
@@ -317,7 +528,7 @@ namespace Schema.Unity.Editor
 
             Random random = new Random();
             var randomIdx = random.Next(entriesCount);
-            return tooltips.GetEntry(randomIdx).Message;
+            return tooltips.GetEntryByIndex(randomIdx).Message;
         }
         
         
@@ -346,11 +557,16 @@ namespace Schema.Unity.Editor
                 if (GUILayout.Button("Create Empty Project"))
                 {
                     // TODO: Handle this better? move to Schema Core?
-                    LatestResponse = SaveManifest();
+                    var ctx = new SchemaContext
+                    {
+                        Driver = "User_Create_New_Project"
+                    };
+                    InitializeTemplateManifestScheme(ctx, SchemaRuntime.DEFAULT_SCRIPTS_PUBLISH_PATH);
+                    LatestResponse = SaveManifest(ctx);
                     LatestManifestLoadResponse = SchemaResult<ManifestLoadStatus>.CheckIf(LatestResponse.Passed, 
                         ManifestLoadStatus.FULLY_LOADED, 
                         LatestResponse.Message,
-                        "Loaded template manifest", Context);
+                        "Loaded template manifest", ctx);
                 }
             }
             
@@ -383,7 +599,10 @@ namespace Schema.Unity.Editor
 
                 if (GUILayout.Button("Load", DoNotExpandWidthOptions))
                 {
-                    OnLoadManifest("On User Load");
+                    OnLoadManifest(new SchemaContext
+                    {
+                        Driver = "User_Load_Manifest"
+                    });
                 }
 
                 if (GUILayout.Button("Open", DoNotExpandWidthOptions))
@@ -394,12 +613,19 @@ namespace Schema.Unity.Editor
                 // save schemes to manifest
                 if (GUILayout.Button("Save All", DoNotExpandWidthOptions))
                 {
-                    LatestResponse = SaveManifest();
+                    LatestResponse = SaveManifest(new SchemaContext
+                    {
+                        Driver = "User_Request_Save_All"
+                    });
                 }
                 
                 if (GUILayout.Button("Publish All", DoNotExpandWidthOptions))
                 {
-                    LatestResponse = PublishAllSchemes();
+                    LatestResponse = PublishAllSchemes(new SchemaContext
+                    {
+                        Driver = "User_Request_Publish_All"
+                    });
+                    EditorUtility.DisplayDialog("Schema", (LatestResponse.Passed) ? "Successfully published all Schemes!" : LatestResponse.Message, "Ok");
                 }
             }
 
@@ -465,7 +691,10 @@ namespace Schema.Unity.Editor
                     {
                         if (AddButton("Create New Schema"))
                         {
-                            CreateNewScheme();
+                            CreateNewScheme(new SchemaContext
+                            {
+                                Driver = "User_Create_New_Schema"
+                            });
                         }
                     }
                 }
@@ -491,7 +720,10 @@ namespace Schema.Unity.Editor
                             {
                                 menu.AddItem(new GUIContent($"{storageFormat.DisplayName}/{soType.Name} - {soType.Assembly.GetName().Name}"), false, () =>
                                 {
-                                    ImportScriptableObjectToDataScheme(soType);
+                                    ImportScriptableObjectToDataScheme(new SchemaContext
+                                    {
+                                        Driver = "User_Import_ScriptableObject"
+                                    }, soType);
                                 });
                             }
                         }
@@ -499,9 +731,13 @@ namespace Schema.Unity.Editor
                         {
                             menu.AddItem(new GUIContent(storageFormat.DisplayName), false, () =>
                             {
-                                if (storageFormat.TryImport(out var importedSchema, out var importFilePath))
+                                var ctx = new SchemaContext
                                 {
-                                    SubmitAddSchemeRequest(importedSchema, importFilePath: importFilePath).FireAndForget();
+                                    Driver = "User_Import_Schema"
+                                };
+                                if (storageFormat.TryImport(ctx, out var importedSchema, out var importFilePath))
+                                {
+                                    SubmitAddSchemeRequest(ctx, importedSchema, importFilePath: importFilePath).FireAndForget();
                                 }
                             });
                         }
@@ -546,25 +782,25 @@ namespace Schema.Unity.Editor
             }
         }
 
-        private SchemaResult CreateNewScheme()
+        private SchemaResult CreateNewScheme(SchemaContext context)
         {
             var newSchema = new DataScheme(newSchemeName);
+            context.Scheme = newSchema;
             
             // Initialize with some starting data
-            var newAttrRes = newSchema.AddAttribute("ID", DataType.Text, defaultValue: string.Empty, isIdentifier: true);
+            var newAttrRes = newSchema.AddAttribute(context, "ID", DataType.Text, defaultValue: string.Empty, isIdentifier: true);
             if (!newAttrRes.Try(out var newIdAttr))
             {
-                return Fail(newAttrRes.Message, newAttrRes.Context);
+                return Fail(context, newAttrRes.Message);
             }
 
-            var addEntryRes = newSchema.AddEntry(new DataEntry
-            {
-                { newIdAttr.AttributeName, string.Empty }
-            });
+            var dataEntry = new DataEntry();
+            dataEntry.Add(newIdAttr.AttributeName, string.Empty, context);
+            var addEntryRes = newSchema.AddEntry(context, dataEntry);
 
             if (addEntryRes.Failed)
             {
-                return Fail(newAttrRes.Message, newAttrRes.Context);
+                return Fail(context, newAttrRes.Message);
             }
                             
             // Create a relative path for the new schema file
@@ -572,10 +808,10 @@ namespace Schema.Unity.Editor
             string relativePath = $"{DefaultContentDirectory}/{fileName}";
             // string relativePath = fileName; // Default to just the filename (relative to Content folder)
                             
-            SubmitAddSchemeRequest(newSchema, importFilePath: relativePath).FireAndForget();
+            SubmitAddSchemeRequest(context, newSchema, importFilePath: relativePath).FireAndForget();
             newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name
 
-            return Pass($"Created new Scheme: {newSchemeName}", Context);
+            return Pass($"Created new Scheme: {newSchemeName}", context);
         }
 
         public static void DrawUILine(Color color, int thickness = 2, int padding = 10)
@@ -594,7 +830,7 @@ namespace Schema.Unity.Editor
         /// Imports a given type of a Scriptable Object as a new or updated Data Scheme
         /// </summary>
         /// <param name="soType">Type of Scriptable Object to Import</param>
-        private void ImportScriptableObjectToDataScheme(Type soType)
+        private SchemaResult ImportScriptableObjectToDataScheme(SchemaContext context, Type soType)
         {
             // Create a data Scheme from a ScriptableObject
             var newSOSchemeName = soType.Name;
@@ -608,11 +844,11 @@ namespace Schema.Unity.Editor
             var dataScheme = new DataScheme(newSOSchemeName);
             
             // Create an attribute for mapping scheme entries to backing assets via asset guids
-            var assetGUIDAttrRes = dataScheme.AddAttribute("Asset", DataType.Guid, isIdentifier: true);
+            var assetGUIDAttrRes = dataScheme.AddAttribute(context, "Asset", DataType.Guid, isIdentifier: true);
             if (!assetGUIDAttrRes.Try(out var assetGuidAttr))
             {
                 LogError(assetGUIDAttrRes.Message, assetGUIDAttrRes.Context);
-                return;
+                return assetGUIDAttrRes.Cast();
             }
             
             var mappedFields = new List<FieldInfo>();
@@ -654,7 +890,7 @@ namespace Schema.Unity.Editor
                             // Create a new data scheme for referenced enum
                             enumScheme = new DataScheme(enumSchemeName);
                             // Create ID attribute to reference
-                            var enumIdAttrRes = enumScheme.AddAttribute("ID", DataType.Text, isIdentifier: true);
+                            var enumIdAttrRes = enumScheme.AddAttribute(context, "ID", DataType.Text, isIdentifier: true);
                             if (!enumIdAttrRes.Try(out enumIdAttr))
                             {
                                 LogError(enumIdAttrRes.Message, enumIdAttrRes.Context);
@@ -666,8 +902,8 @@ namespace Schema.Unity.Editor
                             foreach (var enumValue in enumValues)
                             {
                                 var enumDataEntry = new DataEntry();
-                                enumDataEntry.SetData(enumIdAttr.AttributeName, enumValue.ToString());
-                                var addEntryRes = enumScheme.AddEntry(enumDataEntry);
+                                enumDataEntry.SetData(context, enumIdAttr.AttributeName, enumValue.ToString());
+                                var addEntryRes = enumScheme.AddEntry(context, enumDataEntry);
                                 if (addEntryRes.Failed)
                                 {
                                     LogError(addEntryRes.Message, addEntryRes.Context);
@@ -677,7 +913,7 @@ namespace Schema.Unity.Editor
                                                     
                             // finally save new data scheme
                             string enumSchemeFileName = $"{enumSchemeName}.{Schema.Core.Schema.Storage.DefaultSchemaStorageFormat.Extension}";
-                            SubmitAddSchemeRequest(enumScheme, importFilePath: enumSchemeFileName).FireAndForget();
+                            SubmitAddSchemeRequest(context, enumScheme, importFilePath: enumSchemeFileName).FireAndForget();
                         }
                     }
                     else
@@ -711,7 +947,7 @@ namespace Schema.Unity.Editor
                 else
                 {
                     mappedFields.Add(field);
-                    dataScheme.AddAttribute(field.Name, dataType);
+                    dataScheme.AddAttribute(context, field.Name, dataType);
                 }
             }
                                     
@@ -729,7 +965,7 @@ namespace Schema.Unity.Editor
 
                 var assetPath = AssetDatabase.GetAssetPath(asset);
                 var assetGuid = Guid.Parse(AssetDatabase.AssetPathToGUID(assetPath));
-                var setAssetGuidRes = dataEntry.SetData(assetGuidAttr.AttributeName, assetGuid);
+                var setAssetGuidRes = dataEntry.SetData(context, assetGuidAttr.AttributeName, assetGuid);
 
                 return (asset, dataEntry, setAssetGuidRes);
             }).Where((result) =>
@@ -774,27 +1010,29 @@ namespace Schema.Unity.Editor
                             // TODO: fix this... the reference type itself is a guid...
                             // should this value match the reference's attribute (i.e a guid?)
                             entryValue = otherAsset.dataEntry.GetDataDirect(assetGuidAttr);
-                            LogVerbose($"Setting reference: {entryValue}");
+                            LogDbgVerbose($"Setting reference: {entryValue}");
                         }
                     }
-                    var setDataRes = dataEntry.SetData(field.Name, entryValue);
+                    var setDataRes = dataEntry.SetData(context, field.Name, entryValue);
                     if (setDataRes.Failed)
                     {
                         LogError(setDataRes.Message, setDataRes.Context);
                     }
                 }
 
-                var res = dataScheme.AddEntry(dataEntry, runValidation);
+                var res = dataScheme.AddEntry(context, dataEntry, runValidation);
                 if (res.Failed)
                 {
                     Logger.LogError(res.Message, res.Context);
                     continue;
+                    return res;
                 }
             }
 
             progress.Progress($"Loading final Data Scheme", 0.9f);
             string fileName = $"{newSOSchemeName}.{Schema.Core.Schema.Storage.DefaultSchemaStorageFormat.Extension}";
-            SubmitAddSchemeRequest(dataScheme, importFilePath: fileName).FireAndForget();
+            SubmitAddSchemeRequest(context, dataScheme, importFilePath: fileName).FireAndForget();
+            return Pass("Submitted request to add new scheme");
         }
     }
 }

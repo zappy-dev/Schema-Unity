@@ -9,17 +9,17 @@ namespace Schema.Core.Serialization
         public bool IsImportSupported => true;
         public bool IsExportSupported => false;
     
-        public SchemaResult<DataScheme> DeserializeFromFile(string filePath)
+        public SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath)
         {
             throw new System.NotImplementedException();
         }
 
-        public SchemaResult<DataScheme> Deserialize(string content)
+        public SchemaResult<DataScheme> Deserialize(SchemaContext context, string content)
         {
             throw new System.NotImplementedException();
         }
 
-        public SchemaResult SerializeToFile(string filePath, DataScheme data)
+        public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme data)
         {
             throw new System.NotImplementedException();
         }

@@ -18,26 +18,22 @@ public class Player2DController : MonoBehaviour
 
     private void InitializeConfigs()
     {
-        // Call this methdo
+        // Call this method to initialize Schema
+        Schema.Core.Schema.ManifestUpdated += OnManifestUpdated;
         var loadRes = SchemaRuntime.Initialize();
 
         if (loadRes.Failed)
         {
             Debug.LogError(loadRes.Message);
-            return;
         }
+    }
 
-        if (!EntitiesScheme.Get().Try(out var entities, out var error))
+    private void OnManifestUpdated()
+    {
+        if (!EntitiesScheme.GetEntry(EntitiesScheme.Ids.PLAYER).Try(out var player, 
+                out var playerError))
         {
-            Debug.LogError(error.Message);
-            return;
-        }
-
-        if (!entities.GetEntry(e => e.ID == "Player")
-                .Try(out var player, out var entryError))
-        {
-            Debug.LogError(entryError.Message);
-            return;
+            Debug.LogError(playerError.Message);
         }
 
         Debug.Log($"Using player entry: {player}");

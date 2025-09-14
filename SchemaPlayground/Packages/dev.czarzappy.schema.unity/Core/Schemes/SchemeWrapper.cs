@@ -7,21 +7,44 @@ namespace Schema.Core.Schemes
 {
     public abstract class SchemeWrapper<TEntry> where TEntry : EntryWrapper
     {
-        private protected DataScheme _dataScheme;
-        public DataScheme _ => _dataScheme;
+        private protected readonly DataScheme DataScheme;
+        
+        /// <summary>
+        /// Underlying data scheme
+        /// </summary>
+        public DataScheme _ => DataScheme;
 
         public SchemeWrapper(DataScheme dataScheme)
         {
-            _dataScheme = dataScheme;
+            DataScheme = dataScheme;
         }
         
-        public int EntryCount => _dataScheme.EntryCount;
+        public int EntryCount => DataScheme.EntryCount;
 
         protected abstract TEntry EntryFactory(DataScheme dataScheme, DataEntry dataEntry);
 
-        public TEntry GetEntry(int entryIndex)
+        #region Interface!
+
+        public TEntry GetEntryByIndex(int entryIndex)
         {
-            return EntryFactory(_dataScheme, _dataScheme.GetEntry(entryIndex));
+            return EntryFactory(DataScheme, DataScheme.GetEntry(entryIndex));
+        }
+        
+        public SchemaResult<TEntry> GetEntryById(object entryId)
+        {
+            var idAttrRes = _.GetIdentifierAttribute();
+            if (!idAttrRes.Try(out var idAttr, out var idAttrError))
+            {
+                return idAttrError.CastError<TEntry>();
+            }
+
+            var idEntryRes = _.GetEntry(e => Equals(e.GetData(idAttr.AttributeName), entryId));
+            if (!idEntryRes.Try(out var idEntry, out var idEntryError))
+            {
+                return idEntryError.CastError<TEntry>();
+            }
+
+            return SchemaResult<TEntry>.Pass(EntryFactory(_, idEntry));;
         }
         
         public SchemaResult<TEntry> GetEntry(Func<TEntry, bool> entryFilter)
@@ -32,7 +55,19 @@ namespace Schema.Core.Schemes
 
         public IEnumerable<TEntry> GetEntries()
         {
-            return _dataScheme.GetEntries().Select(e => EntryFactory(_, e));
+            return DataScheme.GetEntries().Select(e => EntryFactory(_, e));
+        }
+        
+        #endregion
+
+        public override bool Equals(object obj)
+        {
+            return DataScheme.Equals((obj as  SchemeWrapper<TEntry>).DataScheme);
+        }
+
+        public override int GetHashCode()
+        {
+            return DataScheme.GetHashCode();
         }
     }
 }

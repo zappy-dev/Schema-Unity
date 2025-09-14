@@ -4,18 +4,21 @@ namespace Schema.Core.Data
 {
     public class GuidDataType : DataType
     {
-        public override SchemaContext Context => new SchemaContext()
-        {
-            DataType = nameof(GuidDataType)
-        };
-        
         public override string TypeName => "Guid";
-        public override SchemaResult CheckIfValidData(object value, SchemaContext context)
+        public override object Clone()
+        {
+            return new GuidDataType
+            {
+                DefaultValue = DefaultValue
+            };
+        }
+
+        public override SchemaResult CheckIfValidData(SchemaContext context, object value)
         {
             return CheckIf(value is Guid, "Value is not a Guid", "Value is a Guid", context);
         }
 
-        public override SchemaResult<object> ConvertData(object value, SchemaContext context)
+        public override SchemaResult<object> ConvertData(SchemaContext context, object value)
         {
             if (value == null)
             {

@@ -1,25 +1,25 @@
 using System.IO;
+using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Serialization;
 using UnityEditor;
 using UnityEngine;
+using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Unity.Editor
 {
     public static class EditorStorageUtility
     {
-        public static void Export(this IStorageFormat<DataScheme> format, DataScheme scheme)
+        public static SchemaResult Export(this IStorageFormat<DataScheme> format, DataScheme scheme, SchemaContext context)
         {
             var extParts = format.Extension.Split('.');
             var lastExt = extParts[extParts.Length - 1];
             var exportFileName = $"{scheme.SchemeName}Scheme.{format.Extension}";
-            Debug.Log($"Export {exportFileName}");
-            Debug.Log($"lastExt {lastExt}");
+            Logger.LogDbgVerbose($"Export {exportFileName}, last ext: {lastExt}");
             
-            
-            if (Core.Schema.GetManifestEntryForScheme(scheme).Try(out var manifestEntry))
+            if (!Core.Schema.GetManifestEntryForScheme(scheme).Try(out var manifestEntry, out var manifestError))
             {
-                // manifestEntry
+                return manifestError.Cast();
             }
             
             // TODO: Set a different target directory preference for csharp code?
@@ -46,18 +46,22 @@ namespace Schema.Unity.Editor
             
             if (string.IsNullOrEmpty(outputFilePath))
             {
-                Debug.LogWarning("Export canceled, no file path provided.");
-                return;
+                return SchemaResult.Fail(context, "Export canceled, no file path provided.");
             }
             
-            format.SerializeToFile(outputFilePath, scheme);
+            var serializeRes = format.SerializeToFile(context, outputFilePath, scheme);
+            if (serializeRes.Failed)
+            {
+                return serializeRes;
+            }
 
             Debug.Log($"Schema \"{scheme.SchemeName}\" exported successfully to {outputFilePath}");
 
             AssetDatabase.Refresh();
+            return SchemaResult.Pass($"Schema '{scheme.SchemeName}' exported to {outputFilePath}");
         }
 
-        public static bool TryImport(this IStorageFormat<DataScheme> format, out DataScheme scheme, out string importFilePath)
+        public static bool TryImport(this IStorageFormat<DataScheme> format, SchemaContext context, out DataScheme scheme, out string importFilePath)
         {
             importFilePath = EditorUtility.OpenFilePanel($"Import from {format.Extension.ToUpper()}", Schema.Core.Schema.DefaultContentDirectory, format.Extension);
 
@@ -69,7 +73,7 @@ namespace Schema.Unity.Editor
             }
             Debug.Log($"Importing scheme from file: {importFilePath}");
 
-            return format.DeserializeFromFile(importFilePath).Try(out scheme);
+            return format.DeserializeFromFile(context, importFilePath).Try(out scheme);
         }
     }
 }

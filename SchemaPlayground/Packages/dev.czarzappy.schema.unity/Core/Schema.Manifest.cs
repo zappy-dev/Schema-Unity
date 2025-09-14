@@ -92,22 +92,19 @@ namespace Schema.Core
         /// <summary>
         /// Gets the manifest's own entry from the manifest scheme, or null if not initialized.
         /// </summary>
-        public static ManifestEntry ManifestSelfEntry
+        public static SchemaResult<ManifestEntry> GetManifestSelfEntry(SchemaContext context)
         {
-            get
+            if (!IsInitialized)
             {
-                if (!IsInitialized)
-                {
-                    return null;
-                }
-
-                if (!GetManifestScheme().Try(out var manifestScheme))
-                {
-                    return null;
-                }
-
-                return manifestScheme.SelfEntry;
+                return SchemaResult<ManifestEntry>.Fail("Schema not initialized.", context);
             }
+
+            if (!GetManifestScheme(context).Try(out var manifestScheme, out var manifestError))
+            {
+                return manifestError.CastError<ManifestEntry>();
+            }
+
+            return manifestScheme.GetSelfEntry(context);
         }
         
         #endregion
@@ -132,12 +129,20 @@ namespace Schema.Core
         /// Initializes the template manifest scheme and loads it into the schema system.
         /// </summary>
         /// <returns>A <see cref="SchemaResult"/> indicating success or failure.</returns>
-        private static SchemaResult InitializeTemplateManifestScheme()
+        public static SchemaResult InitializeTemplateManifestScheme(SchemaContext context, string defaultScriptExportPath)
         {
             lock (manifestOperationLock)
             {
-                var templateManifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema();
-                var result =  LoadDataScheme(templateManifestScheme._, overwriteExisting: true);
+                // build template
+                var templateManifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(context, defaultScriptExportPath);
+                
+                var createRes = Storage.FileSystem.CreateDirectory(context, defaultScriptExportPath);
+                if (createRes.Failed)
+                {
+                    return createRes;
+                }
+                
+                var result = LoadDataScheme(context, templateManifestScheme._, overwriteExisting: true);
                 Logger.LogDbgVerbose(result.Message, result.Context);
                 if (result.Passed)
                 {
@@ -153,9 +158,9 @@ namespace Schema.Core
         /// Gets the manifest scheme if loaded and initialized.
         /// </summary>
         /// <returns>A <see cref="SchemaResult{DataScheme}"/> indicating success or failure, and the manifest scheme if successful.</returns>
-        public static SchemaResult<ManifestScheme> GetManifestScheme()
+        public static SchemaResult<ManifestScheme> GetManifestScheme(SchemaContext context = default)
         {
-            var res = SchemaResult<ManifestScheme>.New(Context.Manifest);
+            var res = SchemaResult<ManifestScheme>.New(context);
             
             if (!IsInitialized)
             {
@@ -191,16 +196,16 @@ namespace Schema.Core
         /// </summary>
         /// <param name="scheme">The data scheme to look up in the manifest.</param>
         /// <returns>A <see cref="SchemaResult{DataEntry}"/> indicating success or failure, and the manifest entry if successful.</returns>
-        public static SchemaResult<ManifestEntry> GetManifestEntryForScheme(DataScheme scheme)
+        public static SchemaResult<ManifestEntry> GetManifestEntryForScheme(DataScheme scheme, SchemaContext context = default)
         {
-            var res = SchemaResult<ManifestEntry>.New(Context.Manifest);
+            var res = SchemaResult<ManifestEntry>.New(context);
             
             if (!IsInitialized || scheme is null)
             {
                 return res.Fail(errorMessage: "Manifest scheme is not initialized");
             }
             
-            return GetManifestEntryForScheme(scheme.SchemeName);
+            return GetManifestEntryForScheme(scheme.SchemeName, context);
         }
         
         /// <summary>
@@ -208,7 +213,7 @@ namespace Schema.Core
         /// </summary>
         /// <param name="schemeName">The name of the scheme to look up in the manifest.</param>
         /// <returns>A <see cref="SchemaResult{DataEntry}"/> indicating success or failure, and the manifest entry if successful.</returns>
-        public static SchemaResult<ManifestEntry> GetManifestEntryForScheme(string schemeName)
+        public static SchemaResult<ManifestEntry> GetManifestEntryForScheme(string schemeName, SchemaContext context = default)
         {
             var res = SchemaResult<ManifestEntry>.New(schemeName);
             
@@ -224,14 +229,10 @@ namespace Schema.Core
 
             lock (manifestOperationLock)
             {
-                if (!GetManifestScheme().Try(out var manifestScheme))
+                if (!GetManifestScheme(context).Try(out var manifestScheme))
                     return res.Fail(errorMessage: "Manifest Scheme not found");
                 
-                bool success = manifestScheme.TryGetEntryForSchemeName(schemeName, out var schemeManifestEntry);
-                    
-                return res.CheckIf(success, schemeManifestEntry, 
-                    errorMessage: "Failed to get manifest entry for scheme", 
-                    successMessage: "Found manifest entry for scheme");
+                return manifestScheme.GetEntryForSchemeName(context, schemeName);
 
             }
         }

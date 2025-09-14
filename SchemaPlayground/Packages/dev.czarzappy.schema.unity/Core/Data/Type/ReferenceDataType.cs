@@ -6,11 +6,6 @@ namespace Schema.Core.Data
     [Serializable]
     public class ReferenceDataType : DataType
     {
-        public override SchemaContext Context => new SchemaContext()
-        {
-            DataType = this.ToString(),
-        };
-        
         public const string TypeNamePrefix = "Reference";
         
         public string ReferenceSchemeName { get; set; }
@@ -43,7 +38,18 @@ namespace Schema.Core.Data
             return $"ReferenceDataType: {ReferenceSchemeName}, Attribute: {ReferenceAttributeName}";
         }
 
-        public override SchemaResult CheckIfValidData(object value, SchemaContext context)
+        public override object Clone()
+        {
+            return new ReferenceDataType
+            {
+                DefaultValue = DefaultValue,
+                ReferenceSchemeName = ReferenceSchemeName,
+                ReferenceAttributeName = ReferenceAttributeName,
+                SupportsEmptyReferences = SupportsEmptyReferences
+            };
+        }
+
+        public override SchemaResult CheckIfValidData(SchemaContext context, object value)
         {
             if (value == null)
             {
@@ -87,10 +93,10 @@ namespace Schema.Core.Data
             var finalizedIdValues = refSchema.GetIdentifierValues()
                 .Select(idValue =>
                 {
-                    var isValidRes = identifier.DataType.CheckIfValidData(idValue, context);
+                    var isValidRes = identifier.DataType.CheckIfValidData(context, idValue);
                     if (isValidRes.Passed) return idValue;
 
-                    var convertRes = identifier.DataType.ConvertData(idValue, context);
+                    var convertRes = identifier.DataType.ConvertData(context, idValue);
                     return convertRes.Result;
                 });
             var matchingIdentifier = finalizedIdValues.FirstOrDefault(v => v.Equals(value));
@@ -101,10 +107,10 @@ namespace Schema.Core.Data
 
             // HACK: Do the conversion for the identifier value here...
 
-            var isValidIdRes = identifier.DataType.CheckIfValidData(matchingIdentifier, context);
+            var isValidIdRes = identifier.DataType.CheckIfValidData(context, matchingIdentifier);
             if (isValidIdRes.Failed)
             {
-                var convertRes = identifier.DataType.ConvertData(matchingIdentifier, context);
+                var convertRes = identifier.DataType.ConvertData(context, matchingIdentifier);
                 if (convertRes.Failed)
                 {
                     // Weird if the referenced identifier cannot convert to the expected type here
@@ -133,7 +139,7 @@ namespace Schema.Core.Data
                 successMessage: "Value exists as an identifier", context);
         }
 
-        public override SchemaResult<object> ConvertData(object value, SchemaContext context)
+        public override SchemaResult<object> ConvertData(SchemaContext context, object value)
         {
             // this is incorrect
             // var data = value as string;
@@ -157,11 +163,11 @@ namespace Schema.Core.Data
                 return Fail<object>("Reference Scheme does not contain Identifier Attribute.", context);
             }
 
-            var isValidRes = identifier.DataType.CheckIfValidData(value, context);
+            var isValidRes = identifier.DataType.CheckIfValidData(context, value);
 
             if (isValidRes.Failed)
             {
-                var convertRes = identifier.DataType.ConvertData(value, context);
+                var convertRes = identifier.DataType.ConvertData(context, value);
 
                 if (convertRes.Failed)
                 {
@@ -173,7 +179,7 @@ namespace Schema.Core.Data
             }
             
             // Then check if that matches an existing identifier
-            var validate = CheckIfValidData(value, context);
+            var validate = CheckIfValidData(context, value);
             
             // If it doesn't, the conversion failed
             return SchemaResult<object>.CheckIf(

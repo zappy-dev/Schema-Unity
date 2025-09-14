@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Schema.Core.Logging;
 
 namespace Schema.Core
@@ -13,6 +14,29 @@ namespace Schema.Core
     public struct SchemaResult
     {
         public static readonly SchemaResult NoOp = new SchemaResult(status: RequestStatus.Passed, "NoOp");
+
+        /// <summary>
+        /// Performs the operation across the given entries under a bulk operation context
+        /// </summary>
+        /// <param name="entries">Entries to operate on.</param>
+        /// <param name="operation">Operation to perform on entries.</param>
+        /// <param name="context">Operation context</param>
+        /// <typeparam name="T">Type of entry</typeparam>
+        /// <returns>Aggregate result of the bulk operation</returns>
+        public static SchemaResult BulkResult<T>(IEnumerable<T> entries, 
+            Func<T, SchemaResult> operation, 
+            string errorMessage = "Failed Bulk Operation",
+            SchemaContext context = default)
+        {
+            bool success = true;
+            foreach (var entry in entries)
+            {
+                var res = operation(entry);
+                success &= res.Passed;
+            }
+
+            return CheckIf(context, success, errorMessage);
+        }
         
         private RequestStatus status;
         public RequestStatus Status => status;
@@ -32,20 +56,13 @@ namespace Schema.Core
 
             // TODO: Maybe create a preference for whether schema results automatically create a log?
             // TODO: Handle logging when creating an empty result
-#if SCHEMA_DEBUG
-             string logMsg = $"[Context={context}] {message}";
+// #if SCHEMA_DEBUG
              if (status == RequestStatus.Failed)
              {
-                 Logger.LogDbgError(logMsg);
+                 string logMsg = $"[Context={context}] {message}";
+                 Logger.LogError(logMsg);
              }
-//             else
-//             {
-//                 if (Logger.Level <= Logger.LogLevel.VERBOSE)
-//                 {
-//                     Logger.LogDbgError(logMsg);
-//                 }
-//             }
-#endif
+// #endif
         }
         
         public override string ToString()
@@ -53,15 +70,16 @@ namespace Schema.Core
             return $"SchemaResponse[status={status}, message={message}]";
         }
     
-        public static SchemaResult Fail(string errorMessage, object context = null) => 
-            new SchemaResult(status: RequestStatus.Failed, message: errorMessage, context: context?.ToString());
+        public static SchemaResult Fail(SchemaContext context, string errorMessage) => 
+            new SchemaResult(status: RequestStatus.Failed, message: errorMessage, context: context);
 
-        public static SchemaResult Pass(string successMessage = "", object context = null) =>
-            new SchemaResult(status: RequestStatus.Passed, message: successMessage, context: context?.ToString());
+        public static SchemaResult Pass(string successMessage = "", SchemaContext context = default) =>
+            new SchemaResult(status: RequestStatus.Passed, message: successMessage, context: context);
 
-        public static SchemaResult CheckIf(bool conditional, string errorMessage, object context = null, string successMessage = null)
+        public static SchemaResult CheckIf(SchemaContext context, bool conditional, string errorMessage,
+            string successMessage = "")
         {
-            return !conditional ? Fail(errorMessage, context: context) : Pass(successMessage: successMessage, context: context);
+            return !conditional ? Fail(context: context, errorMessage: errorMessage) : Pass(successMessage: successMessage, context: context);
         }
     }
 
@@ -99,13 +117,13 @@ namespace Schema.Core
 
             // TODO: Maybe create a preference for whether schema results automatically create a log?
             // TODO: Handle logging when creating an empty result
-#if SCHEMA_DEBUG
-             string logMsg = $"[Context={context}] {message}";
+// #if SCHEMA_DEBUG
              if (status == RequestStatus.Failed)
              {
-                 Logger.LogDbgError(logMsg);
+                 string logMsg = $"[Context={context}] {message}";
+                 Logger.LogError(logMsg);
              }
-#endif
+// #endif
         }
         
         public override string ToString()

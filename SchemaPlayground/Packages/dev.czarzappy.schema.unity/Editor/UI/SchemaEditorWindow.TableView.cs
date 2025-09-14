@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Schema.Core;
 using Schema.Core.Commands;
 using Schema.Core.Data;
 using Schema.Core.DataStructures;
@@ -218,12 +219,20 @@ namespace Schema.Unity.Editor
 
                     if (GUILayout.Button(saveButtonText, ExpandWidthOptions))
                     {
-                        LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
+                        LatestResponse = SaveDataScheme(new SchemaContext
+                        {
+                            Scheme = scheme,
+                            Driver = "User_Save_Scheme",
+                        }, scheme, alsoSaveManifest: false);
                     }
 
                     if (GUILayout.Button("Publish", ExpandWidthOptions))
                     {
-                        PublishScheme(selectedSchemeName);
+                        PublishScheme(new SchemaContext
+                        {
+                            Scheme = scheme,
+                            Driver = "User_Request_Publish_Scheme",
+                        }, selectedSchemeName);
                     }
 
                     // TODO: Open raw schema files
@@ -255,7 +264,11 @@ namespace Schema.Unity.Editor
                             menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), false,
                                 () =>
                                 {
-                                    storageFormat.Export(scheme);
+                                    LatestResponse = storageFormat.Export(scheme, new SchemaContext
+                                    {
+                                        Scheme = scheme,
+                                        Driver = "User_Export_Scheme",
+                                    });
                                 });
                         }
 
@@ -348,7 +361,11 @@ namespace Schema.Unity.Editor
                     if (AddButton("Create New Entry", expandWidth: true, height: 50f))
                     {
                         // TODO: Convert to command
-                        scheme.CreateNewEmptyEntry();
+                        scheme.CreateNewEmptyEntry(new SchemaContext
+                        {
+                            Scheme = scheme,
+                            Driver = "User_Create_Entry",
+                        });
                         LogDbgVerbose($"Added entry to '{scheme.SchemeName}'.");
                         OnSelectedSchemeChanged?.Invoke();
                     }
@@ -511,7 +528,13 @@ namespace Schema.Unity.Editor
                             if (AddButton("Add Attribute"))
                             {
                                 LogDbgVerbose($"Added new attribute to '{scheme.SchemeName}'.`");
-                                LatestResponse = scheme.AddAttribute(new AttributeDefinition
+                                var ctx = new SchemaContext
+                                {
+                                    Driver = "User_Add_Attribute",
+                                    Scheme = scheme,
+                                    AttributeName = newAttributeName
+                                };
+                                LatestResponse = scheme.AddAttribute(ctx, new AttributeDefinition
                                 {
                                     AttributeName = newAttributeName,
                                     DataType = DataType.Text,
@@ -519,10 +542,6 @@ namespace Schema.Unity.Editor
                                     IsIdentifier = false,
                                     ColumnWidth = AttributeDefinition.DefaultColumnWidth,
                                 });
-                                if (LatestResponse.Passed)
-                                {
-                                    LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
-                                }
 
                                 newAttributeName =
                                     string.Empty; // clear out attribute name field since it's unlikely someone wants to make another attribute with the same name
@@ -608,28 +627,29 @@ namespace Schema.Unity.Editor
             bool canMoveDown = sortOrder.HasValue && entryIdx != entryCount - 1;
             
             // TODO: Convert to command
+            var ctx = new SchemaContext
+            {
+                Driver = "User_Move_Entry",
+                Scheme = scheme,
+            };
             rowOptionsMenu.AddItem(new GUIContent("Move To Top"), isDisabled: canMoveUp, () =>
             {
-                scheme.MoveEntry(entry, 0);
-                SaveDataScheme(scheme, alsoSaveManifest: false);
+                scheme.MoveEntry(ctx, entry, 0);
                 OnSelectedSchemeChanged?.Invoke();
             });
             rowOptionsMenu.AddItem(new GUIContent("Move Up"), isDisabled: canMoveUp, () =>
             {
-                scheme.MoveUpEntry(entry);
-                SaveDataScheme(scheme, alsoSaveManifest: false);
+                scheme.MoveUpEntry(ctx, entry);
                 OnSelectedSchemeChanged?.Invoke();
             });
             rowOptionsMenu.AddItem(new GUIContent("Move Down"), isDisabled: canMoveDown, () =>
             {
-                scheme.MoveDownEntry(entry);
-                SaveDataScheme(scheme, alsoSaveManifest: false);
+                scheme.MoveDownEntry(ctx, entry);
                 OnSelectedSchemeChanged?.Invoke();
             });
             rowOptionsMenu.AddItem(new GUIContent("Move To Bottom"), isDisabled: canMoveDown, () =>
             {
-                scheme.MoveEntry(entry, entryCount - 1);
-                SaveDataScheme(scheme, alsoSaveManifest: false);
+                scheme.MoveEntry(ctx, entry, entryCount - 1);
                 OnSelectedSchemeChanged?.Invoke();
             });
             rowOptionsMenu.AddSeparator("");
@@ -637,10 +657,15 @@ namespace Schema.Unity.Editor
             {
                 if (EditorUtility.DisplayDialog("Schema", "Are you sure you want to delete this entry?", "Yes, delete this entry", "No, cancel"))
                 {
+                    var ctx = new SchemaContext
+                    {
+                        Driver = "User_Delete_Entry",
+                        Scheme = scheme,
+                    };
                     SubmitCommandRequest(new CommandRequest
                     {
                         Description = $"Delete entry ({entryIdx}) from Scheme {scheme.SchemeName}",
-                        Command = new DeleteEntryCommand(scheme, entry),
+                        Command = new DeleteEntryCommand(ctx, scheme, entry),
                         OnRequestComplete = result =>
                         {
                             // if (result.IsSuccess)
@@ -661,16 +686,19 @@ namespace Schema.Unity.Editor
         {
             var columnOptionsMenu = new GenericMenu();
 
+            var ctx = new SchemaContext
+            {
+                Driver = "User_Attribute_Move",
+                Scheme = scheme,
+            };
             // attribute column ordering options
             columnOptionsMenu.AddItem(new GUIContent("Move Left"), isDisabled: attributeIdx == 0, () =>
             {
-                scheme.IncreaseAttributeRank(attribute);
-                SaveDataScheme(scheme, alsoSaveManifest: false);
+                scheme.IncreaseAttributeRank(ctx, attribute);
             });
             columnOptionsMenu.AddItem(new GUIContent("Move Right"), isDisabled: attributeIdx == attributeCount - 1, () =>
             {
-                scheme.DecreaseAttributeRank(attribute);
-                SaveDataScheme(scheme, alsoSaveManifest: false);
+                scheme.DecreaseAttributeRank(ctx, attribute);
             });
                             
             // Sorting options
@@ -715,13 +743,15 @@ namespace Schema.Unity.Editor
                     isMatchingType,
                     () =>
                     {
-                        LatestResponse =
-                            scheme.ConvertAttributeType(attributeName: attribute.AttributeName,
-                                newType: builtInType);
-                        if (LatestResponse.Passed) 
+                        var ctx = new SchemaContext
                         {
-                            LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
-                        }
+                            Driver = "User_Convert_Attribute_Type",
+                            Scheme = scheme,
+                            AttributeName = attribute.AttributeName
+                        };
+                        LatestResponse =
+                            scheme.ConvertAttributeType(ctx, attributeName: attribute.AttributeName,
+                                newType: builtInType);
                     });
             }
                             
@@ -737,13 +767,15 @@ namespace Schema.Unity.Editor
                         on: isMatchingType, 
                         () =>
                         {
-                            LatestResponse =
-                                scheme.ConvertAttributeType(attributeName: attribute.AttributeName,
-                                    newType: referenceDataType);
-                            if (LatestResponse.Passed) 
+                            var ctx = new SchemaContext
                             {
-                                LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
-                            }
+                                Driver = "User_Convert_Attribute",
+                                AttributeName = attribute.AttributeName,
+                                Scheme = scheme,
+                            };
+                            LatestResponse =
+                                scheme.ConvertAttributeType(ctx, attributeName: attribute.AttributeName,
+                                    newType: referenceDataType);
                         });
                 }
             }
@@ -754,11 +786,12 @@ namespace Schema.Unity.Editor
             {
                 if (EditorUtility.DisplayDialog("Schema", $"Are you sure you want to delete this attribute: {attribute.AttributeName}?", "Yes, delete this attribute", "No, cancel"))
                 {
-                    LatestResponse = scheme.DeleteAttribute(attribute);
-                    if (LatestResponse.Passed)
+                    LatestResponse = scheme.DeleteAttribute(new SchemaContext
                     {
-                        LatestResponse = SaveDataScheme(scheme, alsoSaveManifest: false);
-                    }
+                        Driver = "User_Delete_Attribute",
+                        AttributeName = attribute.AttributeName,
+                        Scheme = scheme,
+                    }, attribute);
                 }
             });
 
@@ -806,17 +839,22 @@ namespace Schema.Unity.Editor
             {
                 tableCellControlIds[localEntryIdx * scheme.AttributeCount + attributeIdx] = GUIUtility.GetControlID(FocusType.Passive);
             }
-            
+
+            var ctx = new SchemaContext
+            {
+                Driver = "User_Update_Entry_Value",
+                Scheme = scheme,
+            };
             // Render based on data type
             switch (attribute.DataType)
             {
                 case IntegerDataType _:
                     RenderIntegerCell(cellRect, Convert.ToInt32(entryValue), cellStyle, value => 
-                        UpdateEntryValue(entry, attribute, value, scheme));
+                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
                     break;
                 case FloatingPointDataType _:
                     RenderFloatCell(cellRect, Convert.ToSingle(entryValue), cellStyle, value => 
-                        UpdateEntryValue(entry, attribute, value, scheme));
+                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
                     break;
                 case BooleanDataType _:
                     bool boolValue = false;
@@ -827,31 +865,31 @@ namespace Schema.Unity.Editor
                     else if (entryValue is int i)
                         boolValue = i != 0;
                     RenderBooleanCell(cellRect, boolValue, cellStyle, value => 
-                        UpdateEntryValue(entry, attribute, value, scheme));
+                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
                     break;
                 case FilePathDataType _:
                     RenderFilePathCell(cellRect, entryValue.ToString(), cellStyle, value => 
-                        UpdateEntryValue(entry, attribute, value, scheme));
+                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
                     break;
                 case FolderDataType _:
                     RenderFolderCell(cellRect, entryValue.ToString(), cellStyle, value => 
-                        UpdateEntryValue(entry, attribute, value, scheme));
+                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
                     break;
                 case ReferenceDataType refDataType:
                     RenderReferenceCell(cellRect, entryValue, refDataType, cellStyle, value => 
-                        UpdateEntryValue(entry, attribute, value, scheme));
+                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
                     break;
                 case DateTimeDataType _:
                     RenderDateTimeCell(cellRect, entryValue is DateTime dt ? dt : DateTime.Now, cellStyle, value => 
-                        UpdateEntryValue(entry, attribute, value, scheme));
+                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
                     break;
                 case TextDataType _:
                     RenderTextFieldCell(cellRect, entryValue, cellStyle, value => 
-                        UpdateEntryValue(entry, attribute, value, scheme));
+                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
                     break;
                 case GuidDataType _:
                     RenderGuidCell(cellRect, entryValue is Guid ? (Guid)entryValue : default, cellStyle,
-                        value => UpdateEntryValue(entry, attribute, value, scheme));
+                        value => UpdateEntryValue(ctx, entry, attribute, value, scheme));
                     break;
                 default:
                     RenderUnmappedFieldCell(cellRect, entryValue, cellStyle);
@@ -941,7 +979,7 @@ namespace Schema.Unity.Editor
         /// </summary>
         private void RenderFilePathCell(Rect cellRect, string filePath, CellStyle cellStyle, Action<string> onValueChanged)
         {
-            var filePreview = Path.GetFileName(filePath);
+            var filePreview = filePath;
             var previewPath = string.Empty;
             if (string.IsNullOrEmpty(filePreview))
             {
@@ -949,7 +987,7 @@ namespace Schema.Unity.Editor
             }
             else
             {
-                previewPath = Path.GetDirectoryName(filePath);
+                previewPath = filePath;
             }
             
             var fileContent = new GUIContent(filePreview, tooltip: filePath);
@@ -968,20 +1006,21 @@ namespace Schema.Unity.Editor
         /// </summary>
         private void RenderFolderCell(Rect cellRect, string folderPath, CellStyle cellStyle, Action<string> onValueChanged)
         {
-            string folderPreview = folderPath;
+            string folderPreview = PathUtility.SanitizePath(folderPath);
+            var previewPath = string.Empty;
             if (string.IsNullOrEmpty(folderPreview))
             {
                 folderPreview = "...";
             }
             else
             {
-                folderPreview = Path.GetFileName(folderPreview);
+                previewPath = folderPreview;
             }
             
             var folderContent = new GUIContent(folderPreview, tooltip: folderPath);
             if (GUI.Button(cellRect, folderContent, cellStyle.ButtonStyle))
             {
-                var selectedFolder = EditorUtility.OpenFolderPanel("Schema - Folder Selection", folderPreview, "");
+                var selectedFolder = EditorUtility.OpenFolderPanel("Schema - Folder Selection", previewPath, "");
                 if (!string.IsNullOrEmpty(selectedFolder))
                 {
                     onValueChanged?.Invoke(selectedFolder);
@@ -1050,7 +1089,7 @@ namespace Schema.Unity.Editor
         /// <summary>
         /// Updates an entry value and triggers the appropriate async operations
         /// </summary>
-        private void UpdateEntryValue(DataEntry entry, AttributeDefinition attribute, object newValue, DataScheme scheme)
+        private void UpdateEntryValue(SchemaContext context, DataEntry entry, AttributeDefinition attribute, object newValue, DataScheme scheme)
         {
             var attributeName = attribute.AttributeName;
             
@@ -1075,7 +1114,7 @@ namespace Schema.Unity.Editor
 
                 var oldValue = entry.GetData(attributeName);
                 Logger.LogDbgVerbose($"{scheme}, {entry}, old Value: {oldValue} for attribute: {attributeName}");
-                var idRes = UpdateIdentifierValue(scheme.SchemeName, attributeName, oldValue, newValue);
+                var idRes = UpdateIdentifierValue(context, scheme.SchemeName, attributeName, oldValue, newValue);
                 if (idRes.Failed)
                 {
                     Logger.LogDbgError(idRes.Message, idRes.Context);
@@ -1083,7 +1122,7 @@ namespace Schema.Unity.Editor
             }
             else
             {
-                _ = ExecuteSetDataOnEntryAsync(scheme, entry, attributeName, newValue);
+                _ = ExecuteSetDataOnEntryAsync(context, scheme, entry, attributeName, newValue);
             }
         }
         
@@ -1127,28 +1166,33 @@ namespace Schema.Unity.Editor
         private object GetEntryValue(DataScheme scheme, DataEntry entry, AttributeDefinition attribute)
         {
             object entryValue = entry.GetDataDirect(attribute);
-            
+
+            var ctx = new SchemaContext
+            {
+                Driver = "Auto_Migrate_Entry",
+                Scheme = scheme
+            };
             if (entryValue == null)
             {
                 var defaultValue = attribute.CloneDefaultValue();
                 if (defaultValue != null)
                 {
-                    entry.SetData(attribute.AttributeName, entryValue);
+                    entry.SetData(ctx, attribute.AttributeName, entryValue);
                 }
             }
-            else if (attribute.CheckIfValidData(entryValue).Failed)
+            else if (attribute.CheckIfValidData(ctx, entryValue).Failed)
             {
                 using (_dataConvertMarker.Auto())
                 {
-                    if (DataType.ConvertData(entryValue, DataType.Default, attribute.DataType, attribute.Context).Try(out var convertedValue))
+                    if (DataType.ConvertData(ctx, entryValue, DataType.Default, attribute.DataType).Try(out var convertedValue))
                     {
                         entryValue = convertedValue;
-                        entry.SetData(attribute.AttributeName, entryValue);
+                        entry.SetData(ctx, attribute.AttributeName, entryValue);
                     }
                     else
                     {
                         entryValue = attribute.CloneDefaultValue();
-                        entry.SetData(attribute.AttributeName, entryValue);
+                        entry.SetData(ctx, attribute.AttributeName, entryValue);
                     }
                 }
             }

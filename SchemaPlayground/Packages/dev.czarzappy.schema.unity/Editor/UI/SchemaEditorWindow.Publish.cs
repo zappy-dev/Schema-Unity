@@ -13,14 +13,14 @@ namespace Schema.Unity.Editor
 {
     internal partial class SchemaEditorWindow
     {
-        private SchemaResult PublishScheme(string schemeName)
+        private SchemaResult PublishScheme(SchemaContext context, string schemeName)
         {
             LogDbgVerbose($"Publishing {schemeName}");
             var schemeEntry = GetManifestEntryForScheme(schemeName);
             if (!schemeEntry.Try(out ManifestEntry manifestEntry) ||
                 !GetScheme(schemeName).Try(out var schemeToPublish))
             {
-                return Fail($"Could not find manifest entry for scheme to publish, scheme: {schemeName}");
+                return Fail(context, $"Could not find manifest entry for scheme to publish, scheme: {schemeName}");
             }
 
             // TODO: Figure out how to better enumerate this, enforce Manifest scheme attribute is valid
@@ -32,7 +32,7 @@ namespace Schema.Unity.Editor
 
             if (!hasValidPublishTarget)
             {
-                return Fail($"Invalid publish target for scheme to publish, scheme: {schemeName}, found target: {manifestEntry.PublishTarget}, " +
+                return Fail(context, $"Invalid publish target for scheme to publish, scheme: {schemeName}, found target: {manifestEntry.PublishTarget}, " +
                             $"expected a valid type from {nameof(ManifestScheme.PublishTarget)}.");
             }
             
@@ -45,26 +45,30 @@ namespace Schema.Unity.Editor
                     // HACK: Assumes ID column is the asset guid for an underlying scriptable object to publish to
                     if (!schemeToPublish.GetIdentifierAttribute().Try(out var idAttr))
                     {
-                        return Fail("No identifier attribute found for scheme to publish", schemeToPublish.Context);
+                        return Fail(context, "No identifier attribute found for scheme to publish");
                     }
                     
                     foreach (var entry in schemeToPublish.AllEntries)
                     {
-                        var publishRes = PublishEntryToScriptableObject(schemeToPublish, entry, idAttr);
+                        var publishRes = PublishEntryToScriptableObject(context, schemeToPublish, entry, idAttr);
                         isSuccess &= publishRes.Passed;
                     }
                     break;
                 }
                 case ManifestScheme.PublishTarget.RESOURCES:
                 {
-                    var publishRes = PublishToResources(schemeToPublish);
+                    var publishRes = PublishToResources(schemeToPublish, context);
                     isSuccess = publishRes.Passed;
                 } 
                     break;
             }
             
             // Publish code
-            Storage.CSharpStorageFormat.Export(schemeToPublish);
+            var exportRes = Storage.CSharpStorageFormat.Export(schemeToPublish, context);
+            if (exportRes.Failed)
+            {
+                return exportRes;
+            }
             
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -76,12 +80,42 @@ namespace Schema.Unity.Editor
         /// </summary>
         /// <param name="schemeToPublish"></param>
         /// <returns></returns>
-        private SchemaResult PublishToResources(DataScheme schemeToPublish)
+        private SchemaResult PublishToResources(DataScheme originalSchemeToPublish, SchemaContext context)
         {
             var storageFormat = Storage.DefaultSchemaPublishFormat;
-            string schemaPublishPath = $"{SchemaRuntime.DEFAULT_RESOURCE_PUBLISH_PATH}/{schemeToPublish.SchemeName}.{storageFormat.Extension}";
+            string schemaPublishPath = $"{SchemaRuntime.DEFAULT_RESOURCE_PUBLISH_PATH}/{originalSchemeToPublish.SchemeName}.{storageFormat.Extension}";
 
-            var publishRes = storageFormat.SerializeToFile(schemaPublishPath, schemeToPublish);
+            // prepare a new data scheme to publish
+            var publishScheme = new DataScheme(originalSchemeToPublish.SchemeName);
+
+            // first clone published attributes
+            var publishedAttributes = originalSchemeToPublish.GetAttributes(a => a.ShouldPublish).ToList();
+            foreach (var publishedAttr in publishedAttributes)
+            {
+                publishScheme.AddAttribute(context, publishedAttr.Clone() as AttributeDefinition);
+            }
+            
+            // second clone data entries, stripped for only published entries
+            foreach (var entry in originalSchemeToPublish.GetEntries())
+            {
+                var publishedEntry = new DataEntry();
+
+                var copyRes = BulkResult(
+                    entries: publishedAttributes,
+                    operation: (publishedAttr) =>
+                        publishedEntry.SetData(context, publishedAttr.AttributeName, entry.GetDataDirect(publishedAttr)),
+                    errorMessage: $"Failed to publish entry: {entry}",
+                    context: context);
+
+                if (copyRes.Failed)
+                {
+                    return copyRes;
+                }
+
+                publishScheme.AddEntry(context, publishedEntry);
+            }
+            
+            var publishRes = storageFormat.SerializeToFile(context, schemaPublishPath, publishScheme);
 
             return publishRes;
         }
@@ -93,13 +127,13 @@ namespace Schema.Unity.Editor
         /// <param name="entry"></param>
         /// <param name="idAttr"></param>
         /// <returns></returns>
-        private SchemaResult PublishEntryToScriptableObject(DataScheme schemeToPublish, DataEntry entry, AttributeDefinition idAttr)
+        private SchemaResult PublishEntryToScriptableObject(SchemaContext context, DataScheme schemeToPublish, DataEntry entry, AttributeDefinition idAttr)
         {
             var assetGuid = entry.GetDataAsGuid(idAttr.AttributeName);
 
             if (!AssetUtils.TryLoadAssetFromGUID(assetGuid, out var currentAsset))
             {
-                return Fail($"Not asset found with guid: {assetGuid}");
+                return Fail(context,$"Not asset found with guid: {assetGuid}");
             }
                         
             var assetType = currentAsset.GetType();
@@ -138,8 +172,8 @@ namespace Schema.Unity.Editor
                             // HACK: I know in this case the one reference data type we have is an asset guid reference, just resolve that reference
                             case ReferenceDataType refDataType:
 
-                                if (!schemeToPublish.TryGetEntry(searchEntry =>
-                                        searchEntry.GetData(refDataType.ReferenceAttributeName) == value, out var refEntry))
+                                if (!schemeToPublish.GetEntry(searchEntry => searchEntry.GetData(refDataType.ReferenceAttributeName) == value)
+                                        .Try(out var refEntry))
                                 {
                                     LogDbgError($"Failed to find referenced entry for value: {value} ({value?.GetType()})");
                                     continue;
@@ -171,17 +205,33 @@ namespace Schema.Unity.Editor
             return Pass($"Saving changes to asset: {currentAsset}");
         }
 
-        private SchemaResult PublishAllSchemes()
+        private SchemaResult PublishAllSchemes(SchemaContext context)
         {
+            using var progressScope = new ProgressScope("Schema - Publish All");
             // TODO: need a way of generating an aggregate schema result
             bool success = true;
-            foreach (var allScheme in AllSchemes)
-            {
-                var result = PublishScheme(allScheme);
-                success &= result.Passed;
-            }
-            
-            return CheckIf(success, "Failed to publish all schemes. Check console logs for more details.");
+            int progress = 1;
+            int total = AllSchemes.Count();
+
+            return BulkResult(
+                entries: AllSchemes,
+                operation: (schemeName) =>
+                {
+                    progressScope.Progress($"Publishing Scheme '{schemeName}' ({progress} / {total})",
+                        progress * 1.0f / total);
+                    progress++;
+                    return PublishScheme(context, schemeName);
+                },
+                errorMessage: "Failed to publish all schemes. Check console logs for more details.");
+            // foreach (var schemeName in AllSchemes)
+            // {
+            //     progressScope.Progress($"Publishing Scheme '{schemeName}' ({progress} / {total})", progress * 1.0f / total);
+            //     progress++;
+            //     var result = PublishScheme(schemeName, context);
+            //     success &= result.Passed;
+            // }
+            //
+            // return CheckIf(success, "Failed to publish all schemes. Check console logs for more details.");
         }
     }
 }

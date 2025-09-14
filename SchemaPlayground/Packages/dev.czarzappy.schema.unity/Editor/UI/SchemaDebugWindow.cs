@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Schema.Core;
 using UnityEditor;
 using UnityEngine;
 using static Schema.Core.Logging.Logger;
@@ -118,6 +119,10 @@ namespace Schema.Unity.Editor
 
             if (GUILayout.Button("Fix Duplicate Entries"))
             {
+                var ctx = new SchemaContext
+                {
+                    Driver = "Debug_User_Fix_Duplicate_Entries"
+                };
                 foreach (var schemeName in AllSchemes)
                 {
                     if (!GetScheme(schemeName).Try(out var scheme))
@@ -141,7 +146,7 @@ namespace Schema.Unity.Editor
 
                         if (identifierIdx != -1 && foundEntry[identifierIdx])
                         {
-                            scheme.DeleteEntry(entry);
+                            scheme.DeleteEntry(ctx, entry);
                             numDeleted++;
                         }
                         else
@@ -153,7 +158,7 @@ namespace Schema.Unity.Editor
                     if (numDeleted > 0)
                     {
                         LogWarning($"Scheme '{schemeName}' has deleted {numDeleted} entries.");
-                        SaveDataScheme(scheme, false);
+                        SaveDataScheme(ctx, scheme, false);
                     }
                 }
             }

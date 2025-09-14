@@ -15,35 +15,40 @@ namespace Schema.Unity.Editor
         {
             // Create a test scheme with multiple data types
             var testScheme = new DataScheme($"VirtualScrollingTest_{entryCount}");
+            var ctx = new SchemaContext
+            {
+                Scheme = testScheme,
+                Driver = "Generate_Test_Scheme",
+            };
             
             // Add various attribute types
             var idAttribute = new AttributeDefinition(testScheme, "ID", DataType.Integer);
-            testScheme.AddAttribute(idAttribute);
-            testScheme.AddAttribute("Name", DataType.Text);
-            testScheme.AddAttribute("Description", DataType.Text);
-            testScheme.AddAttribute("IsActive", new BooleanDataType());
-            testScheme.AddAttribute("CreatedDate", new DateTimeDataType());
-            testScheme.AddAttribute("Value", DataType.Integer);
+            testScheme.AddAttribute(ctx, idAttribute);
+            testScheme.AddAttribute(ctx, "Name", DataType.Text);
+            testScheme.AddAttribute(ctx, "Description", DataType.Text);
+            testScheme.AddAttribute(ctx, "IsActive", new BooleanDataType());
+            testScheme.AddAttribute(ctx, "CreatedDate", new DateTimeDataType());
+            testScheme.AddAttribute(ctx, "Value", DataType.Integer);
             
             // Generate test entries
             for (int i = 0; i < entryCount; i++)
             {
-                var entry = testScheme.CreateNewEmptyEntry();
-                testScheme.SetDataOnEntry(entry, "ID", i + 1);
-                testScheme.SetDataOnEntry(entry,"Name", $"Test Entry {i + 1:D4}");
-                testScheme.SetDataOnEntry(entry,"Description", $"This is a test description for entry {i + 1}. It contains some text to make it longer and more realistic.");
-                testScheme.SetDataOnEntry(entry,"IsActive", i % 3 == 0); // Every third entry is active
-                testScheme.SetDataOnEntry(entry,"CreatedDate", System.DateTime.Now.AddDays(-i));
-                testScheme.SetDataOnEntry(entry,"Value", Random.Range(1, 1000));
+                var entry = testScheme.CreateNewEmptyEntry(ctx);
+                testScheme.SetDataOnEntry(entry, "ID", i + 1, context: ctx);
+                testScheme.SetDataOnEntry(entry, "Name", $"Test Entry {i + 1:D4}", context: ctx);
+                testScheme.SetDataOnEntry(entry, "Description", $"This is a test description for entry {i + 1}. It contains some text to make it longer and more realistic.", context: ctx);
+                testScheme.SetDataOnEntry(entry, "IsActive", i % 3 == 0, context: ctx); // Every third entry is active
+                testScheme.SetDataOnEntry(entry, "CreatedDate", System.DateTime.Now.AddDays(-i), context: ctx);
+                testScheme.SetDataOnEntry(entry, "Value", Random.Range(1, 1000), context: ctx);
             }
             // HACK - setting idAttribute to an identifier after creating entries
             idAttribute.IsIdentifier = true;
             
             // Save the scheme
             var targetFilePath = $"{testScheme.SchemeName}.json";
-            LoadDataScheme(testScheme, overwriteExisting: true, registerManifestEntry: true, importFilePath: targetFilePath);
+            LoadDataScheme(ctx, testScheme, overwriteExisting: true, registerManifestEntry: true, importFilePath: targetFilePath);
             
-            var result = SaveDataScheme(testScheme, alsoSaveManifest: false);
+            var result = SaveDataScheme(ctx, testScheme, alsoSaveManifest: false);
             
             if (result.Passed)
             {
@@ -53,27 +58,6 @@ namespace Schema.Unity.Editor
             else
             {
                 Debug.LogError($"Failed to generate test data: {result.Message}");
-            }
-        }
-        
-        [MenuItem("Tools/Schema/Clear Test Data")]
-        public static void ClearTestData()
-        {
-            if (GetScheme("VirtualScrollingTest").Try(out var testScheme))
-            {
-                var result = UnloadScheme("VirtualScrollingTest");
-                if (result.Passed)
-                {
-                    Debug.Log("Successfully cleared test data");
-                }
-                else
-                {
-                    Debug.LogError($"Failed to clear test data: {result.Message}");
-                }
-            }
-            else
-            {
-                Debug.Log("No test data found to clear");
             }
         }
     }

@@ -1,27 +1,40 @@
 using System;
 using Newtonsoft.Json;
+using Schema.Core.IO;
 
 namespace Schema.Core.Data
 {
     [Serializable]
-    public class AttributeDefinition : Defaultable, ICloneable
+    public class AttributeDefinition : Defaultable, ICloneable, IComparable<AttributeDefinition>
     {
-        public override SchemaContext Context => new SchemaContext
-        {
-            Scheme = _scheme,
-            AttributeName = AttributeName,
-        };
+        #region Constants
         
         public const int DefaultColumnWidth = 150;
         
+        #endregion
+
+        #region Fields and Properties
         [JsonIgnore]
         internal DataScheme _scheme;
+
+        #region Serialized Data
+
         public string AttributeName { get; set; }
-        public string AttributeToolTip { get; set; }
         public DataType DataType { get; set; }
+        public bool IsIdentifier { get; set; } = false;
+        public bool ShouldPublish { get; set; } = true;
+
+        #region UI Properties
+
+        public string AttributeToolTip { get; set; }
+        
         public int ColumnWidth { get; set; } = DefaultColumnWidth;
 
-        public bool IsIdentifier { get; set; } = false;
+        #endregion
+
+        #endregion
+
+        #endregion
 
         public override string ToString()
         {
@@ -30,15 +43,17 @@ namespace Schema.Core.Data
 
         public AttributeDefinition(DataScheme scheme, 
             string attributeName, DataType dataType, 
-            string attributeToolTip = null,
+            string attributeToolTip = "",
             object defaultValue = null,
-            bool isIdentifier = false) : base(defaultValue)
+            bool isIdentifier = false,
+            bool shouldPublish = true) : base(defaultValue)
         {
             _scheme = scheme;
             AttributeName = attributeName;
             DataType = dataType;
             AttributeToolTip = attributeToolTip;
             IsIdentifier = isIdentifier;
+            ShouldPublish = shouldPublish;
         }
         
         public AttributeDefinition()
@@ -53,20 +68,26 @@ namespace Schema.Core.Data
                 AttributeName = AttributeName?.Clone() as string,
                 AttributeToolTip = AttributeToolTip?.Clone() as string,
                 DefaultValue = CloneDefaultValue(),
-                DataType = DataType,
+                DataType = DataType.Clone() as DataType,
                 ColumnWidth = ColumnWidth,
-                IsIdentifier = IsIdentifier,  
+                IsIdentifier = IsIdentifier,
+                ShouldPublish = ShouldPublish
             };
         }
 
+        /// <summary>
+        /// Copy data from another instance to this instance
+        /// </summary>
+        /// <param name="other">Other instance to copy data from</param>
         public void Copy(AttributeDefinition other)
         {
             AttributeName = other.AttributeName;
             AttributeToolTip = other.AttributeToolTip;
             DefaultValue = other.DefaultValue;
-            DataType = other.DataType;
+            DataType = other.DataType.Clone() as DataType;
             ColumnWidth = other.ColumnWidth;
             IsIdentifier = other.IsIdentifier;
+            ShouldPublish = other.ShouldPublish;
         }
 
         public SchemaResult<ReferenceDataType> CreateReferenceType()
@@ -86,6 +107,24 @@ namespace Schema.Core.Data
         }
 
         #region Equality
+        public int CompareTo(AttributeDefinition other)
+        {
+            if (ReferenceEquals(this, other)) return 0;
+            if (other is null) return 1;
+            var attributeNameComparison = string.Compare(AttributeName, other.AttributeName, StringComparison.Ordinal);
+            if (attributeNameComparison != 0) return attributeNameComparison;
+            var isIdentifierComparison = IsIdentifier.CompareTo(other.IsIdentifier);
+            if (isIdentifierComparison != 0) return isIdentifierComparison;
+            // var dataTypeComparison = DataType.CompareTo(other.DataType);
+            // if (dataTypeComparison != 0) return dataTypeComparison;
+            var attributeTypeComparison = AttributeToolTip.CompareTo(other.AttributeToolTip);
+            if (attributeTypeComparison != 0) return attributeTypeComparison;
+            var columnWidthComparison = ColumnWidth.CompareTo(other.ColumnWidth);
+            if (columnWidthComparison != 0) return columnWidthComparison;
+            // var columnWidthComparison = DefaultValue.CompareTo(other.DefaultValue);
+            // if (columnWidthComparison != 0) return columnWidthComparison;
+            return ShouldPublish.CompareTo(other.ShouldPublish);
+        }
         
         // Equality members should be focused on ensuring that data scheme related fields are the same
         // Less worried about comparing UI properties.
@@ -94,6 +133,20 @@ namespace Schema.Core.Data
             if (AttributeName != other.AttributeName) return false;
             if (!Equals(DataType, other.DataType)) return false;
             if (!Equals(IsIdentifier, other.IsIdentifier)) return false;
+            if (!Equals(ShouldPublish, other.ShouldPublish)) return false;
+            if (!Equals(AttributeToolTip, other.AttributeToolTip)) return false;
+            if (!Equals(ColumnWidth, other.ColumnWidth)) return false;
+
+            // special case equality for paths
+            var defaultValue = DefaultValue;
+            var otherDefaultValue = other.DefaultValue;
+            if (DataType is FSDataType && defaultValue is string dv && otherDefaultValue is string odv)
+            {
+                defaultValue = PathUtility.SanitizePath(dv);
+                otherDefaultValue = PathUtility.SanitizePath(odv);
+            }
+            
+            if (!Equals(defaultValue, otherDefaultValue)) return false;
             return true;
         }
 
@@ -133,14 +186,14 @@ namespace Schema.Core.Data
             AttributeName = newAttributeName;
         }
 
-        public SchemaResult CheckIfValidData(object value)
+        public SchemaResult CheckIfValidData(SchemaContext context, object value)
         {
-            return DataType.CheckIfValidData(value, Context);
+            return DataType.CheckIfValidData(context, value);
         }
 
-        public SchemaResult<object> ConvertData(object value)
+        public SchemaResult<object> ConvertData(SchemaContext context, object value)
         {
-            return DataType.ConvertData(value, Context);
+            return DataType.ConvertData(context, value);
         }
     }
 }

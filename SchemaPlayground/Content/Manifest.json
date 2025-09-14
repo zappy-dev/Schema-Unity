@@ -3,19 +3,19 @@
   "Attributes": [
     {
       "AttributeName": "SchemeName",
-      "AttributeToolTip": null,
       "DataType": {
         "$type": "Schema.Core.Data.TextDataType, Schema.Core",
         "TypeName": "String",
         "DefaultValue": ""
       },
-      "ColumnWidth": 150,
       "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "The name of the scheme",
+      "ColumnWidth": 150,
       "DefaultValue": ""
     },
     {
       "AttributeName": "FilePath",
-      "AttributeToolTip": null,
       "DataType": {
         "$type": "Schema.Core.Data.FilePathDataType, Schema.Core",
         "AllowEmptyPath": true,
@@ -24,25 +24,27 @@
         "TypeName": "FilePath",
         "DefaultValue": ""
       },
-      "ColumnWidth": 150,
       "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Relative path to the staging file from this scheme",
+      "ColumnWidth": 300,
       "DefaultValue": ""
     },
     {
       "AttributeName": "PublishTarget",
-      "AttributeToolTip": null,
       "DataType": {
         "$type": "Schema.Core.Data.TextDataType, Schema.Core",
         "TypeName": "String",
         "DefaultValue": ""
       },
-      "ColumnWidth": 150,
       "IsIdentifier": false,
-      "DefaultValue": ""
+      "ShouldPublish": false,
+      "AttributeToolTip": "Type of output format to use for publishing this data scheme",
+      "ColumnWidth": 150,
+      "DefaultValue": "DEFAULT"
     },
     {
       "AttributeName": "CSharpExportPath",
-      "AttributeToolTip": null,
       "DataType": {
         "$type": "Schema.Core.Data.FolderDataType, Schema.Core",
         "AllowEmptyPath": true,
@@ -51,20 +53,23 @@
         "TypeName": "Folder",
         "DefaultValue": ""
       },
-      "ColumnWidth": 150,
       "IsIdentifier": false,
-      "DefaultValue": ""
+      "ShouldPublish": false,
+      "AttributeToolTip": "Destination folder for generated C# code for this scheme",
+      "ColumnWidth": 300,
+      "DefaultValue": "Assets/Scripts/Schemes"
     },
     {
       "AttributeName": "CSharpNamespace",
-      "AttributeToolTip": null,
       "DataType": {
         "$type": "Schema.Core.Data.TextDataType, Schema.Core",
         "TypeName": "String",
         "DefaultValue": ""
       },
-      "ColumnWidth": 150,
       "IsIdentifier": false,
+      "ShouldPublish": false,
+      "AttributeToolTip": "Namespace for generated C# code for this scheme",
+      "ColumnWidth": 150,
       "DefaultValue": ""
     }
   ],
@@ -73,12 +78,12 @@
       "SchemeName": "Manifest",
       "FilePath": "Content\\Manifest.json",
       "PublishTarget": "DEFAULT",
-      "CSharpExportPath": "Assets\\Scripts\\Schemes",
+      "CSharpExportPath": "Assets/Scripts/Schemes",
       "CSharpNamespace": "ExampleProject.Schemes"
     },
     {
       "SchemeName": "Entities",
-      "FilePath": "Content/Entities.json",
+      "FilePath": "Content\\Entities.json",
       "PublishTarget": "DEFAULT",
       "CSharpExportPath": "Assets\\Scripts\\Schemes",
       "CSharpNamespace": "ExampleProject.Schemes"

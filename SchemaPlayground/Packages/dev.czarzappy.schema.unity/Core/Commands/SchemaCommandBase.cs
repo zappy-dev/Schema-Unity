@@ -39,10 +39,13 @@ namespace Schema.Core.Commands
         /// </summary>
         public DateTime CreatedAt { get; }
         
-        protected SchemaCommandBase()
+        public SchemaContext Context { get; }
+        
+        protected SchemaCommandBase(SchemaContext context)
         {
             Id = CommandId.NewId();
             CreatedAt = DateTime.UtcNow;
+            Context = context;
         }
         
         /// <summary>

@@ -5,7 +5,6 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Newtonsoft.Json;
-using Schema.Core.Logging;
 using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.Data
@@ -310,20 +309,21 @@ namespace Schema.Core.Data
             data = null;
             return false;
         }
-        
+
         /// <summary>
         /// Sets the value for an attribute in this entry.
         /// <b>Warning:</b> Do not call this directly for identifier attributes. Use <see cref="DataScheme.SetDataOnEntry"/> instead to ensure data integrity.
         /// </summary>
+        /// <param name="context"></param>
         /// <param name="attributeName">The attribute name to set.</param>
         /// <param name="value">The value to set.</param>
         /// <returns>A SchemaResult indicating success or failure.</returns>
         // [Obsolete("Do not call SetData directly. Use DataScheme.SetDataOnEntry instead to ensure identifier safety.", false)]
-        public SchemaResult SetData(string attributeName, object value)
+        public SchemaResult SetData(SchemaContext context, string attributeName, object value)
         {
             if (string.IsNullOrWhiteSpace(attributeName))
             {
-                return Fail($"The attribute name is empty.");
+                return Fail(context, $"The attribute name is empty.");
             }
             
             // Logger.LogDbgVerbose($"{attributeName}=>{value}({value?.GetType().Name})", Context);
@@ -331,9 +331,9 @@ namespace Schema.Core.Data
             return Pass("Setting attribute value");
         }
 
-        public void MigrateData(string prevAttributeName, string newAttributeName)
+        public void MigrateData(SchemaContext context, string prevAttributeName, string newAttributeName)
         {
-            SetData(newAttributeName, GetData(prevAttributeName));
+            SetData(context, newAttributeName, GetData(prevAttributeName));
             entryData.Remove(prevAttributeName);
         }
 
@@ -375,12 +375,9 @@ namespace Schema.Core.Data
             return sb.ToString();
         }
 
-        public void Add(string attributeName, object attributeValue)
+        public SchemaResult Add(string attributeName, object attributeValue, SchemaContext context)
         {
-            if (SetData(attributeName, attributeValue).Failed)
-            {
-                throw new ArgumentException($"Failed to set '{attributeName}' to '{attributeValue}'");
-            }
+            return SetData(context, attributeName, attributeValue);
         }
         
         IEnumerator IEnumerable.GetEnumerator()
@@ -424,5 +421,6 @@ namespace Schema.Core.Data
         }
 
         #endregion
+
     }
 }

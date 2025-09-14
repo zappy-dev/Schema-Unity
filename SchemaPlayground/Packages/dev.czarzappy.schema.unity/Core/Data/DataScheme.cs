@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Newtonsoft.Json;
 using Schema.Core.Ext;
+using Schema.Core.IO;
 using Schema.Core.Logging;
 
 namespace Schema.Core.Data
@@ -13,11 +14,6 @@ namespace Schema.Core.Data
     [Serializable]
     public partial class DataScheme : ResultGenerator
     {
-        public override SchemaContext Context => new SchemaContext
-        {
-            Scheme = this,
-        };
-        
         #region Fields and Properties
         
         [JsonProperty("SchemeName")]
@@ -58,11 +54,12 @@ namespace Schema.Core.Data
         public bool IsDirty
         {
             get => isDirty;
-            set
-            {
-                Logger.LogDbgVerbose($"IsDirty=>{value}", Context);
-                isDirty = value;
-            }
+        }
+
+        public void SetDirty(SchemaContext context, bool isDirty) 
+        {
+            Logger.LogDbgVerbose($"IsDirty=>{isDirty}", context);
+            this.isDirty = isDirty;
         }
 
         #endregion
@@ -91,9 +88,9 @@ namespace Schema.Core.Data
         /// </summary>
         /// <param name="overwriteExisting"></param>
         /// <returns></returns>
-        public SchemaResult Load(bool overwriteExisting = false)
+        public SchemaResult Load(SchemaContext context, bool overwriteExisting = false)
         {
-            return Schema.LoadDataScheme(this, overwriteExisting: overwriteExisting);
+            return Schema.LoadDataScheme(context, this, overwriteExisting: overwriteExisting);
         }
 
         #endregion
@@ -148,44 +145,44 @@ namespace Schema.Core.Data
         
         #region Utilities
         
-        public SchemaResult Swap<T>(int srcIndex, int dstIndex, List<T> data)
+        public SchemaResult Swap<T>(SchemaContext context, int srcIndex, int dstIndex, List<T> data)
         {
             if (srcIndex < 0 || srcIndex >= data.Count)
             {
-                return SchemaResult.Fail($"Attempted to move entry from invalid index {srcIndex}.", this);
+                return SchemaResult.Fail(context, $"Attempted to move entry from invalid index {srcIndex}.");
             }
             
             if (dstIndex < 0 || dstIndex >= data.Count)
             {
-                return SchemaResult.Fail($"Attempted to move entry {srcIndex} to invalid destination {dstIndex} is out of range.", this);
+                return SchemaResult.Fail(context, $"Attempted to move entry {srcIndex} to invalid destination {dstIndex} is out of range.");
             }
             
             (data[srcIndex], data[dstIndex]) = (data[dstIndex], data[srcIndex]);
-            IsDirty = true;
-            return SchemaResult.Pass("Successfully swapped entry", this);
+            SetDirty(context, true);
+            return SchemaResult.Pass("Successfully swapped entry", context);
         }
         
-        public SchemaResult Move<T>(T element, int targetIndex, List<T> data)
+        public SchemaResult Move<T>(SchemaContext context, T element, int targetIndex, List<T> data)
         {
             if (targetIndex < 0 || targetIndex >= data.Count)
             {
-                return SchemaResult.Fail($"Target index {targetIndex} is out of range.", this);
+                return SchemaResult.Fail(context, $"Target index {targetIndex} is out of range.");
             }
             
             var entryIdx = data.IndexOf(element);
             if (entryIdx == -1)
             {
-                return SchemaResult.Fail("Element not found", this);
+                return SchemaResult.Fail(context, "Element not found");
             }
             if (entryIdx == targetIndex)
             {
-                return SchemaResult.Fail("Element cannot be the same as the target.", this);
+                return SchemaResult.Fail(context, "Element cannot be the same as the target.");
             }
             data.RemoveAt(entryIdx);
             data.Insert(targetIndex, element);
 
-            isDirty = true;
-            return SchemaResult.Pass($"Moved {element} from {entryIdx} to {targetIndex}", this);
+            SetDirty(context, true);
+            return SchemaResult.Pass($"Moved {element} from {entryIdx} to {targetIndex}", context);
         }
         
         #endregion
@@ -305,7 +302,7 @@ namespace Schema.Core.Data
         /// <param name="oldValue">The old identifier value to be replaced in references.</param>
         /// <param name="newValue">The new identifier value to set in references.</param>
         /// <returns>The number of references updated in this scheme.</returns>
-        public int UpdateReferencesToIdentifier(string referencedScheme, string referencedAttribute, object oldValue, object newValue)
+        public int UpdateReferencesToIdentifier(string referencedScheme, string referencedAttribute, object oldValue, object newValue, SchemaContext context)
         {
             int updated = 0;
             foreach (var attr in attributes)
@@ -319,7 +316,7 @@ namespace Schema.Core.Data
                         var value = entry.GetDataAsString(attr.AttributeName);
                         if (Equals(value, oldValue?.ToString()))
                         {
-                            entry.SetData(attr.AttributeName, newValue);
+                            entry.SetData(context, attr.AttributeName, newValue);
                             updated++;
                         }
                     }
@@ -328,7 +325,7 @@ namespace Schema.Core.Data
 
             if (updated > 0)
             {
-                isDirty = true;
+                SetDirty(context, true);
             }
             return updated;
         }
@@ -340,20 +337,33 @@ namespace Schema.Core.Data
         /// <param name="attributeName">The attribute name to update.</param>
         /// <param name="value">The value to set.</param>
         /// <param name="allowIdentifierUpdate">If true, allows updating identifier values (should only be true for centralized update method).</param>
+        /// <param name="context"></param>
         /// <returns>A SchemaResult indicating success or failure.</returns>
-        public SchemaResult SetDataOnEntry(DataEntry entry, string attributeName, object value, bool allowIdentifierUpdate = false)
+        public SchemaResult SetDataOnEntry(DataEntry entry, string attributeName, object value,
+            bool allowIdentifierUpdate = false, SchemaContext context = default)
         {
             var attrResult = GetAttribute(attributeName);
             if (!attrResult.Try(out var attr))
-                return SchemaResult.Fail($"Attribute '{attributeName}' not found in scheme '{SchemeName}'.");
+                return SchemaResult.Fail(context, $"Attribute '{attributeName}' not found in scheme '{SchemeName}'.");
             if (attr.IsIdentifier && !allowIdentifierUpdate)
             {
-                return SchemaResult.Fail($"Direct mutation of identifier attribute '{attributeName}' is not allowed. Use Schema.UpdateIdentifierValue instead.");
+                return SchemaResult.Fail(context, $"Direct mutation of identifier attribute '{attributeName}' is not allowed. Use Schema.UpdateIdentifierValue instead.");
             }
 
-            Logger.LogDbgVerbose($"SetDataOnEntry, entry: {entry}, {attributeName}=>{value}", context: Context);
-            IsDirty = true;
-            return entry.SetData(attributeName, value);
+            var prevValue = entry.GetDataDirect(attr);
+
+            // special case, don't mutate a file path to a platform-specific format if it is effectively the same.
+            if (attr.DataType is FSDataType && 
+                value is string valueStr && 
+                prevValue is string prevValueStr &&
+                PathUtility.SanitizePath(valueStr) == PathUtility.SanitizePath(prevValueStr))
+            {
+                return SchemaResult.Pass("Value already set", context);
+            }
+
+            Logger.LogDbgVerbose($"SetDataOnEntry, entry: {entry}, {attributeName}=>{value}", context: context);
+            SetDirty(context, true);
+            return entry.SetData(context, attributeName, value);
         }
     }
 }

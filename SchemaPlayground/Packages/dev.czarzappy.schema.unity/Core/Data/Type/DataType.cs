@@ -9,7 +9,7 @@ namespace Schema.Core.Data
     /// Provides built-in types, conversion, and validation logic for schema data.
     /// </summary>
     [Serializable]
-    public abstract class DataType : Defaultable
+    public abstract class DataType : Defaultable, ICloneable
     {
         /// <summary>
         /// Built-in text data type.
@@ -18,11 +18,11 @@ namespace Schema.Core.Data
         /// <summary>
         /// Built-in file path data type.
         /// </summary>
-        public static readonly DataType FilePath = new FilePathDataType(allowEmptyPath: true, useRelativePaths: true);
+        public static readonly DataType FilePath_RelativePaths = new FilePathDataType(allowEmptyPath: true, useRelativePaths: true);
         /// <summary>
         /// Built-in directory path data type.
         /// </summary>
-        public static readonly DataType Folder = new FolderDataType(allowEmptyPath: true, useRelativePaths: true);
+        public static readonly DataType Folder_RelativePaths = new FolderDataType(allowEmptyPath: true, useRelativePaths: true);
         /// <summary>
         /// Built-in guid data type
         /// </summary>
@@ -60,8 +60,8 @@ namespace Schema.Core.Data
             Boolean,
             DateTime,
             Guid,
-            FilePath,
-            Folder,
+            FilePath_RelativePaths,
+            Folder_RelativePaths,
         };
 
         /// <summary>
@@ -94,6 +94,8 @@ namespace Schema.Core.Data
         {
             return $"DataType: {TypeName}";
         }
+
+        public abstract object Clone();
 
         private bool Equals(DataType other)
         {
@@ -131,11 +133,13 @@ namespace Schema.Core.Data
         /// <summary>
         /// Converts data from one data type to another, handling built-in and unknown types.
         /// </summary>
+        /// <param name="context"></param>
         /// <param name="entryData">The data to convert.</param>
         /// <param name="fromType">The source data type.</param>
         /// <param name="toType">The target data type.</param>
         /// <returns>A <see cref="SchemaResult{object}"/> representing the conversion result.</returns>
-        public static SchemaResult<object> ConvertData(object entryData, DataType fromType, DataType toType, SchemaContext context)
+        public static SchemaResult<object> ConvertData(SchemaContext context, object entryData, DataType fromType,
+            DataType toType)
         {
             Logger.LogDbgVerbose($"Trying to convert {entryData} to {toType}", "DataConversion");
             // Handle unknown types from their default string values
@@ -145,7 +149,7 @@ namespace Schema.Core.Data
             if (fromType == toType)
             {
                 return SchemaResult<object>.Pass(entryData,
-                    successMessage: "Conversion no-op for matching type", Schema.Context.DataConversion);
+                    successMessage: "Conversion no-op for matching type", context);
             }
 
             if (fromType.Equals(Text) || isUnknownType)
@@ -155,27 +159,29 @@ namespace Schema.Core.Data
                 if (string.IsNullOrWhiteSpace(data))
                 {
                     return SchemaResult<object>.Pass(toType.CloneDefaultValue(),
-                        successMessage: "Converted empty data to default value", Schema.Context.DataConversion);
+                        successMessage: "Converted empty data to default value", context);
                 }
 
-                return toType.ConvertData(data, context);
+                return toType.ConvertData(context, data);
             }
 
-            return toType.ConvertData(entryData, context);
+            return toType.ConvertData(context, entryData);
         }
 
         /// <summary>
         /// Checks if the provided value is valid for this data type.
         /// </summary>
+        /// <param name="context"></param>
         /// <param name="value">The value to validate.</param>
         /// <returns>A <see cref="SchemaResult"/> indicating if the value is valid.</returns>
-        public abstract SchemaResult CheckIfValidData(object value, SchemaContext context);
-        
+        public abstract SchemaResult CheckIfValidData(SchemaContext context, object value);
+
         /// <summary>
         /// Converts the provided value to this data type.
         /// </summary>
+        /// <param name="context"></param>
         /// <param name="value">The value to convert.</param>
         /// <returns>A <see cref="SchemaResult{object}"/> representing the conversion result.</returns>
-        public abstract SchemaResult<object> ConvertData(object value, SchemaContext context);
+        public abstract SchemaResult<object> ConvertData(SchemaContext context, object value);
     }
 }

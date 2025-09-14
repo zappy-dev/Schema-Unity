@@ -10,59 +10,61 @@ namespace Schema.Core.Data
 
         #region Attribute Mutations
 
-        public SchemaResult<AttributeDefinition> AddAttribute( 
+        public SchemaResult<AttributeDefinition> AddAttribute(
+            SchemaContext context,
             string attributeName, DataType dataType, 
-            string attributeToolTip = null,
+            string attributeToolTip = "",
             object defaultValue = null,
-            bool isIdentifier = false)
+            bool isIdentifier = false,
+            bool shouldPublish = true)
         {
             var newAttribute = new AttributeDefinition(this, attributeName, dataType, attributeToolTip, defaultValue,
-                isIdentifier);
+                isIdentifier, shouldPublish);
 
-            var result = AddAttribute(newAttribute);
+            var result = AddAttribute(context, newAttribute);
             
-            return CheckIf(result.Passed, newAttribute, result.Message, "Created new attribute", Context);
+            return CheckIf(result.Passed, newAttribute, result.Message, "Created new attribute", context);
         }
         
-        public SchemaResult AddAttribute(AttributeDefinition newAttribute)
+        public SchemaResult AddAttribute(SchemaContext context, AttributeDefinition newAttribute)
         {
             // Validate
             if (newAttribute == null)
             {
-                return SchemaResult.Fail("Attribute cannot be null", this);
+                return SchemaResult.Fail(context, "Attribute cannot be null");
             }
 
             // Attribute naming validation
             string newAttributeName = newAttribute.AttributeName;
             if (string.IsNullOrWhiteSpace(newAttributeName))
             {
-                return SchemaResult.Fail("Attribute name cannot be null or empty.", this);
+                return SchemaResult.Fail(context, "Attribute name cannot be null or empty.");
             }
             
             if (attributes.Exists(a => a.AttributeName == newAttributeName))
             {
-                return SchemaResult.Fail("Duplicate attribute name: " + newAttributeName, this);
+                return SchemaResult.Fail(context, "Duplicate attribute name: " + newAttributeName);
             }
 
             if (newAttribute.DataType == null)
             {
-                return SchemaResult.Fail("Attribute data type cannot be null.", this);
+                return SchemaResult.Fail(context, "Attribute data type cannot be null.");
             }
             
             // Commit
             newAttribute._scheme = this;
             attributes.Add(newAttribute);
-            IsDirty = true;
+            SetDirty(context, true);
 
             foreach (var entry in entries)
             {
-                entry.SetData(newAttributeName, newAttribute.CloneDefaultValue());
+                entry.SetData(context, newAttributeName, newAttribute.CloneDefaultValue());
             }
             
-            return SchemaResult.Pass($"Added attribute {newAttributeName}", this);
+            return SchemaResult.Pass($"Added attribute {newAttributeName}", context);
         }
 
-        public SchemaResult ConvertAttributeType(string attributeName, DataType newType)
+        public SchemaResult ConvertAttributeType(SchemaContext context, string attributeName, DataType newType)
         {
             var attribute = attributes.Find(a => a.AttributeName == attributeName);
 
@@ -77,27 +79,27 @@ namespace Schema.Core.Data
                 {
                     var entryData = entry.GetData(attribute).Result;
 
-                    if (!DataType.ConvertData(entryData, attribute.DataType, newType, attribute.Context).Try(out convertedData))
+                    if (!DataType.ConvertData(context, entryData, attribute.DataType, newType).Try(out convertedData))
                     {
-                        return SchemaResult.Fail($"Cannot convert attribute {attributeName} to type {newType}", this);
+                        return SchemaResult.Fail(context, $"Cannot convert attribute {attributeName} to type {newType}");
                     }
                 }
                         
-                entry.SetData(attributeName, convertedData);
+                entry.SetData(context, attributeName, convertedData);
             }
             
             attribute.DataType = newType;
             // TODO: Does the abstract that an attribute can defined a separate default value than a type help right now?
             attribute.DefaultValue = newType.CloneDefaultValue();
-            IsDirty = true;
+            SetDirty(context, true);
             
-            return SchemaResult.Pass($"Converted attribute {attributeName} to type {newType}", this);
+            return SchemaResult.Pass($"Converted attribute {attributeName} to type {newType}", context);
         }
 
-        public SchemaResult DeleteAttribute(AttributeDefinition attribute)
+        public SchemaResult DeleteAttribute(SchemaContext context, AttributeDefinition attribute)
         {
             bool result = attributes.Remove(attribute);
-            IsDirty = true;
+            SetDirty(context, true);
 
             return CheckIf(result, errorMessage: $"Attribute {attribute} cannot be deleted",
                 successMessage: $"Deleted {attribute}");
@@ -109,36 +111,36 @@ namespace Schema.Core.Data
         /// <param name="prevAttributeName"></param>
         /// <param name="newAttributeName"></param>
         /// <exception cref="InvalidOperationException"></exception>
-        public SchemaResult UpdateAttributeName(string prevAttributeName, string newAttributeName)
+        public SchemaResult UpdateAttributeName(SchemaContext context, string prevAttributeName, string newAttributeName)
         {
             if (string.IsNullOrWhiteSpace(prevAttributeName) || string.IsNullOrWhiteSpace(newAttributeName))
             {
-                return SchemaResult.Fail("Attribute name cannot be null or empty.", this);
+                return SchemaResult.Fail(context, "Attribute name cannot be null or empty.");
             }
             
             if (prevAttributeName.Equals(newAttributeName))
             {
-                return SchemaResult.Fail("Attribute name cannot be the same as previous attribute name.", this);
+                return SchemaResult.Fail(context, "Attribute name cannot be the same as previous attribute name.");
             }
 
             if (attributes.Exists(a => a.AttributeName == newAttributeName))
             {
-                return SchemaResult.Fail("Attribute name already exists.", this);
+                return SchemaResult.Fail(context, "Attribute name already exists.");
             }
             
             // for reference type fields, we gotta update anything that references this field.
             if (!GetAttribute(prevAttributeName).Try(out var prevAttribute))
             {
-                return SchemaResult.Fail($"Attribute {prevAttributeName} cannot be found", this);
+                return SchemaResult.Fail(context, $"Attribute {prevAttributeName} cannot be found");
             }
             
             // update attribute and migrate entries
             prevAttribute.UpdateAttributeName(newAttributeName);
             foreach (var entry in entries)
             {
-                entry.MigrateData(prevAttributeName, newAttributeName);
+                entry.MigrateData(context, prevAttributeName, newAttributeName);
             }
-            IsDirty = true;
+            SetDirty(context, true);
 
             // update all referencing attributes in other Schemes
             foreach (var otherScheme in Schema.GetSchemes())
@@ -175,14 +177,17 @@ namespace Schema.Core.Data
                 int entriesUpdated = 0;
                 foreach (var entry in otherScheme.entries)
                 {
-                    entry.MigrateData(prevAttributeName, newAttributeName);
+                    entry.MigrateData(context, prevAttributeName, newAttributeName);
                     entriesUpdated++;
                 }
 
-                otherScheme.IsDirty = referencingAttributesUpdated > 0 && entriesUpdated > 0;
+                if (referencingAttributesUpdated > 0 && entriesUpdated > 0)
+                {
+                    otherScheme.SetDirty(context, true);
+                }
             }
             
-            return SchemaResult.Pass("Updated attribute: " + prevAttributeName + " to " + newAttributeName, this);
+            return SchemaResult.Pass("Updated attribute: " + prevAttributeName + " to " + newAttributeName, context);
         }
 
         #endregion
@@ -239,23 +244,23 @@ namespace Schema.Core.Data
         
         #region Attribute Ordering Operations
 
-        public SchemaResult MoveAttributeRank(AttributeDefinition attribute, int moveRank)
+        public SchemaResult MoveAttributeRank(SchemaContext context, AttributeDefinition attribute, int moveRank)
         {
-            return Move(attribute, moveRank, attributes);
+            return Move(context, attribute, moveRank, attributes);
         }
         
-        public SchemaResult IncreaseAttributeRank(AttributeDefinition attribute)
+        public SchemaResult IncreaseAttributeRank(SchemaContext context, AttributeDefinition attribute)
         {
             var attributeIdx = attributes.IndexOf(attribute);
             var newIdx = attributeIdx - 1; // shift lower to appear sooner
-            return Swap(attributeIdx, newIdx, attributes);
+            return Swap(context, attributeIdx, newIdx, attributes);
         }
 
-        public SchemaResult DecreaseAttributeRank(AttributeDefinition attribute)
+        public SchemaResult DecreaseAttributeRank(SchemaContext context, AttributeDefinition attribute)
         {
             var attributeIdx = attributes.IndexOf(attribute);
             var newIdx = attributeIdx + 1; // shift higher to appear later
-            return Swap(attributeIdx, newIdx, attributes);
+            return Swap(context, attributeIdx, newIdx, attributes);
         }
 
         #endregion

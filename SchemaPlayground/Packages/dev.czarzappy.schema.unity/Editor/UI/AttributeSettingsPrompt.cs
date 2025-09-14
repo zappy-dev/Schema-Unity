@@ -1,4 +1,5 @@
 using System.Linq;
+using Schema.Core;
 using Schema.Core.Data;
 using UnityEditor;
 using UnityEngine;
@@ -34,6 +35,13 @@ namespace Schema.Unity.Editor
             
             EditorGUILayout.LabelField("Attribute Tooltip");
             editAttribute.AttributeToolTip = EditorGUILayout.TextArea(editAttribute.AttributeToolTip);
+            
+            EditorGUILayout.Separator();
+            EditorGUILayout.LabelField("Publishing");
+            editAttribute.ShouldPublish = EditorGUILayout.Toggle("Should Publish", editAttribute.ShouldPublish);
+            
+            EditorGUILayout.Separator();
+            
 
             // Support Reference DataType default value selection
             // TODO: Unify this with the Table Cell rendering
@@ -99,11 +107,21 @@ namespace Schema.Unity.Editor
 
         private void SaveSettings()
         {
-            scheme.UpdateAttributeName(attribute.AttributeName, editAttribute.AttributeName);
+            var ctx = new SchemaContext
+            {
+                Scheme = scheme,
+                AttributeName = editAttribute.AttributeName,
+                Driver = "User_Update_Attribute"
+            };
+            
+            if (attribute.AttributeName != editAttribute.AttributeName)
+            {
+                scheme.UpdateAttributeName(ctx, attribute.AttributeName, editAttribute.AttributeName);
+            }
             attribute.Copy(editAttribute);
 
             // Updating an attribute name can impact referencing schemes, save all dirty
-            Save();
+            Save(ctx);
             
             Close();
         }

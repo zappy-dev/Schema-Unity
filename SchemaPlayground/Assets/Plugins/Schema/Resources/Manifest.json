@@ -3,19 +3,19 @@
   "Attributes": [
     {
       "AttributeName": "SchemeName",
-      "AttributeToolTip": null,
       "DataType": {
         "$type": "Schema.Core.Data.TextDataType, Schema.Core",
         "TypeName": "String",
         "DefaultValue": ""
       },
-      "ColumnWidth": 150,
       "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "The name of the scheme",
+      "ColumnWidth": 150,
       "DefaultValue": ""
     },
     {
       "AttributeName": "FilePath",
-      "AttributeToolTip": null,
       "DataType": {
         "$type": "Schema.Core.Data.FilePathDataType, Schema.Core",
         "AllowEmptyPath": true,
@@ -24,64 +24,21 @@
         "TypeName": "FilePath",
         "DefaultValue": ""
       },
-      "ColumnWidth": 150,
       "IsIdentifier": false,
-      "DefaultValue": ""
-    },
-    {
-      "AttributeName": "PublishTarget",
-      "AttributeToolTip": null,
-      "DataType": {
-        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
-        "TypeName": "String",
-        "DefaultValue": ""
-      },
-      "ColumnWidth": 150,
-      "IsIdentifier": false,
-      "DefaultValue": ""
-    },
-    {
-      "AttributeName": "CSharpExportPath",
-      "AttributeToolTip": null,
-      "DataType": {
-        "$type": "Schema.Core.Data.FolderDataType, Schema.Core",
-        "AllowEmptyPath": true,
-        "UseRelativePaths": true,
-        "BasePath": null,
-        "TypeName": "Folder",
-        "DefaultValue": ""
-      },
-      "ColumnWidth": 150,
-      "IsIdentifier": false,
-      "DefaultValue": ""
-    },
-    {
-      "AttributeName": "CSharpNamespace",
-      "AttributeToolTip": null,
-      "DataType": {
-        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
-        "TypeName": "String",
-        "DefaultValue": ""
-      },
-      "ColumnWidth": 150,
-      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Relative path to the staging file from this scheme",
+      "ColumnWidth": 300,
       "DefaultValue": ""
     }
   ],
   "Entries": [
     {
       "SchemeName": "Manifest",
-      "FilePath": "Content\\Manifest.json",
-      "PublishTarget": "DEFAULT",
-      "CSharpExportPath": "Assets\\Scripts\\Schemes",
-      "CSharpNamespace": "ExampleProject.Schemes"
+      "FilePath": "Content\\Manifest.json"
     },
     {
       "SchemeName": "Entities",
-      "FilePath": "Content/Entities.json",
-      "PublishTarget": "DEFAULT",
-      "CSharpExportPath": "Assets\\Scripts\\Schemes",
-      "CSharpNamespace": "ExampleProject.Schemes"
+      "FilePath": "Content\\Entities.json"
     }
   ]
 }

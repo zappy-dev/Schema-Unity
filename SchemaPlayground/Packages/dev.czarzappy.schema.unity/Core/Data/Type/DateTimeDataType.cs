@@ -6,13 +6,16 @@ namespace Schema.Core.Data
     [Serializable]
     public class DateTimeDataType : DataType
     {
-        public override SchemaContext Context => new SchemaContext()
-        {
-            DataType = nameof(DateTimeDataType),
-        };
-        
         public override string TypeName => "Date Time";
-        public override SchemaResult CheckIfValidData(object value, SchemaContext context)
+        public override object Clone()
+        {
+            return new DateTimeDataType
+            {
+                DefaultValue = DefaultValue
+            };
+        }
+
+        public override SchemaResult CheckIfValidData(SchemaContext context, object value)
         {
             return CheckIf(value is DateTime, 
                 errorMessage: "Value is not a DateTime",
@@ -20,7 +23,7 @@ namespace Schema.Core.Data
 
         }
 
-        public override SchemaResult<object> ConvertData(object value, SchemaContext context)
+        public override SchemaResult<object> ConvertData(SchemaContext context, object value)
         {
             var data = value as string;
             

@@ -11,25 +11,25 @@ namespace Schema.Core.Data
         
         #region Entry Mutations
         
-        public DataEntry CreateNewEmptyEntry()
+        public DataEntry CreateNewEmptyEntry(SchemaContext context)
         {
             var entry = new DataEntry();
             foreach (var attribute in attributes)
             {
-                SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue());
+                SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue(), context: context);
             }
             
             entries.Add(entry);
-            IsDirty = true;
+            SetDirty(context, true);
             return entry;
         }
 
-        public SchemaResult AddEntry(DataEntry newEntry, bool runDataValidation = true)
+        public SchemaResult AddEntry(SchemaContext context, DataEntry newEntry, bool runDataValidation = true)
         {
             Logger.LogDbgVerbose($"Adding {newEntry}...", this);
             if (newEntry is null)
             {
-                return SchemaResult.Fail("Entry cannot be null", this);
+                return SchemaResult.Fail(context, "Entry cannot be null");
             }
             
             // TODO: Validate that a data entry has all of the expected attributes and add default attribute values if not present
@@ -42,13 +42,13 @@ namespace Schema.Core.Data
 
                 if (!GetAttributeByName(attributeName).Try(out var attribute))
                 {
-                    return SchemaResult.Fail($"No matching attribute found for '{kvp.Key}'", this);
+                    return SchemaResult.Fail(context, $"No matching attribute found for '{kvp.Key}'");
                 }
 
                 var entryValue = kvp.Value;
                 if (runDataValidation)
                 {
-                    var isValidRes = attribute.CheckIfValidData(entryValue);
+                    var isValidRes = attribute.CheckIfValidData(context, entryValue);
                     if (isValidRes.Failed)
                     {
                         return isValidRes;
@@ -63,35 +63,34 @@ namespace Schema.Core.Data
                     continue;
                 }
 
-                newEntry.SetData(attribute.AttributeName, attribute.CloneDefaultValue());
+                newEntry.SetData(context, attribute.AttributeName, attribute.CloneDefaultValue());
             }
             
             entries.Add(newEntry);
-            IsDirty = true;
-            return SchemaResult.Pass($"Added {newEntry}", this);
+            SetDirty(context, true);
+            return SchemaResult.Pass($"Added {newEntry}", context);
         }
 
-        public SchemaResult DeleteEntry(DataEntry entry)
+        public SchemaResult DeleteEntry(SchemaContext context, DataEntry entry)
         {
             bool result = entries.Remove(entry);
-            IsDirty = result;
-            return SchemaResult.CheckIf(result, 
-                errorMessage: "Could not delete entry",
-                successMessage: "Removed entry");
+            if (result)
+            {
+                SetDirty(context, true);
+            }
+            return SchemaResult.CheckIf(context,
+                result, errorMessage: "Could not delete entry", successMessage: "Removed entry");
         }
 
         #endregion
         
         #region Entry Retrieval Queries
-        public DataEntry GetEntry(Func<DataEntry, bool> entryFilter)
-        {
-            return entries.FirstOrDefault(entryFilter);
-        }
 
-        public bool TryGetEntry(Func<DataEntry, bool> entryFilter, out DataEntry entry)
+        // Let this context get defaulted, since it is used by the runtime
+        public SchemaResult<DataEntry> GetEntry(Func<DataEntry, bool> entryFilter, SchemaContext context = default)
         {
-            entry = entries.FirstOrDefault(entryFilter);
-            return entry != null;
+            var entry = entries.FirstOrDefault(entryFilter);
+            return SchemaResult<DataEntry>.CheckIf(entry != null, entry, "Entry not found", context: context);
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -104,28 +103,28 @@ namespace Schema.Core.Data
 
         #region Entry Ordering Operations
         
-        public SchemaResult MoveUpEntry(DataEntry entry)
+        public SchemaResult MoveUpEntry(SchemaContext context, DataEntry entry)
         {
             var entryIdx = entries.IndexOf(entry);
             var newIdx = entryIdx - 1;
-            return SwapEntries(entryIdx, newIdx);
+            return SwapEntries(context, entryIdx, newIdx);
         }
 
-        public SchemaResult MoveDownEntry(DataEntry entry)
+        public SchemaResult MoveDownEntry(SchemaContext context, DataEntry entry)
         {
             var entryIdx = entries.IndexOf(entry);
             var newIdx = entryIdx + 1;
-            return SwapEntries(entryIdx, newIdx);
+            return SwapEntries(context, entryIdx, newIdx);
         }
 
-        public SchemaResult MoveEntry(DataEntry entry, int targetIndex)
+        public SchemaResult MoveEntry(SchemaContext context, DataEntry entry, int targetIndex)
         {
-            return Move(entry, targetIndex, entries);
+            return Move(context, entry, targetIndex, entries);
         }
 
-        public SchemaResult SwapEntries(int srcIndex, int dstIndex)
+        public SchemaResult SwapEntries(SchemaContext context, int srcIndex, int dstIndex)
         {
-            return Swap(srcIndex, dstIndex, entries);
+            return Swap(context, srcIndex, dstIndex, entries);
         }
 
         #endregion

@@ -9,6 +9,26 @@ namespace Schema.Core.IO
     public static class PathUtility
     {
         /// <summary>
+        /// Sanitizes the given path by converting platform-specific directory separators to the current platform
+        /// </summary>
+        /// <param name="path">Path to sanitize</param>
+        /// <returns>Platform sanitized path</returns>
+        public static string SanitizePath(string path)
+        {
+            switch (Path.DirectorySeparatorChar)
+            {
+                case '/':
+                    path = path.Replace('\\', Path.DirectorySeparatorChar);
+                    break;
+                case '\\':
+                    path = path.Replace('/', Path.DirectorySeparatorChar);
+                    break;
+            }
+            
+            return path;
+        }
+        
+        /// <summary>
         /// Converts an absolute path to a path relative to the specified base directory.
         /// </summary>
         /// <param name="absolutePath">The absolute path to convert.</param>

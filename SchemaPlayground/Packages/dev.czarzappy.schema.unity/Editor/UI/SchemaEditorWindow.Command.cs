@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Schema.Core;
 using Schema.Core.Commands;
 using Schema.Core.Data;
 using Schema.Unity.Editor.Ext;
@@ -92,7 +93,7 @@ namespace Schema.Unity.Editor
 
         private async Task ProcessCommandRequest(CommandRequest request)
         {
-            LogVerbose($"Starting to process command: {request.Description}");
+            LogDbgVerbose($"Starting to process command: {request.Description}");
             _operationInProgress = true;
             _currentOperationDescription = request.Description;
             try
@@ -186,7 +187,7 @@ namespace Schema.Unity.Editor
         }
         
         // Async version of adding a schema using command system
-        private Task SubmitAddSchemeRequest(DataScheme newSchema, string importFilePath = null)
+        private Task SubmitAddSchemeRequest(SchemaContext context, DataScheme newSchema, string importFilePath = null)
         {
             // TODO: Replace this bad pattern, what if multiple operations need to queue up?
             // if (_operationInProgress) return;
@@ -210,7 +211,7 @@ namespace Schema.Unity.Editor
             SubmitCommandRequest(new CommandRequest
             {
                 Description = $"Adding schema '{newSchema.SchemeName}'",
-                Command = new LoadDataSchemeCommand(
+                Command = new LoadDataSchemeCommand(context,
                     newSchema,
                     overwriteExisting: overwriteExisting,
                     importFilePath: importFilePath,
@@ -220,7 +221,11 @@ namespace Schema.Unity.Editor
                     if (result.IsSuccess)
                     {
                         // persist data to file first
-                        Save(true);
+                        Save(new SchemaContext
+                        {
+                            Scheme = newSchema,
+                            Driver = "User_Add_New_Scheme"
+                        },true);
                         
                         // then select the new scheme
                         OnSelectScheme(newSchema.SchemeName, "Added schema");
@@ -266,7 +271,7 @@ namespace Schema.Unity.Editor
             // }
         }
 
-        private Task ExecuteSetDataOnEntryAsync(DataScheme scheme, DataEntry entry, string attributeName, object value)
+        private Task ExecuteSetDataOnEntryAsync(SchemaContext context, DataScheme scheme, DataEntry entry, string attributeName, object value)
         {
             // if (_operationInProgress) return;
             // _operationInProgress = true;
@@ -275,7 +280,7 @@ namespace Schema.Unity.Editor
             SubmitCommandRequest(new CommandRequest
             {
                 Description = $"Updating '{scheme.SchemeName}.{attributeName}'",
-                Command = new SetDataOnEntryCommand(scheme, entry, attributeName, value),
+                Command = new SetDataOnEntryCommand(context, scheme, entry, attributeName, value),
                 OnRequestComplete = (result) =>
                 {
                     if (!result.IsSuccess)
@@ -330,8 +335,6 @@ namespace Schema.Unity.Editor
             try
             {
                 await commandProcessor.UndoAsync(_cancellationTokenSource.Token);
-                // Persist sync save for now
-                Save();
             }
             catch (OperationCanceledException) { }
             finally
@@ -351,7 +354,6 @@ namespace Schema.Unity.Editor
             try
             {
                 await commandProcessor.RedoAsync(_cancellationTokenSource.Token);
-                Save();
             }
             catch (OperationCanceledException) { }
             finally

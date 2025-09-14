@@ -1,5 +1,4 @@
-﻿using System.IO;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Schema.Core.IO;
 
 namespace Schema.Core.Data
@@ -34,7 +33,7 @@ namespace Schema.Core.Data
             this.useRelativePaths = useRelativePaths;
             this.basePath = basePath;
         }
-        
+
         /// <summary>
         /// Gets the base path, either from the provided base path or from the default project path
         /// </summary>

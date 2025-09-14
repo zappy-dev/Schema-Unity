@@ -14,8 +14,8 @@ namespace Schema.Core.Commands
         // Captured for undo
         private int entryIdx;
         
-        public DeleteEntryCommand(DataScheme scheme,
-            DataEntry entry)
+        public DeleteEntryCommand(SchemaContext context, DataScheme scheme,
+            DataEntry entry) : base(context)
         {
             _scheme = scheme;
             _entry = entry;
@@ -30,7 +30,7 @@ namespace Schema.Core.Commands
                 return Task.FromResult(Fail("Scheme does not contain entry"));
             }
 
-            var deleteRes = _scheme.DeleteEntry(_entry);
+            var deleteRes = _scheme.DeleteEntry(Context, _entry);
             if (deleteRes.Failed)
             {
                 return Task.FromResult(Fail(deleteRes.Message));
@@ -39,7 +39,7 @@ namespace Schema.Core.Commands
             if (_scheme.IsManifest)
             {
                 var manifestEntry = new ManifestEntry(_scheme, _entry);
-                var unloadRes = Schema.UnloadScheme(manifestEntry.SchemeName);
+                var unloadRes = Schema.UnloadScheme(Context, manifestEntry.SchemeName);
 
                 if (unloadRes.Failed)
                 {
@@ -52,7 +52,7 @@ namespace Schema.Core.Commands
 
         protected override Task<CommandResult> UndoInternalAsync(CancellationToken cancellationToken)
         {
-            var addEntryRes = _scheme.AddEntry(_entry);
+            var addEntryRes = _scheme.AddEntry(Context, _entry);
 
             if (addEntryRes.Failed)
             {
@@ -63,14 +63,14 @@ namespace Schema.Core.Commands
             {
                 var manifestEntry = new ManifestEntry(_scheme, _entry);
 
-                var reloadSchemaRes = Schema.LoadSchemeFromManifestEntry(manifestEntry);
+                var reloadSchemaRes = Schema.LoadSchemeFromManifestEntry(Context, manifestEntry);
                 if (reloadSchemaRes.Failed)
                 {
                     return Task.FromResult(Fail(reloadSchemaRes.Message));
                 }
             }
 
-            var moveRes = _scheme.MoveEntry(_entry, entryIdx);
+            var moveRes = _scheme.MoveEntry(Context, _entry, entryIdx);
             
             var cmdResult = moveRes.Passed
                 ? Pass(moveRes)

@@ -1,64 +1,87 @@
 using System;
 using System.IO;
 using Schema.Core.Logging;
+using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.IO
 {
     public class LocalFileSystem : IFileSystem
     {
         #region File Operations
-        public SchemaResult<string> ReadAllText(string filePath)
+        public SchemaResult<string> ReadAllText(SchemaContext context, string filePath)
         {
-            return SchemaResult<string>.Pass(File.ReadAllText(filePath));
+            var sanitizedPath = PathUtility.SanitizePath(filePath);
+            return SchemaResult<string>.Pass(File.ReadAllText(sanitizedPath));
         }
 
-        public SchemaResult<string[]> ReadAllLines(string filePath)
+        public SchemaResult<string[]> ReadAllLines(SchemaContext context, string filePath)
         {
-            return SchemaResult<string[]>.Pass(File.ReadAllLines(filePath));
+            var sanitizedPath = PathUtility.SanitizePath(filePath);
+            return SchemaResult<string[]>.Pass(File.ReadAllLines(sanitizedPath));
         }
 
-        public SchemaResult WriteAllText(string filePath, string fileContent)
+        public SchemaResult WriteAllText(SchemaContext context, string filePath, string fileContent)
         {
-            Logger.LogDbgVerbose($"Writing file {filePath}, size: {fileContent.Length}");
-            File.WriteAllText(filePath, fileContent);
-            return SchemaResult.Pass();
+            var sanitizedPath = PathUtility.SanitizePath(filePath);
+            Logger.LogDbgVerbose($"Writing file {sanitizedPath}, size: {fileContent.Length}");
+            
+            // Extract the directory path from the file path
+            var directoryPath = Path.GetDirectoryName(sanitizedPath);
+
+            // Check if the directory exists, and if not, create it
+            var dirExists = DirectoryExists(context, directoryPath);
+            if (!dirExists)
+            {
+                var createDirRes = CreateDirectory(context, directoryPath);
+
+                if (createDirRes.Failed)
+                {
+                    return Fail(context, "Failed to create directory");
+                }
+            }
+            File.WriteAllText(sanitizedPath, fileContent);
+            return Pass();
         }
 
-        public SchemaResult FileExists(string filePath)
+        public SchemaResult FileExists(SchemaContext context, string filePath)
         {
-            return SchemaResult.CheckIf(File.Exists(filePath), "File does not exist");
+            var sanitizedPath = PathUtility.SanitizePath(filePath);
+            
+            return CheckIf(context, File.Exists(sanitizedPath), $"File '{sanitizedPath}' does not exist");
         }
         
         #endregion
         
         #region Directory Operations
         
-        public SchemaResult DirectoryExists(string directoryPath)
+        public bool DirectoryExists(SchemaContext context, string directoryPath)
         {
             if (string.IsNullOrWhiteSpace(directoryPath))
             {
-                throw new ArgumentNullException(nameof(directoryPath));
+                return false;
             }
+            var sanitizedPath = PathUtility.SanitizePath(directoryPath);
             
-            return SchemaResult.CheckIf(Directory.Exists(directoryPath),  "Directory does not exist");
+            return Directory.Exists(sanitizedPath);
         }
 
-        public SchemaResult CreateDirectory(string directoryPath)
+        public SchemaResult CreateDirectory(SchemaContext context, string directoryPath)
         {
             if (string.IsNullOrWhiteSpace(directoryPath))
             {
-                throw new ArgumentNullException(nameof(directoryPath));
+                return Fail(context, "Directory is empty");
             }
+            var sanitizedPath = PathUtility.SanitizePath(directoryPath);
 
             // Directory already exists, move on
-            if (DirectoryExists(directoryPath).Passed)
+            if (DirectoryExists(context, sanitizedPath))
             {
-                return SchemaResult.Pass("Directory already exists");
+                return Pass("Directory already exists");
             }
             
-            Directory.CreateDirectory(directoryPath);
+            Directory.CreateDirectory(sanitizedPath);
             
-            return SchemaResult.Pass();
+            return Pass();
         }
         
         #endregion

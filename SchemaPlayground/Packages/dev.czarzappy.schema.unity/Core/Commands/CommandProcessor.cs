@@ -123,7 +123,7 @@ namespace Schema.Core.Commands
                 }
                 
                 var command = _undoStack.Pop();
-                Logger.LogVerbose($"Undoing command: {command.Description}", this);
+                Logger.LogDbgVerbose($"Undoing command: {command.Description}", this);
                 
                 var stopwatch = Stopwatch.StartNew();
                 var result = await command.UndoAsync(cancellationToken);

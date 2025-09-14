@@ -5,9 +5,9 @@
     "description": "A Unity package for integrating Schema functionality, developed by zappy.",
     "unity": "2020.3",
     "author": {
-      "name": "zappy",
-      "email": "contact@czarzappy.dev",
-      "url": "https://czarzappy.dev/projects/schema"
+      "name": "DevZappy",
+      "email": "me@devzappy.com",
+      "url": "https://www.devzappy.com/projects/schema"
     },
     "dependencies": {
         "com.unity.nuget.newtonsoft-json": "3.2.1"
