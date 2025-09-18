@@ -60,7 +60,7 @@ namespace Schema.Core
              if (status == RequestStatus.Failed)
              {
                  string logMsg = $"[Context={context}] {message}";
-                 Logger.LogError(logMsg);
+                 Logger.LogDbgError(logMsg);
              }
 // #endif
         }
@@ -121,7 +121,7 @@ namespace Schema.Core
              if (status == RequestStatus.Failed)
              {
                  string logMsg = $"[Context={context}] {message}";
-                 Logger.LogError(logMsg);
+                 Logger.LogDbgError(logMsg);
              }
 // #endif
         }

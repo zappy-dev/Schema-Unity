@@ -133,6 +133,21 @@ namespace Schema.Core
             if (!GetScheme(schemeName).Try(out var targetScheme))
                 return Fail(context, $"Scheme '{schemeName}' not found.");
 
+            return UpdateIdentifierValue(context, targetScheme, identifierAttribute, oldValue, newValue);
+        }
+        
+        /// <summary>
+        /// Updates an identifier value in the specified scheme and propagates the change to all referencing entries in all loaded schemes.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="targetScheme">The scheme containing the identifier to update.</param>
+        /// <param name="identifierAttribute">The name of the identifier attribute to update.</param>
+        /// <param name="oldValue">The old identifier value to be replaced.</param>
+        /// <param name="newValue">The new identifier value to set.</param>
+        /// <returns>A SchemaResult indicating success or failure, and the number of references updated.</returns>
+        public static SchemaResult UpdateIdentifierValue(SchemaContext context, DataScheme targetScheme,
+            string identifierAttribute, object oldValue, object newValue)
+        {
             var entry = targetScheme.AllEntries.FirstOrDefault(e => Equals(e.GetData(identifierAttribute), oldValue));
             if (entry == null)
                 return Fail(context, $"Entry with {identifierAttribute} == '{oldValue}' not found in scheme '{targetScheme}'.");
@@ -144,11 +159,11 @@ namespace Schema.Core
             // 2. Propagate to all referencing entries in all loaded schemes
             foreach (var scheme in GetSchemes())
             {
-                if (scheme.SchemeName == schemeName)
+                if (scheme.SchemeName == targetScheme.SchemeName)
                     continue;
-                totalUpdated += scheme.UpdateReferencesToIdentifier(schemeName, identifierAttribute, oldValue, newValue, context);
+                totalUpdated += scheme.UpdateReferencesToIdentifier(targetScheme.SchemeName, identifierAttribute, oldValue, newValue, context);
             }
-            return Pass($"Updated identifier value from '{oldValue}' to '{newValue}' in '{schemeName}'. Updated {totalUpdated} references.");
+            return Pass($"Updated identifier value from '{oldValue}' to '{newValue}' in '{targetScheme.SchemeName}'. Updated {totalUpdated} references.", context);
         }
         
         #endregion

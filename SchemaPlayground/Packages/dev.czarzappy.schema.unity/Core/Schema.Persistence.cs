@@ -267,11 +267,39 @@ namespace Schema.Core
                 return Fail(context, errorMessage: "Schema already exists: " + schemeName);
             }
 
+            var schemeAttributes = scheme.GetAttributes().ToList();
             // TODO: This can be parallelized
             // process all incoming entry data and make sure it is in a valid formats 
             foreach (var entry in scheme.AllEntries)
             {
-                foreach (var attribute in scheme.GetAttributes())
+                var attributesToRemove = new List<string>();
+                // prune unknown attributes
+                using var entryEnumerator = entry.GetEnumerator();
+                while (entryEnumerator.MoveNext())
+                {
+                    var kvp = entryEnumerator.Current;
+                    var attrName = kvp.Key;
+                    bool isKnownAttribute = schemeAttributes.Select(attr => attr.AttributeName).Contains(attrName);
+                    if (isKnownAttribute)
+                    {
+                        continue;
+                    }
+                    
+                    attributesToRemove.Add(attrName);
+                }
+
+                foreach (var attrName in attributesToRemove)
+                {
+                    using var _ = new AttributeContextScope(context, attrName);
+                    context.AttributeName = attrName;
+                    var removeRes = entry.RemoveData(context, attrName);
+                    if (removeRes.Failed)
+                    {
+                        return removeRes;
+                    }
+                }
+                
+                foreach (var attribute in schemeAttributes)
                 {
                     attribute._scheme = scheme;
                     
@@ -533,5 +561,20 @@ namespace Schema.Core
         #endregion
         
         #endregion
+    }
+
+    public class AttributeContextScope : IDisposable
+    {
+        private SchemaContext context;
+        public AttributeContextScope(SchemaContext context, string attrName)
+        {
+            this.context = context;
+            context.AttributeName = attrName;
+        }
+
+        public void Dispose()
+        {
+            context.AttributeName = null;
+        }
     }
 }

@@ -422,5 +422,10 @@ namespace Schema.Core.Data
 
         #endregion
 
+        public SchemaResult RemoveData(SchemaContext context, string attrName)
+        {
+            bool didRemove = entryData.Remove(attrName);
+            return CheckIf(context, didRemove, "Did not remove attribute", "Removed attribute");
+        }
     }
 }

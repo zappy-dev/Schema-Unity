@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Schema.Core;
 using Schema.Core.Data;
@@ -289,6 +290,8 @@ namespace Schema.Unity.Editor
             // validate manifest is up-to-date with latest template
             var templateManifest = ManifestDataSchemeFactory.BuildTemplateManifestSchema(context, SchemaRuntime.DEFAULT_SCRIPTS_PUBLISH_PATH);
 
+            context.Scheme = templateManifest._;
+            
             var loadedManifestAttributes = LoadedManifestScheme._.GetAttributes();
             var templateAttributes = templateManifest._.GetAttributes();
             // TODO: Should just check if attributes are equal...
@@ -327,12 +330,16 @@ namespace Schema.Unity.Editor
                 entries: LoadedManifestScheme.GetEntries(),
                 operation: (entry) =>
                 {
+                    // special case handling for the manifest scheme self entry...
                     if (entry.SchemeName == Manifest.MANIFEST_SCHEME_NAME)
                     {
                         if (templateManifest.GetSelfEntry(context).Try(out var manifestEntry))
                         {
                             manifestEntry.CSharpExportPath = entry.CSharpExportPath;
-                            manifestEntry.SchemeName = entry.SchemeName;
+
+                            UpdateIdentifierValue(context, templateManifest._,
+                                nameof(ManifestEntry.SchemeName), manifestEntry.SchemeName, entry.SchemeName);
+                            // manifestEntry.SchemeName = entry.SchemeName;
                             manifestEntry.CSharpNamespace = entry.CSharpNamespace;
                             manifestEntry.FilePath = entry.FilePath;
                             manifestEntry.PublishTarget = entry.PublishTarget;
@@ -345,7 +352,8 @@ namespace Schema.Unity.Editor
                     }
                     else
                     {
-                        return templateManifest._.AddEntry(context, entry._);
+                        // entries containing data for attributes that do not exist...
+                        return templateManifest._.AddEntry(context, entry._, runDataValidation: false);
                     }
                 },
                 errorMessage: "Failed to migrate existing entries.",

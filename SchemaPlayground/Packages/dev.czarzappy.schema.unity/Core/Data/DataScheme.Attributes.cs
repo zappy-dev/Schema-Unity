@@ -199,13 +199,13 @@ namespace Schema.Core.Data
             return attributes[attributeIndex];
         }
 
-        public SchemaResult<AttributeDefinition> GetAttributeByName(string attributeName)
+        public SchemaResult<AttributeDefinition> GetAttributeByName(string attributeName, SchemaContext? context = null)
         {
             var attribute = attributes.FirstOrDefault(a => a.AttributeName.Equals(attributeName));
             
             return CheckIf(attribute != null, attribute, 
-                errorMessage: "Attribute does not exist",
-                successMessage: $"Attribute with name '{attributeName}' exist");
+                errorMessage: $"Attribute with name '{attributeName}' does not exist",
+                successMessage: $"Attribute with name '{attributeName}' exist", context);
         }
 
         public SchemaResult<AttributeDefinition> GetAttribute(Func<AttributeDefinition, bool> predicate)

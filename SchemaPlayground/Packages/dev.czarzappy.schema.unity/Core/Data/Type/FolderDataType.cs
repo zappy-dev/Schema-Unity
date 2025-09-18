@@ -45,7 +45,7 @@ namespace Schema.Core.Data
             string resolvedPath = ResolvePath(filePath);
 
             bool directoryExists = Schema.Storage.FileSystem.DirectoryExists(context, resolvedPath);
-            return CheckIf(directoryExists, "Directory do not exist", "Directory exists", context);
+            return CheckIf(directoryExists, $"Directory '{resolvedPath}' do not exist", "Directory exists", context);
         }
 
         public override SchemaResult<object> ConvertData(SchemaContext context, object value)

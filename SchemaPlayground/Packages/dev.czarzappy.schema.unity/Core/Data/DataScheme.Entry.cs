@@ -40,9 +40,13 @@ namespace Schema.Core.Data
                 string attributeName = kvp.Key;
                 // Don't need to validate invalid attribute names, since adding new entry data already does that.
 
-                if (!GetAttributeByName(attributeName).Try(out var attribute))
+                if (!GetAttributeByName(attributeName, context: context).Try(out var attribute))
                 {
-                    return SchemaResult.Fail(context, $"No matching attribute found for '{kvp.Key}'");
+                    // TODO: Figure out a better solution for adding entries that contain unknown attributes
+                    Logger.LogWarning($"Skipping validation for unknown attribute: {attributeName}");
+                    continue;
+                    // skip attribute that doesn't exist, instead of failing to add completely?
+                    // return SchemaResult.Fail(context, $"No matching attribute found for '{kvp.Key}'");
                 }
 
                 var entryValue = kvp.Value;
