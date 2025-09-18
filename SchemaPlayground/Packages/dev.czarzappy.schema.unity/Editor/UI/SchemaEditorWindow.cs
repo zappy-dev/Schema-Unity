@@ -632,13 +632,12 @@ namespace Schema.Unity.Editor
                     EditorUtility.RevealInFinder(ManifestImportPath);
                 }
 
-                // save schemes to manifest
                 if (GUILayout.Button("Save All", DoNotExpandWidthOptions))
                 {
-                    LatestResponse = SaveManifest(new SchemaContext
+                    LatestResponse = Save(new SchemaContext
                     {
                         Driver = "User_Request_Save_All"
-                    });
+                    }, saveManifest: true);
                 }
                 
                 if (GUILayout.Button("Publish All", DoNotExpandWidthOptions))
