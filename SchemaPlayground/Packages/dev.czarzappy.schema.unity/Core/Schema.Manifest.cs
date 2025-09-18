@@ -134,7 +134,9 @@ namespace Schema.Core
             lock (manifestOperationLock)
             {
                 // build template
-                var templateManifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(context, defaultScriptExportPath);
+                var templateManifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(context, 
+                    defaultScriptExportPath,
+                    Path.Combine(DefaultContentDirectory, "Manifest.json"));
                 
                 var createRes = Storage.FileSystem.CreateDirectory(context, defaultScriptExportPath);
                 if (createRes.Failed)

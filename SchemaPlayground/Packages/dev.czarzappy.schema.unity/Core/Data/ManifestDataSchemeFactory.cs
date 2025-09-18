@@ -10,7 +10,9 @@ namespace Schema.Core.Data
         /// Builds a template manifest schema with default attributes and a self-entry.
         /// </summary>
         /// <returns>A <see cref="DataScheme"/> representing the template manifest schema.</returns>
-        public static ManifestScheme BuildTemplateManifestSchema(SchemaContext context, string defaultScriptExportPath)
+        public static ManifestScheme BuildTemplateManifestSchema(SchemaContext context, 
+            string defaultScriptExportPath,
+            string importPath)
         {
             var templateManifestScheme = new DataScheme(Manifest.MANIFEST_SCHEME_NAME);
             templateManifestScheme.AddAttribute(context, new AttributeDefinition
@@ -65,7 +67,7 @@ namespace Schema.Core.Data
             var manifestSelfEntry = new DataEntry(new Dictionary<string, object>
             {
                 { nameof(ManifestEntry.SchemeName), Manifest.MANIFEST_SCHEME_NAME },
-                { nameof(ManifestEntry.FilePath), DataType.Text.CloneDefaultValue() },
+                { nameof(ManifestEntry.FilePath), importPath },
                 { nameof(ManifestEntry.PublishTarget), ManifestScheme.PublishTarget.DEFAULT.ToString() }, // TODO: support enum values
                 { nameof(ManifestEntry.CSharpExportPath), defaultScriptExportPath },
                 { nameof(ManifestEntry.CSharpNamespace), DataType.Text.CloneDefaultValue() }

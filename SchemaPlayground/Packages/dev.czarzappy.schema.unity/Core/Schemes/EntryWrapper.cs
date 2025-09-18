@@ -1,9 +1,10 @@
+using System;
 using Schema.Core.Data;
 
 namespace Schema.Core.Schemes
 {
     [System.Serializable]
-    public class EntryWrapper
+    public class EntryWrapper : IEquatable<EntryWrapper>
     {
         protected readonly DataEntry DataEntry;
         public DataEntry _ => DataEntry;
@@ -23,12 +24,22 @@ namespace Schema.Core.Schemes
 
         public override bool Equals(object obj)
         {
-            return DataEntry.Equals(obj);
+            if (obj is null) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != GetType()) return false;
+            return Equals((EntryWrapper)obj);
         }
 
         public override int GetHashCode()
         {
-            return DataEntry.GetHashCode();
+            return (DataEntry != null ? DataEntry.GetHashCode() : 0);
+        }
+
+        public bool Equals(EntryWrapper other)
+        {
+            if (other is null) return false;
+            if (ReferenceEquals(this, other)) return true;
+            return Equals(DataEntry, other.DataEntry);
         }
     }
 }

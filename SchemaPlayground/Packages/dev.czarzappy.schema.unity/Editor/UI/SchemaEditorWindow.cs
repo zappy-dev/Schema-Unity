@@ -288,17 +288,21 @@ namespace Schema.Unity.Editor
                 Driver = "Manifest Migration Wizard"
             };
             // validate manifest is up-to-date with latest template
-            var templateManifest = ManifestDataSchemeFactory.BuildTemplateManifestSchema(context, SchemaRuntime.DEFAULT_SCRIPTS_PUBLISH_PATH);
+            var templateManifest = ManifestDataSchemeFactory.BuildTemplateManifestSchema(context, 
+                SchemaRuntime.DEFAULT_SCRIPTS_PUBLISH_PATH, 
+                Path.Combine(DefaultContentDirectory, "Manifest.json"));
 
             context.Scheme = templateManifest._;
             
             var loadedManifestAttributes = LoadedManifestScheme._.GetAttributes();
             var templateAttributes = templateManifest._.GetAttributes();
             // TODO: Should just check if attributes are equal...
-            if (loadedManifestAttributes.SequenceEqual(templateAttributes)) return;
+            // also check if the manifest self entry is the same?
+            if (loadedManifestAttributes.SequenceEqual(templateAttributes) &&
+                LoadedManifestScheme.GetSelfEntry(context).Result.Equals(templateManifest.GetSelfEntry(context).Result)) return;
             
             // auto-report differences
-            var sb = BuildAttributeDiffReport(LoadedManifestScheme._, templateManifest._);
+            var sb = BuildDiffReport(context, LoadedManifestScheme, templateManifest);
             bool shouldUpgrade = EditorUtility.DisplayDialog("Schema - Manifest Out-Of-Data",
                 sb.ToString(), "Upgrade", "Skip");
             
@@ -333,16 +337,17 @@ namespace Schema.Unity.Editor
                     // special case handling for the manifest scheme self entry...
                     if (entry.SchemeName == Manifest.MANIFEST_SCHEME_NAME)
                     {
-                        if (templateManifest.GetSelfEntry(context).Try(out var manifestEntry))
+                        if (templateManifest.GetSelfEntry(context).Try(out var templateManifestEntry))
                         {
-                            manifestEntry.CSharpExportPath = entry.CSharpExportPath;
+                            templateManifestEntry.CSharpExportPath = string.IsNullOrWhiteSpace(entry.CSharpExportPath) ? templateManifestEntry.CSharpExportPath : entry.CSharpExportPath;
 
+                            // Setting Manifest to Manifest?
                             UpdateIdentifierValue(context, templateManifest._,
-                                nameof(ManifestEntry.SchemeName), manifestEntry.SchemeName, entry.SchemeName);
+                                nameof(ManifestEntry.SchemeName), templateManifestEntry.SchemeName, entry.SchemeName);
                             // manifestEntry.SchemeName = entry.SchemeName;
-                            manifestEntry.CSharpNamespace = entry.CSharpNamespace;
-                            manifestEntry.FilePath = entry.FilePath;
-                            manifestEntry.PublishTarget = entry.PublishTarget;
+                            templateManifestEntry.CSharpNamespace = string.IsNullOrWhiteSpace(entry.CSharpNamespace) ? templateManifestEntry.CSharpNamespace : entry.CSharpNamespace;
+                            templateManifestEntry.FilePath = string.IsNullOrWhiteSpace(entry.FilePath) ? templateManifestEntry.FilePath : entry.FilePath;
+                            templateManifestEntry.PublishTarget = string.IsNullOrWhiteSpace(entry.PublishTarget) ? templateManifestEntry.PublishTarget : entry.PublishTarget;
                         }
                         // skip manifest...
                         // TODO: What manifest changes could exist in a project's manifest?
@@ -373,10 +378,10 @@ namespace Schema.Unity.Editor
         /// Builds a human-readable report of differences between two manifests' attribute sets.
         /// Reports: added, removed, and modified attributes (per-field deltas).
         /// </summary>
-        private StringBuilder BuildAttributeDiffReport(DataScheme currentManifest, DataScheme templateManifest)
+        private StringBuilder BuildDiffReport(SchemaContext context, ManifestScheme currentManifest, ManifestScheme templateManifest)
         {
-            var currentAttributes = currentManifest.GetAttributes().ToDictionary(a => a.AttributeName);
-            var templateAttributes = templateManifest.GetAttributes().ToDictionary(a => a.AttributeName);
+            var currentAttributes = currentManifest._.GetAttributes().ToDictionary(a => a.AttributeName);
+            var templateAttributes = templateManifest._.GetAttributes().ToDictionary(a => a.AttributeName);
 
             var sb = new StringBuilder();
             sb.AppendLine("Your project is using an out-of-date Manifest version. Would you like to upgrade?");
@@ -481,7 +486,16 @@ namespace Schema.Unity.Editor
 
             if (!anyModified && removed.Count == 0 && added.Count == 0)
             {
-                sb.AppendLine("No differences detected.");
+                var currentSelfEntry = currentManifest.GetSelfEntry(context).Result;
+                var templateSelfEntry = templateManifest.GetSelfEntry(context).Result;
+                if (Equals(currentSelfEntry, templateSelfEntry))
+                {
+                    sb.AppendLine("No differences detected.");
+                }
+                else
+                {
+                    sb.AppendLine("Manifest Self Entry is out-of-date.");
+                }
             }
 
 

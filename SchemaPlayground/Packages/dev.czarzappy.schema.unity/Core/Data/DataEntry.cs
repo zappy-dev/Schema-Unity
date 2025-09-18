@@ -10,7 +10,7 @@ using static Schema.Core.SchemaResult;
 namespace Schema.Core.Data
 {
     [Serializable]
-    public class DataEntry : IEnumerable<KeyValuePair<string, object>>
+    public class DataEntry : IEnumerable<KeyValuePair<string, object>>, IEquatable<DataEntry>
     {
         public string Context => nameof(DataEntry);
         
@@ -392,7 +392,7 @@ namespace Schema.Core.Data
 
         #region Equality Members
 
-        protected bool Equals(DataEntry other)
+        public bool Equals(DataEntry other)
         {
             return entryData.SequenceEqual(other.entryData);
         }

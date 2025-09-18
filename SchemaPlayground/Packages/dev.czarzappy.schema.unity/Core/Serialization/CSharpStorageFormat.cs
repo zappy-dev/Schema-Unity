@@ -71,8 +71,16 @@ namespace Schema.Core.Serialization
         
         public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme scheme)
         {
-            var schemeClassName = $"{scheme.SchemeName}Scheme";
-            var entryClassName = $"{scheme.SchemeName}Entry";
+            var baseSchemeClassIdentifier = scheme.SchemeName
+                .Replace(" ", string.Empty) // remove whitespace
+                .ToPascalCase();
+
+            if (!IsValidIdentifierName(baseSchemeClassIdentifier))
+            {
+                return Fail(context, $"Cannot generate identifier for base class name '{baseSchemeClassIdentifier}'");
+            }
+            var schemeClassName = $"{baseSchemeClassIdentifier}Scheme";
+            var entryClassName = $"{baseSchemeClassIdentifier}Entry";
             var sb = new StringBuilder();
 
             bool useNamespace = !string.IsNullOrWhiteSpace(ManifestEntry.CSharpNamespace);

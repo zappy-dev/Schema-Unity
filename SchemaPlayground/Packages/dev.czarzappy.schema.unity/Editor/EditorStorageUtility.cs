@@ -14,7 +14,9 @@ namespace Schema.Unity.Editor
         {
             var extParts = format.Extension.Split('.');
             var lastExt = extParts[extParts.Length - 1];
-            var exportFileName = $"{scheme.SchemeName}Scheme.{format.Extension}";
+            var sanitizedBaseFileName = scheme.SchemeName
+                .Replace(" ", string.Empty);
+            var exportFileName = $"{sanitizedBaseFileName}Scheme.{format.Extension}";
             Logger.LogDbgVerbose($"Export {exportFileName}, last ext: {lastExt}");
             
             if (!Core.Schema.GetManifestEntryForScheme(scheme).Try(out var manifestEntry, out var manifestError))
