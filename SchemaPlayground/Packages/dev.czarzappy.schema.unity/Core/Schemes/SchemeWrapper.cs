@@ -53,9 +53,9 @@ namespace Schema.Core.Schemes
             return SchemaResult<TEntry>.CheckIf(foundEntry != default, foundEntry, "Entry not found");
         }
 
-        public IEnumerable<TEntry> GetEntries()
+        public IEnumerable<TEntry> GetEntries(SchemaContext context = default)
         {
-            return DataScheme.GetEntries().Select(e => EntryFactory(_, e));
+            return DataScheme.GetEntries(context: context).Select(e => EntryFactory(_, e));
         }
         
         #endregion

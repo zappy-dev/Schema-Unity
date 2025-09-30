@@ -4,13 +4,13 @@ namespace Schema.Core
 {
     public abstract class ResultGenerator
     {
-        internal SchemaResult Fail(string errorMessage, SchemaContext? context = null) => 
+        internal SchemaResult Fail(string errorMessage, SchemaContext context) => 
             new SchemaResult(status: RequestStatus.Failed, message: errorMessage, context: context);
 
         internal SchemaResult Pass(string message = null, SchemaContext? context = null) =>
             new SchemaResult(status: RequestStatus.Passed, message: message, context: context);
 
-        internal SchemaResult CheckIf(bool conditional, string errorMessage, string successMessage, SchemaContext? context = null)
+        internal SchemaResult CheckIf(bool conditional, string errorMessage, string successMessage, SchemaContext context)
         {
             return conditional ? Pass(message: successMessage, context) : Fail(errorMessage, context);
         }

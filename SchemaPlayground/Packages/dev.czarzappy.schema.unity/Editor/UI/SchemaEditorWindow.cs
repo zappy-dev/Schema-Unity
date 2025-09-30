@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -28,6 +29,8 @@ namespace Schema.Unity.Editor
     internal partial class SchemaEditorWindow : EditorWindow
     {
         #region Static Fields and Constants
+
+        public static SchemaEditorWindow Instance { get; private set; }
 
         private const string EDITORPREFS_KEY_SELECTEDSCHEME = "Schema:SelectedSchemeName";
         
@@ -120,6 +123,7 @@ namespace Schema.Unity.Editor
 
         private void OnEnable()
         {
+            Instance = this;
             LogDbgVerbose("Scheme Editor enabled", this);
             isInitialized = false;
             EditorApplication.update += InitializeSafely;
@@ -176,10 +180,12 @@ namespace Schema.Unity.Editor
             {
                 Driver = "Editor_Initialization",
             });
+            
             if (LatestResponse.Passed)
             {
                 // manifest should be loaded at this point
-                tooltipOfTheDay = $"Tip Of The Day: {GetTooltipMessage()}";
+                // TODO: Solve publishing Tooltips for schema itself, multiple schema contexts...
+                // tooltipOfTheDay = $"Tip Of The Day: {GetTooltipMessage()}";
 
                 InitializeFileWatcher();
             }
@@ -269,8 +275,6 @@ namespace Schema.Unity.Editor
         private SchemaResult OnLoadManifest(SchemaContext context)
         {
             LogDbgVerbose($"Loading Manifest", context);
-            // TODO: Figure out why progress reporting is making the Unity Editor unhappy
-            // using var progressReporter = new EditorProgressReporter("Schema", $"Loading Manifest - {context}");
             LatestManifestLoadResponse = LoadManifestFromPath(context, ManifestImportPath);
             LatestResponse = LatestManifestLoadResponse.Cast();
 
@@ -308,10 +312,10 @@ namespace Schema.Unity.Editor
             
             if (!shouldUpgrade) return;
 
-            // TODO: Need to migrate attributes...
             var loadedAttributesLookup = loadedManifestAttributes.ToDictionary(a => a.AttributeName);
             var templateAttributesLookup = templateAttributes.ToDictionary(a => a.AttributeName);
 
+            // Migrate existing attributes
             foreach (var kvp in loadedAttributesLookup)
             {
                 var attributeName = kvp.Key;
@@ -319,15 +323,20 @@ namespace Schema.Unity.Editor
 
                 if (!templateAttributesLookup.TryGetValue(attributeName, out var templateAttribute))
                 {
+                    // Not in templates, maybe a project-defined manifest attribute?
                     continue;
                 }
 
+                // Is this flipped?...
+                // need a better heuristic for handling migrations...
+                // maybe need to remember the previous manifest values?
                 loadedAttribute.ColumnWidth = templateAttribute.ColumnWidth;
                 loadedAttribute.AttributeToolTip = templateAttribute.AttributeToolTip;
                 loadedAttribute.ShouldPublish = templateAttribute.ShouldPublish;
                 loadedAttribute.IsIdentifier = templateAttribute.IsIdentifier;
                 loadedAttribute.DefaultValue = templateAttribute.CloneDefaultValue();
                 loadedAttribute.DataType = templateAttribute.DataType.Clone() as DataType;
+                
             }
             
             var migrateRes = BulkResult(
@@ -339,15 +348,16 @@ namespace Schema.Unity.Editor
                     {
                         if (templateManifest.GetSelfEntry(context).Try(out var templateManifestEntry))
                         {
-                            templateManifestEntry.CSharpExportPath = string.IsNullOrWhiteSpace(entry.CSharpExportPath) ? templateManifestEntry.CSharpExportPath : entry.CSharpExportPath;
-
-                            // Setting Manifest to Manifest?
-                            UpdateIdentifierValue(context, templateManifest._,
-                                nameof(ManifestEntry.SchemeName), templateManifestEntry.SchemeName, entry.SchemeName);
+                            
+                            // Core.Schema.UpdateIdentifierValue(context, Manifest.MANIFEST_SCHEME_NAME, entry.SchemeName, )
+                            // templateManifest._.ident
+                            // manifestEntry
                             // manifestEntry.SchemeName = entry.SchemeName;
-                            templateManifestEntry.CSharpNamespace = string.IsNullOrWhiteSpace(entry.CSharpNamespace) ? templateManifestEntry.CSharpNamespace : entry.CSharpNamespace;
-                            templateManifestEntry.FilePath = string.IsNullOrWhiteSpace(entry.FilePath) ? templateManifestEntry.FilePath : entry.FilePath;
-                            templateManifestEntry.PublishTarget = string.IsNullOrWhiteSpace(entry.PublishTarget) ? templateManifestEntry.PublishTarget : entry.PublishTarget;
+                            templateManifestEntry.CSharpExportPath = entry.CSharpExportPath;
+                            templateManifestEntry.CSharpNamespace = entry.CSharpNamespace;
+                            templateManifestEntry.FilePath = entry.FilePath;
+                            templateManifestEntry.PublishTarget = entry.PublishTarget;
+                            // TODO: Make sure to update for future parameters? Code gen?
                         }
                         // skip manifest...
                         // TODO: What manifest changes could exist in a project's manifest?
@@ -526,15 +536,6 @@ namespace Schema.Unity.Editor
         #endregion
 
         #region Rendering Methods
-
-        /// <summary>
-        /// Utility method for release focus from a selected control.
-        /// Selecting a control can prevent it from updating with new values. By forcing a release of the focus, these controls can repaint with new values
-        /// </summary>
-        private void ReleaseControlFocus()
-        {
-            GUI.FocusControl(null);
-        }
         private string GetTooltipMessage()
         {
             if (!GetScheme("Tooltips").Try(out var tooltipDataScheme)) 
@@ -646,7 +647,6 @@ namespace Schema.Unity.Editor
                     {
                         Driver = "User_Request_Publish_All"
                     });
-                    EditorUtility.DisplayDialog("Schema", (LatestResponse.Passed) ? "Successfully published all Schemes!" : LatestResponse.Message, "Ok");
                 }
             }
 
@@ -660,6 +660,9 @@ namespace Schema.Unity.Editor
             {
                 EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestResponse.Message}", LatestResponse.MessageType());
             }
+
+            EditorGUILayout.TextField("Current Event", Event.current.ToString());
+            EditorGUILayout.Vector2Field("Mouse Pos", Event.current.mousePosition);
 #endif
 
             // Do not render more until we have valid manifest loaded
@@ -691,6 +694,20 @@ namespace Schema.Unity.Editor
             }
             // Table View
             GUILayout.EndHorizontal();
+
+            if (!string.IsNullOrWhiteSpace(nextControlToFocus))
+            {
+                Logger.LogDbgVerbose($"Setting focus on control: {nextControlToFocus}");
+                GUI.FocusControl(nextControlToFocus);
+                nextControlToFocus = null;
+            }
+
+            if (releaseControl)
+            {
+                Logger.LogDbgVerbose($"Releasing focus");
+                GUI.FocusControl(nextControlToFocus);
+                releaseControl = false;
+            }
         }
 
         /// <summary>
@@ -705,8 +722,13 @@ namespace Schema.Unity.Editor
                 // New Schema creation form
                 using (new EditorGUILayout.HorizontalScope(DoNotExpandWidthOptions))
                 {
+                    LogEvent(new Event(Event.current));
                     // Input field to add a new scheme
+                    GUI.SetNextControlName(CONTROL_NAME_NEW_SCHEME_NAME_FIELD);
                     newSchemeName = EditorGUILayout.TextField( newSchemeName, DoNotExpandWidthOptions);
+                    
+                    // Logger.LogDbgVerbose($"GUI.GetNameOfFocusedControl(): {GUI.GetNameOfFocusedControl()}");
+                    // Logger.LogDbgVerbose($"[{Time.frameCount}] newSchemeName: {newSchemeName}");
 
                     using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newSchemeName)))
                     {
@@ -716,6 +738,17 @@ namespace Schema.Unity.Editor
                             {
                                 Driver = "User_Create_New_Schema"
                             });
+                        }
+
+                        if (Event.current.type == EventType.Repaint)
+                        {
+                            // var r = GUILayoutUtility.GetLastRect();              // group-space
+                            // var screenTL = GUIUtility.GUIToScreenPoint(r.position);
+                            // var winTL    = (Vector2)position.position;           // window top-left in screen coords
+                            // CreateNewSchemeButtonWinRect = new Rect(screenTL - winTL, r.size);
+                            // CreateNewSchemeButtonWinRect = new Rect(r);
+                            CreateNewSchemeButtonWinRect = this.GetLastScreenRect();
+                            // Logger.LogDbgVerbose($"rect capture, r: {r}, {nameof(CreateNewSchemeButtonWinRect)}: {CreateNewSchemeButtonWinRect}");
                         }
                     }
                 }
@@ -792,7 +825,16 @@ namespace Schema.Unity.Editor
                             return s.DisplayName;
 #endif
                         }).ToArray(), 1, LeftAlignedButtonStyle);
-                        
+
+
+                        if (Event.current.type == EventType.Repaint)
+                        {
+                            ExplorerWinRect = this.GetLastScreenRect();
+                            // Logger.LogDbgVerbose($"ExplorerWinRect: {ExplorerWinRect}");
+                        }
+
+                        OverlapChecker(nameof(ExplorerWinRect), ExplorerWinRect);
+
                         if (schemeChange.changed)
                         {
                             var nextSelectedSchema = schemeNames[selectedSchemaIndex];
@@ -802,6 +844,14 @@ namespace Schema.Unity.Editor
                 }
             }
         }
+
+        private void LogEvent(Event current)
+        {
+            // Logger.LogDbgVerbose($"[{Time.frameCount}] Event.current: {Event.current}, isKey: {Event.current.isKey}");
+            eventHistory.Add((Time.frameCount, current));
+        }
+        
+        
 
         private SchemaResult CreateNewScheme(SchemaContext context)
         {

@@ -44,7 +44,7 @@ public class TestSchema
         var newScheme = new DataScheme(newSchemeName);
 
         // Act
-        var addResponse = Schema.LoadDataScheme(newScheme, overwriteExisting);
+        var addResponse = Schema.LoadDataScheme(Context, newScheme, overwriteExisting);
         
         // Assert
         Assert.IsTrue(addResponse.Passed);
@@ -60,7 +60,7 @@ public class TestSchema
     [TestCase("missing.json")]
     public void Test_LoadManifest_BadPath(string? badManifestPath)
     {
-        var loadResponse = Schema.LoadManifestFromPath(badManifestPath, Context);
+        var loadResponse = Schema.LoadManifestFromPath(Context, badManifestPath);
         Assert.IsFalse(loadResponse.Passed);
     }
     
@@ -70,13 +70,13 @@ public class TestSchema
         string malformedFilePath = "malformed.json";
         
         // Arrange
-        _mockFileSystem.Setup(fs => fs.FileExists(malformedFilePath))
+        _mockFileSystem.Setup(fs => fs.FileExists(Context, malformedFilePath))
             .Returns(SchemaResult.Pass());
-        _mockFileSystem.Setup(fs => fs.ReadAllText(malformedFilePath))
+        _mockFileSystem.Setup(fs => fs.ReadAllText(Context, malformedFilePath))
             .Returns(SchemaResult<string>.Pass("malformedContent"));
         
         // Act
-        var loadResponse = Schema.LoadManifestFromPath(malformedFilePath, Context);
+        var loadResponse = Schema.LoadManifestFromPath(Context, malformedFilePath);
         
         // Assert
         Assert.IsFalse(loadResponse.Passed);
@@ -89,14 +89,14 @@ public class TestSchema
         // Arrange
         
         var manifestSavePath = $"{Manifest.MANIFEST_SCHEME_NAME}.json";
-        var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema();
+        var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(Context);
         
-        manifestScheme.AddManifestEntry("Invalid");
+        manifestScheme.AddManifestEntry(Context, "Invalid");
         
         MockPersistScheme(manifestSavePath, manifestScheme);
         
         // Act
-        var loadResponse = Schema.LoadManifestFromPath(manifestSavePath, Context);
+        var loadResponse = Schema.LoadManifestFromPath(Context, manifestSavePath);
         
         // Assert
         Assert.IsTrue(loadResponse.Passed);
@@ -109,19 +109,19 @@ public class TestSchema
 
     private void MockPersistScheme(string filePath, DataScheme scheme, bool mockRead = true, bool mockWrite = false)
     {
-        _mockFileSystem.Setup(m => m.FileExists(filePath)).Returns(SchemaResult.Pass()).Verifiable();
+        _mockFileSystem.Setup(m => m.FileExists(Context, filePath)).Returns(SchemaResult.Pass()).Verifiable();
 
         if (mockRead)
         {
-            _mockFileSystem.Setup(m => m.ReadAllText(filePath))
+            _mockFileSystem.Setup(m => m.ReadAllText(Context, filePath))
                 .Returns(SchemaResult<string>.Pass(Schema.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
         }
 
         if (mockWrite)
         {
-            _mockFileSystem.Setup(m => m.DirectoryExists("")).Returns(SchemaResult.Pass()).Verifiable();
-            _mockFileSystem.Setup(m => m.FileExists(filePath)).Returns(SchemaResult.Pass()).Verifiable();
-            _mockFileSystem.Setup(m => m.WriteAllText(filePath, Schema.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
+            _mockFileSystem.Setup(m => m.DirectoryExists(Context, "")).Returns(true).Verifiable();
+            _mockFileSystem.Setup(m => m.FileExists(Context, filePath)).Returns(SchemaResult.Pass()).Verifiable();
+            _mockFileSystem.Setup(m => m.WriteAllText(Context, filePath, Schema.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
         }
     }
 
@@ -131,10 +131,10 @@ public class TestSchema
         Logger.Level = Logger.LogLevel.VERBOSE;
         // Arrange
         var manifestFilePath = $"{Manifest.MANIFEST_SCHEME_NAME}.json";
-        var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema();
+        var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(Context);
         
         // Update manifest entry to be aware of self path
-        var manifestSelfEntry = manifestScheme.SelfEntry;
+        var manifestSelfEntry = manifestScheme.GetSelfEntry(Context).AssertPassed();
         
         manifestSelfEntry.FilePath = manifestFilePath;
         
@@ -146,12 +146,12 @@ public class TestSchema
         MockPersistScheme(testDataSchemeFilePath, testDataScheme);
 
         // add test data scheme manifest entry
-        manifestScheme.AddManifestEntry(testDataSchemeName, importFilePath: testDataSchemeFilePath).AssertPassed();
+        manifestScheme.AddManifestEntry(Context, testDataSchemeName, importFilePath: testDataSchemeFilePath).AssertPassed();
 
         MockPersistScheme(manifestFilePath, manifestScheme);
 
         // Act
-        Schema.LoadManifestFromPath(manifestFilePath, Context).AssertPassed();
+        Schema.LoadManifestFromPath(Context, manifestFilePath).AssertPassed();
         Schema.GetManifestEntryForScheme(testDataScheme).TryAssert(out var testDataEntry);
         
         // Assert
@@ -171,7 +171,7 @@ public class TestSchema
     [Test, TestCaseSource(nameof(BadManifestEntryTestCases))]
     public void Test_LoadSchemeFromManifestEntry_BadEntry(ManifestEntry? manifestEntry)
     {
-        var res = Schema.LoadSchemeFromManifestEntry(manifestEntry);
+        var res = Schema.LoadSchemeFromManifestEntry(Context, manifestEntry);
         res.AssertFailed();
     }
 
@@ -196,7 +196,7 @@ public class TestSchema
     [Test, TestCaseSource(nameof(BadSchemeTestCases))]
     public bool Test_SaveDataScheme_BadScheme(DataScheme scheme)
     {
-        var saveResponse = Schema.SaveDataScheme(scheme, true);
+        var saveResponse = Schema.SaveDataScheme(Context, scheme, true);
         return saveResponse.Passed;
     }
 
@@ -207,10 +207,10 @@ public class TestSchema
         var newScheme = new DataScheme("Foo");
         var newSchemeFilePath = "Foo.json";
         MockPersistScheme(newSchemeFilePath, newScheme);
-        Schema.LoadDataScheme(newScheme, true, importFilePath: newSchemeFilePath).AssertPassed();
+        Schema.LoadDataScheme(Context, newScheme, true, importFilePath: newSchemeFilePath).AssertPassed();
         
         // Act
-        Schema.SaveDataScheme(newScheme, false).AssertPassed();
+        Schema.SaveDataScheme(Context, newScheme, false).AssertPassed();
     }
     
     [Test]
@@ -218,12 +218,12 @@ public class TestSchema
     {
         Logger.Level = Logger.LogLevel.VERBOSE;
         var manifestSavePath = $"{Manifest.MANIFEST_SCHEME_NAME}.json";
-        var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema();
-        var manifestSelfEntry = manifestScheme.SelfEntry;
+        var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(Context);
+        var manifestSelfEntry = manifestScheme.GetSelfEntry(Context).AssertPassed();
 
         manifestSelfEntry.FilePath = manifestSavePath;
         
-        Schema.SaveDataScheme(manifestScheme._, true).AssertFailed();
+        Schema.SaveDataScheme(Context, manifestScheme._, true).AssertFailed();
     }
     
     [Test]
@@ -232,7 +232,7 @@ public class TestSchema
         Logger.Level = Logger.LogLevel.VERBOSE;
         var dataScheme = new DataScheme("Foo");
         
-        Schema.SaveDataScheme(dataScheme, true).AssertFailed();
+        Schema.SaveDataScheme(Context, dataScheme, true).AssertFailed();
     }
     
     [Test]
@@ -240,7 +240,7 @@ public class TestSchema
     {
         Logger.Level = Logger.LogLevel.VERBOSE;
         
-        Schema.Save(saveManifest: true).AssertFailed();
+        Schema.Save(Context, saveManifest: true).AssertFailed();
     }
     
     [Test]
@@ -249,17 +249,17 @@ public class TestSchema
         Logger.Level = Logger.LogLevel.VERBOSE;
         
         var manifestSavePath =  $"{Manifest.MANIFEST_SCHEME_NAME}.json";
-        var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema();
-        var manifestSelfEntry = manifestScheme.SelfEntry;
+        var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(Context);
+        var manifestSelfEntry = manifestScheme.GetSelfEntry(Context).AssertPassed();
 
         Schema.ManifestImportPath = manifestSavePath;
         manifestSelfEntry.FilePath = manifestSavePath;
         MockPersistScheme(manifestSavePath, manifestScheme, mockRead: false, mockWrite: true);
         
-        var loadRes = Schema.LoadDataScheme(manifestScheme._, true);
+        var loadRes = Schema.LoadDataScheme(Context, manifestScheme._, true);
         loadRes.AssertPassed();
         
-        var saveRes = Schema.SaveDataScheme(manifestScheme._, true);
+        var saveRes = Schema.SaveDataScheme(Context, manifestScheme._, true);
         saveRes.AssertPassed();
         _mockFileSystem.VerifyAll();
         _mockFileSystem.VerifyNoOtherCalls();
@@ -279,7 +279,7 @@ public class TestSchema
     {
         string manifestSavePath = "Manifest.json";
         Schema.ManifestImportPath = manifestSavePath;
-        var saveResponse = Schema.SaveManifest();
+        var saveResponse = Schema.SaveManifest(Context);
         Assert.IsTrue(saveResponse.Passed);
     }
 
@@ -288,12 +288,12 @@ public class TestSchema
     {
         // Arrange: No schemes are dirty
         var scheme = new DataScheme("Clean");
-        Schema.LoadDataScheme(scheme, true, importFilePath: "Clean.json");
-        scheme.IsDirty = false;
+        Schema.LoadDataScheme(Context, scheme, true, importFilePath: "Clean.json");
+        scheme.SetDirty(Context, false);
         
         // Act
         Logger.Level = Logger.LogLevel.VERBOSE;
-        var result = Schema.Save(saveManifest: false);
+        var result = Schema.Save(Context, saveManifest: false);
         
         // Assert
         result.AssertPassed();
@@ -305,17 +305,17 @@ public class TestSchema
     [Test]
     public void Test_Save_OneDirtyScheme_SavesAndClearsDirtyFlag()
     {
-        _mockFileSystem.Setup(fs => fs.DirectoryExists("")).Returns(SchemaResult.Pass()).Verifiable();
+        _mockFileSystem.Setup(fs => fs.DirectoryExists(Context, "")).Returns(true).Verifiable();
         
         // Arrange
         var scheme = new DataScheme("Dirty");
-        _mockFileSystem.Setup(fs => fs.WriteAllText("Dirty.json", Schema.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
+        _mockFileSystem.Setup(fs => fs.WriteAllText(Context, "Dirty.json", Schema.Storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed())).Verifiable();
         
-        Schema.LoadDataScheme(scheme, true, importFilePath: "Dirty.json");
-        scheme.IsDirty = true;
+        Schema.LoadDataScheme(Context, scheme, true, importFilePath: "Dirty.json");
+        scheme.SetDirty(Context, true);
         
         // Act
-        var result = Schema.Save(saveManifest: false);
+        var result = Schema.Save(Context, saveManifest: false);
         
         // Assert
         result.AssertPassed();
@@ -329,12 +329,12 @@ public class TestSchema
     {
         // Arrange
         var scheme = new DataScheme("Failing");
-        Schema.LoadDataScheme(scheme, true);
-        scheme.IsDirty = true;
+        Schema.LoadDataScheme(Context, scheme, true);
+        scheme.SetDirty(Context, true);
         // Mock manifest entry
-        var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema();
-        manifestScheme.AddManifestEntry(scheme.SchemeName, importFilePath: "Failing.json");
-        Schema.LoadDataScheme(manifestScheme._, true);
+        var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(Context);
+        manifestScheme.AddManifestEntry(Context, scheme.SchemeName, importFilePath: "Failing.json");
+        Schema.LoadDataScheme(Context, manifestScheme._, true);
     }
 
     [Test]
@@ -343,15 +343,15 @@ public class TestSchema
         // Arrange
         var scheme1 = new DataScheme("Dirty1");
         var scheme2 = new DataScheme("Dirty2");
-        Schema.LoadDataScheme(scheme1, true);
-        Schema.LoadDataScheme(scheme2, true);
-        scheme1.IsDirty = true;
-        scheme2.IsDirty = true;
+        Schema.LoadDataScheme(Context, scheme1, true);
+        Schema.LoadDataScheme(Context, scheme2, true);
+        scheme1.SetDirty(Context, true);
+        scheme2.SetDirty(Context, true);
         // Mock manifest entries
-        var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema();
-        manifestScheme.AddManifestEntry(scheme1.SchemeName, importFilePath: "Dirty1.json");
-        manifestScheme.AddManifestEntry(scheme2.SchemeName, importFilePath: "Dirty2.json");
-        Schema.LoadDataScheme(manifestScheme._, true);
+        var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(Context);
+        manifestScheme.AddManifestEntry(Context, scheme1.SchemeName, importFilePath: "Dirty1.json");
+        manifestScheme.AddManifestEntry(Context, scheme2.SchemeName, importFilePath: "Dirty2.json");
+        Schema.LoadDataScheme(Context, manifestScheme._, true);
         // As above, patching SaveDataScheme to fail for one scheme is not trivial without refactor
         // Placeholder for the failure path
     }

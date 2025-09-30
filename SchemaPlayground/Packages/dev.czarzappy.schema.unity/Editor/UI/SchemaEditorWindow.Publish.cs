@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Schema.Core;
 using Schema.Core.Data;
@@ -96,7 +97,7 @@ namespace Schema.Unity.Editor
             }
             
             // second clone data entries, stripped for only published entries
-            foreach (var entry in originalSchemeToPublish.GetEntries())
+            foreach (var entry in originalSchemeToPublish.GetEntries(context: context))
             {
                 var publishedEntry = new DataEntry();
 
@@ -205,16 +206,17 @@ namespace Schema.Unity.Editor
             return Pass($"Saving changes to asset: {currentAsset}");
         }
 
-        private SchemaResult PublishAllSchemes(SchemaContext context)
+
+        private SchemaResult BulkPublishSchemes(SchemaContext context, IReadOnlyList<string> schemeNames)
         {
             using var progressScope = new ProgressScope("Schema - Publish All");
             // TODO: need a way of generating an aggregate schema result
             bool success = true;
             int progress = 1;
-            int total = AllSchemes.Count();
+            int total = schemeNames.Count;
 
-            return BulkResult(
-                entries: AllSchemes,
+            var bulkRes =  BulkResult(
+                entries: schemeNames,
                 operation: (schemeName) =>
                 {
                     progressScope.Progress($"Publishing Scheme '{schemeName}' ({progress} / {total})",
@@ -223,6 +225,30 @@ namespace Schema.Unity.Editor
                     return PublishScheme(context, schemeName);
                 },
                 errorMessage: "Failed to publish all schemes. Check console logs for more details.");
+            
+            EditorUtility.DisplayDialog("Schema", (bulkRes.Passed) ? "Successfully published all Schemes!" : bulkRes.Message, "Ok");
+            return bulkRes;
+        }
+        
+        private SchemaResult PublishAllSchemes(SchemaContext context)
+        {
+            return BulkPublishSchemes(context, AllSchemes.ToList());
+            // using var progressScope = new ProgressScope("Schema - Publish All");
+            // // TODO: need a way of generating an aggregate schema result
+            // bool success = true;
+            // int progress = 1;
+            // int total = AllSchemes.Count();
+            //
+            // return BulkResult(
+            //     entries: AllSchemes,
+            //     operation: (schemeName) =>
+            //     {
+            //         progressScope.Progress($"Publishing Scheme '{schemeName}' ({progress} / {total})",
+            //             progress * 1.0f / total);
+            //         progress++;
+            //         return PublishScheme(context, schemeName);
+            //     },
+            //     errorMessage: "Failed to publish all schemes. Check console logs for more details.");
             // foreach (var schemeName in AllSchemes)
             // {
             //     progressScope.Progress($"Publishing Scheme '{schemeName}' ({progress} / {total})", progress * 1.0f / total);

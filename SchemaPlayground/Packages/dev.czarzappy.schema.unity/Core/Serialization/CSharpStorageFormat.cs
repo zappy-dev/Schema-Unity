@@ -59,7 +59,7 @@ namespace Schema.Core.Serialization
                 }
                 else
                 {
-                    if (!(char.IsLetterOrDigit(id[i]) ||  id[i] == '_' || id[i] == '-'))
+                    if (!(char.IsLetterOrDigit(id[i]) ||  id[i] == '_'))
                     {
                         return false;
                     }
@@ -96,7 +96,6 @@ namespace Schema.Core.Serialization
 $@"using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Schemes;
-using UnityEngine;
 using static Schema.Core.Schema;
 
 {namespaceHeaderCode}
@@ -111,9 +110,10 @@ using static Schema.Core.Schema;
 ");
 
             var hasIdAttr = scheme.GetIdentifierAttribute().Try(out var idAttr);
+            var shouldGenerateIds = ManifestEntry.CSharpGenerateIds && hasIdAttr;
             // ID Entry Enum
             // TODO: Sanitize identifier enums and validate the use-case for this
-            if (hasIdAttr)
+            if (shouldGenerateIds)
             {
                 sb.Append(
 $@"     
@@ -124,6 +124,9 @@ $@"
                 {
                     string sanitizedId = identifierValue.ToString()
                         .Replace(' ', '_') // replace whitespace
+                        .Replace('-', '_') // replace whitespace
+                        .Replace("#", "POUND") // replace whitespace
+                        .Replace(",", string.Empty) // replace commas
                         .ToUpper();
                     if (!IsValidIdentifierName(sanitizedId))
                     {
@@ -140,9 +143,10 @@ $@"
                         case IntegerDataType _:
                             idValueCode = identifierValue.ToString();
                             break;
+                        default:
+                            return Fail(context, $"No code mapping for identifier data type: {idAttr}");
                     }
                     
-                    // TODO: this is only correct if the value is a string...
                     sb.Append(
 $@"         
             public const string {sanitizedId} = {idValueCode};
@@ -183,7 +187,6 @@ $@"
         }}
     }}
 
-    [SerializeField]
     public partial class {entryClassName} : EntryWrapper
     {{
         public {entryClassName}(DataScheme dataScheme, DataEntry entry) : base(dataScheme, entry) {{}}

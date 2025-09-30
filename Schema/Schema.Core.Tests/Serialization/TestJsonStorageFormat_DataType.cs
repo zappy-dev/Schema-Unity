@@ -10,6 +10,10 @@ namespace Schema.Core.Tests.Serialization;
 [TestFixture]
 public class TestJsonStorageFormat_DataType
 {
+    private static SchemaContext Context = new SchemaContext
+    {
+        Driver = nameof(TestJsonStorageFormat_DataType)
+    };
     private JsonStorageFormat<DataType> dataTypeStorageFormat;
     
     [SetUp]
@@ -23,7 +27,7 @@ public class TestJsonStorageFormat_DataType
     public void Test_TryDeserialize(string testJsonString, bool expectedSuccess, object expectedData, bool _, string _2)
     {
         // Test code here
-        if (dataTypeStorageFormat.Deserialize(testJsonString)
+        if (dataTypeStorageFormat.Deserialize(Context, testJsonString)
             .TryAssertCondition(expectedSuccess, out var data))
         {
             Assert.That(data, Is.EqualTo(expectedData));

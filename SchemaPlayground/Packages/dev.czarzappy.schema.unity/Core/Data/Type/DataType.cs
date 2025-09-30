@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Newtonsoft.Json;
 using Schema.Core.Logging;
 
 namespace Schema.Core.Data
@@ -67,6 +68,7 @@ namespace Schema.Core.Data
         /// <summary>
         /// Gets the name of the data type.
         /// </summary>
+        [JsonIgnore]
         public abstract string TypeName { get; }
 
         /// <summary>

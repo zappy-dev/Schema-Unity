@@ -6,7 +6,7 @@ using Schema.Core.Data;
 
 namespace Schema.Core.Serialization
 {
-    public class DataTypeConverter : JsonConverter
+    public class DataTypeJsonConverter : JsonConverter
     {
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {

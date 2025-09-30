@@ -10,6 +10,10 @@ namespace Schema.Core
         public string DataType;
         public string Driver;
 
+        public bool IsEmpty => string.IsNullOrEmpty(AttributeName) && 
+                               string.IsNullOrEmpty(DataType) && 
+                               string.IsNullOrEmpty(Driver) && Scheme == null;
+
         public override string ToString()
         {
             var sb = new StringBuilder();

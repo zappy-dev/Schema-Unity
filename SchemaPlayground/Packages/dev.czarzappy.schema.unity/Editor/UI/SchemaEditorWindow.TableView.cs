@@ -9,8 +9,10 @@ using Schema.Core.Data;
 using Schema.Core.DataStructures;
 using Schema.Core.IO;
 using Schema.Core.Serialization;
+using Schema.Unity.Editor.Ext;
 using Unity.Profiling;
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
 using static Schema.Core.Schema;
 using static Schema.Core.Logging.Logger;
@@ -71,10 +73,10 @@ namespace Schema.Unity.Editor
                     x = SettingsWidth;
                     for (int i = 0; i < columnIndex; i++)
                     {
-                        var iAttr = scheme.GetAttribute(i);
+                        var iAttr = scheme.GetAttribute(i).Result;
                         x += iAttr.ColumnWidth;
                     }
-                    var attribute = scheme.GetAttribute(columnIndex);
+                    var attribute = scheme.GetAttribute(columnIndex).Result;
                     width = attribute.ColumnWidth;
                 }
                 
@@ -104,8 +106,12 @@ namespace Schema.Unity.Editor
             }
             
             Logger.LogDbgVerbose($"Refreshing Table Entries for scheme: {scheme}");
+            var refreshCtx = new SchemaContext
+            {
+                Driver = "Editor_Refresh_Table_Entries"
+            };
             var sortOrder = GetSortOrderForScheme(scheme);
-            var realAllEntries = scheme.GetEntries(sortOrder);
+            var realAllEntries = scheme.GetEntries(sortOrder, context: refreshCtx);
             
             var compiledFilters = GetAttributeFiltersForScheme(scheme);
             if (compiledFilters.Count <= 0)
@@ -228,11 +234,11 @@ namespace Schema.Unity.Editor
 
                     if (GUILayout.Button("Publish", ExpandWidthOptions))
                     {
-                        PublishScheme(new SchemaContext
+                        BulkPublishSchemes(new SchemaContext
                         {
                             Scheme = scheme,
                             Driver = "User_Request_Publish_Scheme",
-                        }, selectedSchemeName);
+                        }, new [] { selectedSchemeName });
                     }
 
                     // TODO: Open raw schema files
@@ -483,7 +489,7 @@ namespace Schema.Unity.Editor
                         // render column attribute headings
                         for (var attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                         {
-                            var attribute = scheme.GetAttribute(attributeIdx);
+                            var attribute = scheme.GetAttribute(attributeIdx).Result;
 
                             // column settings gear
                             string attributeLabel = attribute.AttributeName;
@@ -559,7 +565,7 @@ namespace Schema.Unity.Editor
                         // GUILayout.Space(SETTINGS_WIDTH); // for the row number column
                         for (var attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
                         {
-                            var attribute = scheme.GetAttribute(attributeIdx);
+                            var attribute = scheme.GetAttribute(attributeIdx).Result;
                             string filterValue = attributeFilters.TryGetValue(attribute.AttributeName, out var val)
                                 ? val
                                 : string.Empty;
@@ -753,9 +759,31 @@ namespace Schema.Unity.Editor
                             scheme.ConvertAttributeType(ctx, attributeName: attribute.AttributeName,
                                 newType: builtInType);
                     });
+                
+                // List variant
+                columnOptionsMenu.AddItem(new GUIContent($"Convert Type/List/{builtInType.TypeName}"), 
+                    isMatchingType, // TODO: fix this matching type logic
+                    () =>
+                    {
+                        var ctx = new SchemaContext
+                        {
+                            Driver = "User_Convert_Attribute_Type",
+                            Scheme = scheme,
+                            AttributeName = attribute.AttributeName
+                        };
+                        var newListDataType = new ListDataType(builtInType, ctx);
+                        LatestResponse =
+                            scheme.ConvertAttributeType(ctx, attributeName: attribute.AttributeName,
+                                newType: newListDataType);
+                    });
             }
+            
+            // handle list data type conversion
+            // ... can convert to a List data type of any other type...?
+            
                             
             columnOptionsMenu.AddSeparator("Convert Type");
+            // render reference type conversions
             foreach (var schemeName in AllSchemes.OrderBy(s => s))
             {
                 if (GetScheme(schemeName).Try(out var dataSchema) 
@@ -776,6 +804,23 @@ namespace Schema.Unity.Editor
                             LatestResponse =
                                 scheme.ConvertAttributeType(ctx, attributeName: attribute.AttributeName,
                                     newType: referenceDataType);
+                        });
+                    
+                    // List variant
+                    columnOptionsMenu.AddItem(new GUIContent($"Convert Type/List/{referenceDataType.TypeName}"),
+                        on: isMatchingType, // TODO: fix this matching type logic
+                        () =>
+                        {
+                            var ctx = new SchemaContext
+                            {
+                                Driver = "User_Convert_Attribute",
+                                AttributeName = attribute.AttributeName,
+                                Scheme = scheme,
+                            };
+                            var newListDataType = new ListDataType(referenceDataType, ctx);
+                            LatestResponse =
+                                scheme.ConvertAttributeType(ctx, attributeName: attribute.AttributeName,
+                                    newType: newListDataType);
                         });
                 }
             }
@@ -845,6 +890,7 @@ namespace Schema.Unity.Editor
                 Driver = "User_Update_Entry_Value",
                 Scheme = scheme,
             };
+            
             // Render based on data type
             switch (attribute.DataType)
             {
@@ -891,12 +937,38 @@ namespace Schema.Unity.Editor
                     RenderGuidCell(cellRect, entryValue is Guid ? (Guid)entryValue : default, cellStyle,
                         value => UpdateEntryValue(ctx, entry, attribute, value, scheme));
                     break;
+                case ListDataType _:
+                    RenderListCell(cellRect, entryValue, cellStyle, value => UpdateEntryValue(ctx, entry,  attribute, value, scheme));
+                    break;
                 default:
                     RenderUnmappedFieldCell(cellRect, entryValue, cellStyle);
                     break;
             }
             
             GUI.backgroundColor = originalColor;
+        }
+
+        private void RenderListCell(Rect cellRect, object entryValue, CellStyle cellStyle, Action<object> action)
+        {
+            // rendering list
+            var elements = new string[] { };
+            
+            var list = new ReorderableList(elements, typeof(string), true, false,  true, true);
+            list.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Items");
+            list.drawElementCallback = (rect, index, active, focused) =>
+            {
+                rect.y += 2;
+                var el = elements[index];
+                elements[index] = EditorGUI.TextField(rect, $"Element {index}", el);
+            };
+            list.onAddCallback = rl =>
+            {
+            };
+            list.onRemoveCallback = rl =>
+            {
+            };
+            
+            list.DoLayoutList();
         }
 
         private void RenderGuidCell(Rect cellRect, Guid entryValue, CellStyle cellStyle, Action<object> action)
@@ -1147,7 +1219,7 @@ namespace Schema.Unity.Editor
             // Render data cells
             for (int attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
             {
-                var attribute = scheme.GetAttribute(attributeIdx);
+                var attribute = scheme.GetAttribute(attributeIdx).Result;
                 var cellRect = new Rect(currentX, rowRect.y, attribute.ColumnWidth, _tableLayout.RowHeight);
                 var entryValue = GetEntryValue(scheme, entry, attribute);
                 

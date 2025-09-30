@@ -22,6 +22,10 @@ namespace ExampleProject.Schemes
             public const string MANIFEST = "Manifest";
          
             public const string ENTITIES = "Entities";
+         
+            public const string REWARDTYPE = "RewardType";
+         
+            public const string CHESTS = "Chests";
      
         }
 

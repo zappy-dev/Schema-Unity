@@ -16,7 +16,7 @@ namespace Schema.Core.Data
             var entry = new DataEntry();
             foreach (var attribute in attributes)
             {
-                SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue(), context: context);
+                SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue(), allowIdentifierUpdate: true, context: context);
             }
             
             entries.Add(entry);
@@ -26,7 +26,8 @@ namespace Schema.Core.Data
 
         public SchemaResult AddEntry(SchemaContext context, DataEntry newEntry, bool runDataValidation = true)
         {
-            Logger.LogDbgVerbose($"Adding {newEntry}...", this);
+            using var _ = new SchemeContextScope(ref context, this);
+            Logger.LogDbgVerbose($"Adding {newEntry}...", context);
             if (newEntry is null)
             {
                 return SchemaResult.Fail(context, "Entry cannot be null");

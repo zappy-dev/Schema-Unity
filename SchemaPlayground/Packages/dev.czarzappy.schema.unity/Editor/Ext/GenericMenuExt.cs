@@ -1,7 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace Schema.Unity
+namespace Schema.Unity.Editor.Ext
 {
     public static class GenericMenuExt
     {

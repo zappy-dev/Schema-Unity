@@ -64,6 +64,10 @@ namespace ExampleProject.Schemes
         /// </summary>
      
         public float MoveSpeed => DataEntry.GetDataAsFloat("MoveSpeed");
+     
+        public int Health => DataEntry.GetDataAsInt("Health");
+     
+        public string Name => DataEntry.GetDataAsString("Name");
  
     }
 }

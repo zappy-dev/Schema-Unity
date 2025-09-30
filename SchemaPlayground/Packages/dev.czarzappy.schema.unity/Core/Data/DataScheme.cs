@@ -235,7 +235,7 @@ namespace Schema.Core.Data
         
         #endregion
         
-        public IEnumerable<DataEntry> GetEntries(AttributeSortOrder sortOrder = default)
+        public IEnumerable<DataEntry> GetEntries(AttributeSortOrder sortOrder = default, SchemaContext context = default)
         {
             if (!sortOrder.HasValue)
             {
@@ -243,7 +243,7 @@ namespace Schema.Core.Data
             }
 
             var attributeName = sortOrder.AttributeName;
-            if (!GetAttributeByName(attributeName).Try(out var attribute))
+            if (!GetAttributeByName(attributeName, context).Try(out var attribute))
             {
                 throw new ArgumentException($"Attempted to get entries using invalid sort attribute: {attributeName}");
             }

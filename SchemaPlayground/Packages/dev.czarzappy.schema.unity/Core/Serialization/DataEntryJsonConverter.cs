@@ -10,7 +10,7 @@ namespace Schema.Core.Serialization
     /// JSON converter for DataEntry objects that handles serialization and deserialization
     /// while preserving the original data types of values.
     /// </summary>
-    public class DataEntryConverter : JsonConverter
+    public class DataEntryJsonConverter : JsonConverter
     {
         /// <summary>
         /// Serializes a DataEntry to JSON by writing each key-value pair directly.

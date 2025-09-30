@@ -60,7 +60,7 @@ namespace Schema.Core
              if (status == RequestStatus.Failed)
              {
                  string logMsg = $"[Context={context}] {message}";
-                 Logger.LogDbgError(logMsg);
+                 Logger.LogError(logMsg);
              }
 // #endif
         }
@@ -92,10 +92,12 @@ namespace Schema.Core
         {
             get
             {
-                // if (status == RequestStatus.Failed)
-                // {
-                //     throw new InvalidOperationException($"The request status {status} is not supported.");
-                // }
+                // Number of comments, uncomments: 2
+                // Uncomment reason: I want to make sure this fails if calling the result was wrong during list data type creation
+                if (status == RequestStatus.Failed)
+                {
+                    throw new InvalidOperationException($"The request status {status} is not supported.");
+                }
                 
                 return result;
             }
@@ -117,11 +119,17 @@ namespace Schema.Core
 
             // TODO: Maybe create a preference for whether schema results automatically create a log?
             // TODO: Handle logging when creating an empty result
+            // TODO: Need to not log an error during tests...
 // #if SCHEMA_DEBUG
+            // Number of times I comment / uncomment this: 5
+            // Reason to uncomment: Helpful for debugging a publishing issue
+            
              if (status == RequestStatus.Failed)
              {
                  string logMsg = $"[Context={context}] {message}";
-                 Logger.LogDbgError(logMsg);
+                 // Logger.LogDbgError(logMsg);
+                 // Reason to convert to non-dbg: Helpful for debugging list data type conversion error
+                 Logger.LogError(logMsg);
              }
 // #endif
         }

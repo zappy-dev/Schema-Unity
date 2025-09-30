@@ -32,8 +32,8 @@ namespace Schema.Core.Serialization
                 },
                 Converters = new List<JsonConverter>
                 {
-                    new DataTypeConverter(),
-                    new DataEntryConverter(),
+                    new DataTypeJsonConverter(),
+                    new DataEntryJsonConverter(),
                 },
                 Formatting = Formatting.Indented,
             };

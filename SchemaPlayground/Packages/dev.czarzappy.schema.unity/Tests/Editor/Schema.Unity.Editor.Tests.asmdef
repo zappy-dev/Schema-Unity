@@ -1,0 +1,19 @@
+{
+    "name": "Schema.Unity.Editor.Tests",
+    "rootNamespace": "Schema.Unity.Editor.Tests",
+    "references": [
+        "Schema.Unity.Editor",
+        "Schema.Core"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

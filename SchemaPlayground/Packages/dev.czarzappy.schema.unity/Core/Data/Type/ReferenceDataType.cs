@@ -49,6 +49,34 @@ namespace Schema.Core.Data
             };
         }
 
+        public SchemaResult<AttributeDefinition> GetReferencedIdentifierAttribute(SchemaContext context)
+        {
+            // what if the referenced scheme is the self scheme?
+            if (!Schema.GetScheme(ReferenceSchemeName).Try(out var refSchema))
+            {
+                if (context.Scheme.SchemeName == ReferenceSchemeName)
+                {
+                    refSchema = context.Scheme;
+                }
+                else
+                {
+                    return Fail<AttributeDefinition>("Could not load Reference Scheme", context);
+                }
+            }
+
+            if (!refSchema.GetIdentifierAttribute().Try(out var identifier))
+            {
+                return Fail<AttributeDefinition>("Reference Scheme does not contain Identifier Attribute.", context);
+            }
+
+            if (identifier.AttributeName != ReferenceAttributeName)
+            {
+                return Fail<AttributeDefinition>("Reference Scheme Identifier Attribute does not match", context);
+            }
+
+            return refSchema.GetAttributeByName(identifier.AttributeName, context);
+        }
+
         public override SchemaResult CheckIfValidData(SchemaContext context, object value)
         {
             if (value == null)

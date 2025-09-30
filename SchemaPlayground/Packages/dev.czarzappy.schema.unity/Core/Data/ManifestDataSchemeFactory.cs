@@ -14,6 +14,7 @@ namespace Schema.Core.Data
             string defaultScriptExportPath,
             string importPath)
         {
+            // NOTE: Modifying this usually means causing a data migration for users. Be careful
             var templateManifestScheme = new DataScheme(Manifest.MANIFEST_SCHEME_NAME);
             templateManifestScheme.AddAttribute(context, new AttributeDefinition
             {
@@ -63,6 +64,17 @@ namespace Schema.Core.Data
                 IsIdentifier = false,
                 ShouldPublish = false,
             });
+            templateManifestScheme.AddAttribute(context, new AttributeDefinition
+            {
+                AttributeName = "CSharpGenerateIds",
+                DataType = DataType.Boolean.Clone() as DataType,
+                DefaultValue = true,
+                AttributeToolTip = "Determines whether to generate Identifiers in emitted C#. It is generally useful to allow identifiers code to get generated, but optional to disable.",
+                IsIdentifier = false,
+                ShouldPublish = false,
+            });
+            
+            // You will have to prime a new attribute name first before using its code-gen'd version.
             
             var manifestSelfEntry = new DataEntry(new Dictionary<string, object>
             {
@@ -70,7 +82,8 @@ namespace Schema.Core.Data
                 { nameof(ManifestEntry.FilePath), importPath },
                 { nameof(ManifestEntry.PublishTarget), ManifestScheme.PublishTarget.DEFAULT.ToString() }, // TODO: support enum values
                 { nameof(ManifestEntry.CSharpExportPath), defaultScriptExportPath },
-                { nameof(ManifestEntry.CSharpNamespace), DataType.Text.CloneDefaultValue() }
+                { nameof(ManifestEntry.CSharpNamespace), DataType.Text.CloneDefaultValue() },
+                { "CSharpGenerateIds", DataType.Boolean.CloneDefaultValue() }
             });
             // skipping data validation because we don't want to resolve file system paths...
             templateManifestScheme.AddEntry(context, manifestSelfEntry, runDataValidation: false);

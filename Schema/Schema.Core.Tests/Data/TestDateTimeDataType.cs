@@ -5,6 +5,10 @@ namespace Schema.Core.Tests.Data;
 [TestFixture]
 public class TestDateTimeDataType
 {
+    private static SchemaContext Context = new SchemaContext
+    {
+        Driver = nameof(TestDateTimeDataType)
+    };
     private DateTimeDataType _type;
 
     [SetUp]
@@ -17,14 +21,14 @@ public class TestDateTimeDataType
     public void CheckIfValidData_ShouldPass_OnDateTime()
     {
         var dt = DateTime.Now;
-        var result = _type.CheckIfValidData(dt, TestFixtureSetup.SchemaTestContext);
+        var result = _type.CheckIfValidData(Context, dt);
         Assert.That(result.Passed, Is.True);
     }
 
     [Test]
     public void CheckIfValidData_ShouldFail_OnNonDateTime()
     {
-        var result = _type.CheckIfValidData("not a date", TestFixtureSetup.SchemaTestContext);
+        var result = _type.CheckIfValidData(Context, "not a date");
         Assert.That(result.Passed, Is.False);
     }
 
@@ -32,7 +36,7 @@ public class TestDateTimeDataType
     public void ConvertData_ShouldSucceed_OnValidString()
     {
         var dateStr = "2025-01-02 03:04:05";
-        var conversion = _type.ConvertData(dateStr, TestFixtureSetup.SchemaTestContext);
+        var conversion = _type.ConvertData(Context, dateStr);
         Assert.That(conversion.Passed, Is.True);
         Assert.That(conversion.Result, Is.TypeOf<DateTime>());
         Assert.That(((DateTime)conversion.Result), Is.EqualTo(DateTime.Parse(dateStr)));
@@ -41,7 +45,7 @@ public class TestDateTimeDataType
     [Test]
     public void ConvertData_ShouldFail_OnInvalidString()
     {
-        var conversion = _type.ConvertData("invalid date", TestFixtureSetup.SchemaTestContext);
+        var conversion = _type.ConvertData(Context, "invalid date");
         Assert.That(conversion.Passed, Is.False);
     }
 } 

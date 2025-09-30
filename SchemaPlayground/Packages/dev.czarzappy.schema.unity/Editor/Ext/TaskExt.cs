@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using UnityEngine;
 using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Unity.Editor.Ext

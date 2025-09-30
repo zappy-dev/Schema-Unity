@@ -129,7 +129,7 @@ namespace Schema.Core
         /// Initializes the template manifest scheme and loads it into the schema system.
         /// </summary>
         /// <returns>A <see cref="SchemaResult"/> indicating success or failure.</returns>
-        public static SchemaResult InitializeTemplateManifestScheme(SchemaContext context, string defaultScriptExportPath)
+        public static SchemaResult InitializeTemplateManifestScheme(SchemaContext context, string defaultScriptExportPath = "")
         {
             lock (manifestOperationLock)
             {

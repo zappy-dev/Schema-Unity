@@ -3,7 +3,8 @@
     "rootNamespace": "Schema.Unity.Editor",
     "references": [
         "Schema.Core",
-        "Schema.Runtime"
+        "Schema.Runtime",
+        "Unity.EditorCoroutines.Editor"
     ],
     "includePlatforms": [
         "Editor"

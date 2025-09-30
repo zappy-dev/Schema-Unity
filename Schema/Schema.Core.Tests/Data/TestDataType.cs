@@ -10,6 +10,10 @@ namespace Schema.Core.Tests.Data;
 [TestFixture]
 public class TestDataType
 {
+    private static SchemaContext Context = new SchemaContext
+    {
+        Driver = nameof(TestDataType)
+    };
     private Mock<IFileSystem> _mockFileSystem;
     private const string VALID_FILE_PATH = "valid.json";
     private const string INVALID_FILE_PATH = "invalid.json";
@@ -29,32 +33,32 @@ public class TestDataType
         
         Schema.SetStorage(new Storage(_mockFileSystem.Object));
 
-        _mockFileSystem.Setup(m => m.FileExists(VALID_FILE_PATH)).Returns(SchemaResult.Pass());
-        _mockFileSystem.Setup(m => m.FileExists(INVALID_FILE_PATH)).Returns(SchemaResult.Fail(""));
+        _mockFileSystem.Setup(m => m.FileExists(Context, VALID_FILE_PATH)).Returns(SchemaResult.Pass());
+        _mockFileSystem.Setup(m => m.FileExists(Context, INVALID_FILE_PATH)).Returns(SchemaResult.Fail(Context, ""));
 
         // pre-load data schemes
         var validScheme = new DataScheme(VALID_SCHEME_NAME);
-        validScheme.AddAttribute(VALID_REFERENCE_ATTRIBUTE, DataType.Text, isIdentifier: true);
-        validScheme.AddAttribute(INVALID_REFERENCE_ATTRIBUTE, DataType.Text);
-        validScheme.AddEntry(new DataEntry(new Dictionary<string, object>()
+        validScheme.AddAttribute(Context, VALID_REFERENCE_ATTRIBUTE, DataType.Text, isIdentifier: true);
+        validScheme.AddAttribute(Context, INVALID_REFERENCE_ATTRIBUTE, DataType.Text);
+        validScheme.AddEntry(Context, new DataEntry(new Dictionary<string, object>()
         {
             { VALID_REFERENCE_ATTRIBUTE, VALID_REFERENCE_VALUE }
         }));
-        Schema.LoadDataScheme(validScheme, true);
+        Schema.LoadDataScheme(Context, validScheme, true);
         
         var validSchemaNoIdentifier = new DataScheme(VALID_SCHEME_NAME_NO_IDENTIFIER);
-        validSchemaNoIdentifier.AddAttribute(VALID_REFERENCE_ATTRIBUTE, DataType.Text);
-        validSchemaNoIdentifier.AddEntry(new DataEntry(new Dictionary<string, object>()
+        validSchemaNoIdentifier.AddAttribute(Context, VALID_REFERENCE_ATTRIBUTE, DataType.Text);
+        validSchemaNoIdentifier.AddEntry(Context, new DataEntry(new Dictionary<string, object>()
         {
             { VALID_REFERENCE_ATTRIBUTE, VALID_REFERENCE_VALUE }
         }));
-        Schema.LoadDataScheme(validSchemaNoIdentifier, true);
+        Schema.LoadDataScheme(Context, validSchemaNoIdentifier, true);
     }
     
     [Test, TestCaseSource(nameof(ConversionTestCases))]
     public void Test_TryToConvertData(object data, DataType fromType, DataType toType, bool expectSuccessResult, object expectedConvertedResult)
     {
-        var conversion = DataType.ConvertData(data, fromType, toType, context: TestFixtureSetup.SchemaTestContext);
+        var conversion = DataType.ConvertData(Context, data, fromType, toType);
 
         conversion.AssertCondition(expectSuccessResult, expectedConvertedResult);
     }
@@ -76,9 +80,9 @@ public class TestDataType
             var testDate = DateTime.Parse(testValidDateStr);
             yield return new TestCaseData(testValidDateStr, DataType.Text, DataType.DateTime, true, testDate);
             
-            yield return new TestCaseData(VALID_FILE_PATH, DataType.Text, DataType.FilePath, true, VALID_FILE_PATH);
-            yield return new TestCaseData(INVALID_FILE_PATH, DataType.Text, DataType.FilePath, false, null);
-            yield return new TestCaseData(INVALID_FILE_PATH, DataType.Text, DataType.FilePath, false, null);
+            yield return new TestCaseData(VALID_FILE_PATH, DataType.Text, DataType.FilePath_RelativePaths, true, VALID_FILE_PATH);
+            yield return new TestCaseData(INVALID_FILE_PATH, DataType.Text, DataType.FilePath_RelativePaths, false, null);
+            yield return new TestCaseData(INVALID_FILE_PATH, DataType.Text, DataType.FilePath_RelativePaths, false, null);
             
             // Reference type conversions
             yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.Text, 
@@ -122,7 +126,7 @@ public class TestDataType
             yield return new TestCaseData(DataType.Text, new TextDataType(null), true);
             yield return new TestCaseData(DataType.DateTime, new DateTimeDataType(), true);
             yield return new TestCaseData(DataType.Integer, new IntegerDataType(), true);
-            yield return new TestCaseData(DataType.FilePath, new FilePathDataType(), true);
+            yield return new TestCaseData(DataType.FilePath_RelativePaths, new FilePathDataType(), true);
             yield return new TestCaseData(DataType.Text, DataType.Integer, false);
             yield return new TestCaseData(DataType.Text, new ReferenceDataType("Schema1", "Attribute1"), false);
             yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema1", "Attribute1"), true);
@@ -137,9 +141,9 @@ public class TestDataType
     public void Test_BooleanDataType_CheckIfValidData()
     {
         var boolType = new BooleanDataType();
-        Assert.That(boolType.CheckIfValidData(true, TestFixtureSetup.SchemaTestContext).Passed, Is.True);
-        Assert.That(boolType.CheckIfValidData(false, TestFixtureSetup.SchemaTestContext).Passed, Is.True);
-        Assert.That(boolType.CheckIfValidData("true", TestFixtureSetup.SchemaTestContext).Passed, Is.False);
-        Assert.That(boolType.CheckIfValidData(1, TestFixtureSetup.SchemaTestContext).Passed, Is.False);
+        Assert.That(boolType.CheckIfValidData(Context, true).Passed, Is.True);
+        Assert.That(boolType.CheckIfValidData(Context, false).Passed, Is.True);
+        Assert.That(boolType.CheckIfValidData(Context, "true").Passed, Is.False);
+        Assert.That(boolType.CheckIfValidData(Context, 1).Passed, Is.False);
     }
 }

@@ -102,7 +102,7 @@ namespace Schema.Core.Data
             SetDirty(context, true);
 
             return CheckIf(result, errorMessage: $"Attribute {attribute} cannot be deleted",
-                successMessage: $"Deleted {attribute}");
+                successMessage: $"Deleted {attribute}", context: context);
         }
 
         /// <summary>
@@ -194,18 +194,24 @@ namespace Schema.Core.Data
 
         #region Attribute Retrieval Queries
         
-        public AttributeDefinition GetAttribute(int attributeIndex)
+        public SchemaResult<AttributeDefinition> GetAttribute(int attributeIndex, SchemaContext context = default)
         {
-            return attributes[attributeIndex];
+            var res = SchemaResult<AttributeDefinition>.New(context);
+            if (attributeIndex < 0 || attributeIndex >= this.AttributeCount)
+            {
+                return res.Fail($"Attribute Index ({attributeIndex}) is out of range [0,{this.AttributeCount})");
+            }
+
+            return res.Pass(attributes[attributeIndex]);
         }
 
-        public SchemaResult<AttributeDefinition> GetAttributeByName(string attributeName, SchemaContext? context = null)
+        public SchemaResult<AttributeDefinition> GetAttributeByName(string attributeName, SchemaContext context = default)
         {
             var attribute = attributes.FirstOrDefault(a => a.AttributeName.Equals(attributeName));
             
             return CheckIf(attribute != null, attribute, 
-                errorMessage: $"Attribute with name '{attributeName}' does not exist",
-                successMessage: $"Attribute with name '{attributeName}' exist", context);
+                errorMessage: $"Attribute '{attributeName}' does not exist",
+                successMessage: $"Attribute with name '{attributeName}' exist", context: context);
         }
 
         public SchemaResult<AttributeDefinition> GetAttribute(Func<AttributeDefinition, bool> predicate)

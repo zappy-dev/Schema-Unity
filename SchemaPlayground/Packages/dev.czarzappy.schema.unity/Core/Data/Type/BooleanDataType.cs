@@ -39,7 +39,7 @@ namespace Schema.Core.Data
                     return Pass<object>(parsed, successMessage: "Parsed as boolean.", context: context);
                 if (fromData is int i)
                     return Pass<object>(i != 0, successMessage: "Converted int to boolean.", context: context);
-                return Fail<object>("Failed to convert to Boolean", context: context);
+                return Fail<object>($"Failed to convert {fromData} to Boolean", context: context);
             }
             catch (Exception e)
             {

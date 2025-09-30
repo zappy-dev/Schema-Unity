@@ -219,7 +219,10 @@ namespace Schema.Core.Serialization
             
             for (int i = 0; i < attributeCount; i++)
             {
-                var attribute = scheme.GetAttribute(i);
+                if (!scheme.GetAttribute(i).Try(out var attribute, out var error))
+                {
+                    return error.CastError<string>();
+                }
                 
                 csvContent.Append(attribute.AttributeName);
 
@@ -236,7 +239,11 @@ namespace Schema.Core.Serialization
             {
                 for (int i = 0; i < attributeCount; i++)
                 {
-                    var attribute = scheme.GetAttribute(i);
+                    if (!scheme.GetAttribute(i).Try(out var attribute, out var error))
+                    {
+                        return error.CastError<string>();
+                    }
+                    
                     csvContent.Append(entry.GetData(attribute.AttributeName));
                     
                     // fence posting

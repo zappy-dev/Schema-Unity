@@ -7,6 +7,10 @@ namespace Schema.Core.Tests.Data;
 [TestFixture]
 public class TestDataScheme
 {
+    private static SchemaContext Context = new SchemaContext
+    {
+        Driver = nameof(TestDataScheme)
+    };
     private static DataScheme testScheme;
     private DataScheme emptyScheme;
     private const string EXISTING_STRING_ATTRIBUTE_NAME = "ExistingStringField";
@@ -20,8 +24,8 @@ public class TestDataScheme
         emptyScheme = new DataScheme();
         
         testScheme = new DataScheme("Test");
-        testScheme.AddAttribute(EXISTING_STRING_ATTRIBUTE_NAME, DataType.Text).AssertPassed();
-        testScheme.AddAttribute(EXISTING_INTEGER_ATTRIBUTE_NAME, DataType.Integer).AssertPassed();
+        testScheme.AddAttribute(Context, EXISTING_STRING_ATTRIBUTE_NAME, DataType.Text).AssertPassed();
+        testScheme.AddAttribute(Context, EXISTING_INTEGER_ATTRIBUTE_NAME, DataType.Integer).AssertPassed();
     }
     
 
@@ -32,24 +36,24 @@ public class TestDataScheme
         // Schema A: RewardTypes
         var rewardTypeScheme = new DataScheme("RewardTypes");
         var nameAttr = new AttributeDefinition(rewardTypeScheme, "Name", DataType.Text, isIdentifier: true);
-        rewardTypeScheme.AddAttribute(nameAttr).AssertPassed();
-        rewardTypeScheme.AddEntry(new DataEntry { { nameAttr.AttributeName, "GOLD" } });
-        rewardTypeScheme.AddEntry(new DataEntry { { nameAttr.AttributeName, "SILVER" } });
-        rewardTypeScheme.AddEntry(new DataEntry { { nameAttr.AttributeName, "COPPER" } });
-        rewardTypeScheme.Load().AssertPassed();
+        rewardTypeScheme.AddAttribute(Context, nameAttr).AssertPassed();
+        rewardTypeScheme.AddEntry(Context, new DataEntry { { nameAttr.AttributeName, "GOLD" , Context } });
+        rewardTypeScheme.AddEntry(Context, new DataEntry { { nameAttr.AttributeName, "SILVER" , Context } });
+        rewardTypeScheme.AddEntry(Context, new DataEntry { { nameAttr.AttributeName, "COPPER" , Context } });
+        rewardTypeScheme.Load(Context).AssertPassed();
         rewardTypeScheme.GetIdentifierAttribute().TryAssert(out var rewardTypeIdAttr);
         rewardTypeIdAttr.CreateReferenceType().TryAssert(out var rewardTypeRefType);
 
         // Schema B: LootRolls, referencing RewardTypes.Name
         var lootRollsScheme = new DataScheme("LootRolls");
-        lootRollsScheme.AddAttribute(new AttributeDefinition(lootRollsScheme, "RewardType", rewardTypeRefType)).AssertPassed();
-        lootRollsScheme.AddAttribute(new AttributeDefinition(lootRollsScheme, "Amount", DataType.Integer)).AssertPassed();
-        lootRollsScheme.AddEntry(new DataEntry { { "RewardType", "GOLD" }, { "Amount", 100 } });
-        lootRollsScheme.AddEntry(new DataEntry { { "RewardType", "SILVER" }, { "Amount", 50 } });
-        lootRollsScheme.Load().AssertPassed();
+        lootRollsScheme.AddAttribute(Context, new AttributeDefinition(lootRollsScheme, "RewardType", rewardTypeRefType)).AssertPassed();
+        lootRollsScheme.AddAttribute(Context, new AttributeDefinition(lootRollsScheme, "Amount", DataType.Integer)).AssertPassed();
+        lootRollsScheme.AddEntry(Context, new DataEntry { { "RewardType", "GOLD", Context }, { "Amount", 100 , Context } });
+        lootRollsScheme.AddEntry(Context, new DataEntry { { "RewardType", "SILVER", Context }, { "Amount", 50 , Context } });
+        lootRollsScheme.Load(Context).AssertPassed();
 
         // Act: Use the new centralized update method
-        var result = Schema.UpdateIdentifierValue(rewardTypeScheme.SchemeName, nameAttr.AttributeName, "GOLD", "PLATINUM");
+        var result = Schema.UpdateIdentifierValue(Context, rewardTypeScheme.SchemeName, nameAttr.AttributeName, "GOLD", "PLATINUM");
         Assert.That(result.Passed, Is.True, result.Message);
 
         // Assert: All references in Schema B are updated
@@ -65,13 +69,13 @@ public class TestDataScheme
     [Test, TestCaseSource(nameof(AddEntry_BadCases))]
     public void Test_AddEntry_BadCases(DataEntry badEntry)
     {
-        testScheme.AddEntry(badEntry).AssertFailed();
+        testScheme.AddEntry(Context, badEntry).AssertFailed();
     }
 
     [Test, TestCaseSource(nameof(AddEntry_BadCases))]
     public void Test_DeleteEntry_BadCases(DataEntry badEntry)
     {
-        testScheme.DeleteEntry(badEntry).AssertFailed();
+        testScheme.DeleteEntry(Context, badEntry).AssertFailed();
     }
 
     [Test]
@@ -79,10 +83,10 @@ public class TestDataScheme
     {
         // Arrange
         DataEntry entry = new DataEntry();
-        testScheme.AddEntry(entry);
+        testScheme.AddEntry(Context, entry);
         
         // Act
-        testScheme.DeleteEntry(entry).AssertPassed();
+        testScheme.DeleteEntry(Context, entry).AssertPassed();
     }
 
     private static IEnumerable AddEntry_BadCases
@@ -92,11 +96,11 @@ public class TestDataScheme
             yield return new TestCaseData(null);
             yield return new TestCaseData(new DataEntry
             {
-                {"UnknownField", "data"}
+                {"UnknownField", "data", Context}
             });
             yield return new TestCaseData(new DataEntry
             {
-                {EXISTING_INTEGER_ATTRIBUTE_NAME, "baddata"}
+                {EXISTING_INTEGER_ATTRIBUTE_NAME, "baddata", Context}
             });
         }
     }
@@ -131,15 +135,15 @@ public class TestDataScheme
         // Arrange
         var dataScheme = new DataScheme("Foo");
         string attributeName = "Field1";
-        dataScheme.AddAttribute(new AttributeDefinition(dataScheme, attributeName, DataType.Text));
-        dataScheme.AddEntry(new DataEntry
+        dataScheme.AddAttribute(Context, new AttributeDefinition(dataScheme, attributeName, DataType.Text));
+        dataScheme.AddEntry(Context, new DataEntry
         {
-            { attributeName, "1" }
+            { attributeName, "1", Context}
         });
-        dataScheme.AddEntry(new DataEntry());
+        dataScheme.AddEntry(Context, new DataEntry());
         
         // Act
-        var conversionResponse = dataScheme.ConvertAttributeType(attributeName, DataType.Integer);
+        var conversionResponse = dataScheme.ConvertAttributeType(Context, attributeName, DataType.Integer);
         
         // Assert
         Assert.IsTrue(conversionResponse.Passed);
@@ -153,14 +157,14 @@ public class TestDataScheme
         // Arrange
         var dataScheme = new DataScheme("Foo");
         string attributeName = "Field1";
-        dataScheme.AddAttribute(new AttributeDefinition(dataScheme, attributeName, DataType.Integer));
-        dataScheme.AddEntry(new DataEntry(new Dictionary<string, object>()
+        dataScheme.AddAttribute(Context, new AttributeDefinition(dataScheme, attributeName, DataType.Integer));
+        dataScheme.AddEntry(Context, new DataEntry(new Dictionary<string, object>()
         {
             { attributeName, 1 }
         }));
         
         // Act
-        var res = dataScheme.ConvertAttributeType(attributeName, DataType.DateTime);
+        var res = dataScheme.ConvertAttributeType(Context, attributeName, DataType.DateTime);
         
         // Assert
         res.AssertFailed();
@@ -171,33 +175,33 @@ public class TestDataScheme
     public void Test_UpdateAttributeName(string previousName, DataType prevDataType, string newName, bool expected)
     {
         // Arrange
-        testScheme.AddAttribute(previousName, prevDataType).AssertPassed();
-        testScheme.AddEntry(new DataEntry
+        testScheme.AddAttribute(Context, previousName, prevDataType).AssertPassed();
+        testScheme.AddEntry(Context, new DataEntry
         {
-            { previousName, "FieldValue" }
+            { previousName, "FieldValue", Context }
         }).AssertPassed();
-        testScheme.AddAttribute("OtherField", DataType.Text).AssertPassed();
-        testScheme.AddEntry(new DataEntry
+        testScheme.AddAttribute(Context, "OtherField", DataType.Text).AssertPassed();
+        testScheme.AddEntry(Context, new DataEntry
         {
-            { "OtherField", "FieldValue" }
+            { "OtherField", "FieldValue", Context }
         }).AssertPassed();
         
         // Act
-        testScheme.UpdateAttributeName(previousName, newName).AssertCondition(expected);
+        testScheme.UpdateAttributeName(Context, previousName, newName).AssertCondition(expected);
     }
     
     [Test]
     public void Test_UpdateAttributeName_InvalidAttribute()
     {
         // Arrange
-        testScheme.AddAttribute("OtherField", DataType.Text).AssertPassed();
-        testScheme.AddEntry(new DataEntry
+        testScheme.AddAttribute(Context, "OtherField", DataType.Text).AssertPassed();
+        testScheme.AddEntry(Context, new DataEntry
         {
-            { "OtherField", "FieldValue" }
+            { "OtherField", "FieldValue", Context }
         }).AssertPassed();
         
         // Act
-        testScheme.UpdateAttributeName("InvalidField", "NewField").AssertFailed();
+        testScheme.UpdateAttributeName(Context, "InvalidField", "NewField").AssertFailed();
     }
 
     private static IEnumerable UpdateAttributeNameTestCases
@@ -221,14 +225,14 @@ public class TestDataScheme
         
         // create ref scheme with identifier field
         var refScheme = new DataScheme(refSchemeName);
-        refScheme.AddAttribute(refIdAttributeName, DataType.Text, isIdentifier: true).AssertPassed();
-        refScheme.AddEntry(new DataEntry
+        refScheme.AddAttribute(Context, refIdAttributeName, DataType.Text, isIdentifier: true).AssertPassed();
+        refScheme.AddEntry(Context, new DataEntry
         {
-            { refIdAttributeName, goodRefValue }
+            { refIdAttributeName, goodRefValue, Context }
         });
         
         // then load into memory
-        refScheme.Load().AssertPassed();
+        refScheme.Load(Context).AssertPassed();
         
         refScheme.GetIdentifierAttribute().TryAssert(out var identifierAttribute);
 
@@ -236,18 +240,18 @@ public class TestDataScheme
 
         // prepare referencing data scheme
         var dataScheme = new DataScheme("Foo");
-        dataScheme.AddAttribute(refFieldName, refType).AssertPassed();
-        dataScheme.AddEntry(new DataEntry
+        dataScheme.AddAttribute(Context, refFieldName, refType).AssertPassed();
+        dataScheme.AddEntry(Context, new DataEntry
         { 
-            { refFieldName, goodRefValue }
+            { refFieldName, goodRefValue, Context }
         }).AssertPassed();
         
         // then load into memory
-        dataScheme.Load().AssertPassed();
+        dataScheme.Load(Context).AssertPassed();
 
         // Act
         var newRefAttributeName = "NewField";
-        refScheme.UpdateAttributeName(refIdAttributeName, newRefAttributeName).AssertCondition(expected);
+        refScheme.UpdateAttributeName(Context, refIdAttributeName, newRefAttributeName).AssertCondition(expected);
 
         // Assert
         dataScheme.GetAttribute(refFieldName).TryAssert(out var refAttribute);
@@ -270,10 +274,10 @@ public class TestDataScheme
         string defaultValue = "Bar";
         foreach (var attributeName in attributeNames)
         {
-            testScheme.AddAttribute(attributeName, DataType.Text, defaultValue: defaultValue);
+            testScheme.AddAttribute(Context, attributeName, DataType.Text, defaultValue: defaultValue);
         }
         
-        var entry = testScheme.CreateNewEmptyEntry();
+        var entry = testScheme.CreateNewEmptyEntry(Context);
         foreach (var attributeName in attributeNames)
         {
             Assert.That(entry.GetDataAsString(attributeName), Is.EqualTo(defaultValue));
@@ -286,7 +290,7 @@ public class TestDataScheme
         // Act
         
         // Arrange
-        var addResponse = testScheme.AddAttribute(attribute);
+        var addResponse = testScheme.AddAttribute(Context, attribute);
         
         return addResponse.Passed;
     }
@@ -307,10 +311,10 @@ public class TestDataScheme
     [Test]
     public void Test_SwapEntries()
     {
-        var firstEntry = testScheme.CreateNewEmptyEntry();
-        var secondEntry = testScheme.CreateNewEmptyEntry();
+        var firstEntry = testScheme.CreateNewEmptyEntry(Context);
+        var secondEntry = testScheme.CreateNewEmptyEntry(Context);
 
-        var swapRes = testScheme.SwapEntries(0, 1);
+        var swapRes = testScheme.SwapEntries(Context, 0, 1);
         swapRes.AssertPassed();
         
         Assert.That(testScheme.GetEntry(0), Is.EqualTo(secondEntry));
@@ -320,46 +324,46 @@ public class TestDataScheme
     [Test]
     public void Test_MoveUpEntry_BadMove()
     {
-        var firstEntry = testScheme.CreateNewEmptyEntry();
-        var secondEntry = testScheme.CreateNewEmptyEntry();
+        var firstEntry = testScheme.CreateNewEmptyEntry(Context);
+        var secondEntry = testScheme.CreateNewEmptyEntry(Context);
         
-        var moveRes = testScheme.MoveUpEntry(firstEntry);
+        var moveRes = testScheme.MoveUpEntry(Context, firstEntry);
         moveRes.AssertFailed();
     }
 
     [Test]
     public void Test_MoveUpEntry_GoodMove()
     {
-        var firstEntry = testScheme.CreateNewEmptyEntry();
+        var firstEntry = testScheme.CreateNewEmptyEntry(Context);
         
         // make sure second entrty does not match first in equality check
-        var secondEntry = testScheme.CreateNewEmptyEntry();
-        secondEntry.SetData("Foo", "Bar");
+        var secondEntry = testScheme.CreateNewEmptyEntry(Context);
+        secondEntry.SetData(Context, "Foo", "Bar");
         
-        var moveRes = testScheme.MoveUpEntry(secondEntry);
+        var moveRes = testScheme.MoveUpEntry(Context, secondEntry);
         moveRes.AssertPassed();
     }
 
     [Test]
     public void Test_MoveDownEntry_BadMove()
     {
-        var firstEntry = testScheme.CreateNewEmptyEntry();
+        var firstEntry = testScheme.CreateNewEmptyEntry(Context);
         
         // amke sure element is different
-        var secondEntry = testScheme.CreateNewEmptyEntry();
-        secondEntry.SetData("foo", "bar");
+        var secondEntry = testScheme.CreateNewEmptyEntry(Context);
+        secondEntry.SetData(Context, "foo", "bar");
         
-        var moveRes = testScheme.MoveDownEntry(secondEntry);
+        var moveRes = testScheme.MoveDownEntry(Context, secondEntry);
         moveRes.AssertFailed();
     }
 
     [Test]
     public void Test_MoveDownEntry_GoodMove()
     {
-        var firstEntry = testScheme.CreateNewEmptyEntry();
-        var secondEntry = testScheme.CreateNewEmptyEntry();
+        var firstEntry = testScheme.CreateNewEmptyEntry(Context);
+        var secondEntry = testScheme.CreateNewEmptyEntry(Context);
         
-        var moveRes = testScheme.MoveDownEntry(firstEntry);
+        var moveRes = testScheme.MoveDownEntry(Context, firstEntry);
         moveRes.AssertPassed();
     }
 
@@ -369,10 +373,10 @@ public class TestDataScheme
     [TestCase(2, false)]
     public void Test_MoveEntry(int moveIdx, bool expected)
     {
-        var firstEntry = testScheme.CreateNewEmptyEntry();
-        var secondEntry = testScheme.CreateNewEmptyEntry();
+        var firstEntry = testScheme.CreateNewEmptyEntry(Context);
+        var secondEntry = testScheme.CreateNewEmptyEntry(Context);
 
-        var res = testScheme.MoveEntry(firstEntry, moveIdx);
+        var res = testScheme.MoveEntry(Context, firstEntry, moveIdx);
         Assert.That(res.Passed, Is.EqualTo(expected));
     }
     
@@ -383,12 +387,12 @@ public class TestDataScheme
         var dataScheme = CreateOrderTestScheme(out var firstAttribute, out var secondAttribute, out var thirdAttribute);
         
         // Act
-        var increaseResponse = dataScheme.IncreaseAttributeRank(secondAttribute);
+        var increaseResponse = dataScheme.IncreaseAttributeRank(Context, secondAttribute);
         
         // Assert
         Assert.IsTrue(increaseResponse.Passed);
-        Assert.That(dataScheme.GetAttribute(0), Is.EqualTo(secondAttribute));
-        Assert.That(dataScheme.GetAttribute(1), Is.EqualTo(firstAttribute));
+        Assert.That(dataScheme.GetAttribute(0).Result, Is.EqualTo(secondAttribute));
+        Assert.That(dataScheme.GetAttribute(1).Result, Is.EqualTo(firstAttribute));
     }
     
     [Test]
@@ -396,17 +400,17 @@ public class TestDataScheme
     {
         // Arrange
         var dataScheme = CreateOrderTestScheme(out var firstAttribute, out var secondAttribute, out var thirdAttribute);
-        dataScheme.AddAttribute(firstAttribute);
-        dataScheme.AddAttribute(secondAttribute);
-        dataScheme.AddAttribute(thirdAttribute);
+        dataScheme.AddAttribute(Context, firstAttribute);
+        dataScheme.AddAttribute(Context, secondAttribute);
+        dataScheme.AddAttribute(Context, thirdAttribute);
         
         // Act
-        var increaseResponse = dataScheme.DecreaseAttributeRank(firstAttribute);
+        var increaseResponse = dataScheme.DecreaseAttributeRank(Context, firstAttribute);
         
         // Assert
         Assert.IsTrue(increaseResponse.Passed);
-        Assert.That(dataScheme.GetAttribute(0), Is.EqualTo(secondAttribute));
-        Assert.That(dataScheme.GetAttribute(1), Is.EqualTo(firstAttribute));
+        Assert.That(dataScheme.GetAttribute(0).Result, Is.EqualTo(secondAttribute));
+        Assert.That(dataScheme.GetAttribute(1).Result, Is.EqualTo(firstAttribute));
     }
 
     [Test]
@@ -414,20 +418,20 @@ public class TestDataScheme
     {
         var dataScheme = new DataScheme("Foo");
         var sortAttribute = "FirstAttribute";
-        dataScheme.AddAttribute(new AttributeDefinition(dataScheme, sortAttribute, DataType.Text));
-        dataScheme.AddAttribute(new AttributeDefinition(dataScheme, "SecondAttribute", DataType.Text));
+        dataScheme.AddAttribute(Context, new AttributeDefinition(dataScheme, sortAttribute, DataType.Text));
+        dataScheme.AddAttribute(Context, new AttributeDefinition(dataScheme, "SecondAttribute", DataType.Text));
 
-        dataScheme.AddEntry(new DataEntry
+        dataScheme.AddEntry(Context, new DataEntry
         {
-            { sortAttribute, "a" },
+            { sortAttribute, "a", Context },
         });
-        dataScheme.AddEntry(new DataEntry
+        dataScheme.AddEntry(Context, new DataEntry
         {
-            { sortAttribute, "c" },
+            { sortAttribute, "c", Context },
         });
-        dataScheme.AddEntry(new DataEntry
+        dataScheme.AddEntry(Context, new DataEntry
         {
-            { sortAttribute, "b" },
+            { sortAttribute, "b", Context },
         });
         
         Assert.That(dataScheme.GetEntries(), 
@@ -461,7 +465,7 @@ public class TestDataScheme
     [Test, TestCaseSource(nameof(DeleteAttributeTestCases))]
     public void Test_DeleteAttribute(AttributeDefinition attribute, bool expectedResult)
     {
-        testScheme.DeleteAttribute(attribute).AssertCondition(expectedResult);
+        testScheme.DeleteAttribute(Context, attribute).AssertCondition(expectedResult);
     }
 
     private static IEnumerable DeleteAttributeTestCases
@@ -476,9 +480,9 @@ public class TestDataScheme
     private static DataScheme CreateOrderTestScheme(out AttributeDefinition firstAttribute, out AttributeDefinition secondAttribute, out AttributeDefinition thirdAttribute)
     {
         var dataScheme = new DataScheme("Foo");
-        firstAttribute = dataScheme.AddAttribute("FirstAttribute", DataType.Text).AssertPassed();
-        secondAttribute = dataScheme.AddAttribute("SecondAttribute", DataType.Text).AssertPassed();
-        thirdAttribute = dataScheme.AddAttribute("ThirdAttribute", DataType.Text).AssertPassed();
+        firstAttribute = dataScheme.AddAttribute(Context, "FirstAttribute", DataType.Text).AssertPassed();
+        secondAttribute = dataScheme.AddAttribute(Context, "SecondAttribute", DataType.Text).AssertPassed();
+        thirdAttribute = dataScheme.AddAttribute(Context, "ThirdAttribute", DataType.Text).AssertPassed();
 
         return dataScheme;
     }
@@ -489,18 +493,18 @@ public class TestDataScheme
         var dataScheme = CreateOrderTestScheme(out var firstAttribute, out var secondAttribute, out var thirdAttribute);
 
         // Move third to front
-        var moveFrontRes = dataScheme.MoveAttributeRank(thirdAttribute, 0);
+        var moveFrontRes = dataScheme.MoveAttributeRank(Context, thirdAttribute, 0);
         Assert.IsTrue(moveFrontRes.Passed);
-        Assert.That(dataScheme.GetAttribute(0), Is.EqualTo(thirdAttribute));
-        Assert.That(dataScheme.GetAttribute(1), Is.EqualTo(firstAttribute));
-        Assert.That(dataScheme.GetAttribute(2), Is.EqualTo(secondAttribute));
+        Assert.That(dataScheme.GetAttribute(0).Result, Is.EqualTo(thirdAttribute));
+        Assert.That(dataScheme.GetAttribute(1).Result, Is.EqualTo(firstAttribute));
+        Assert.That(dataScheme.GetAttribute(2).Result, Is.EqualTo(secondAttribute));
 
         // Move first to back
-        var moveBackRes = dataScheme.MoveAttributeRank(firstAttribute, 2);
+        var moveBackRes = dataScheme.MoveAttributeRank(Context, firstAttribute, 2);
         Assert.IsTrue(moveBackRes.Passed);
-        Assert.That(dataScheme.GetAttribute(0), Is.EqualTo(thirdAttribute));
-        Assert.That(dataScheme.GetAttribute(1), Is.EqualTo(secondAttribute));
-        Assert.That(dataScheme.GetAttribute(2), Is.EqualTo(firstAttribute));
+        Assert.That(dataScheme.GetAttribute(0).Result, Is.EqualTo(thirdAttribute));
+        Assert.That(dataScheme.GetAttribute(1).Result, Is.EqualTo(secondAttribute));
+        Assert.That(dataScheme.GetAttribute(2).Result, Is.EqualTo(firstAttribute));
     }
 
     [Test]
@@ -509,31 +513,31 @@ public class TestDataScheme
         var dataScheme = CreateOrderTestScheme(out var firstAttribute, out var secondAttribute, out var thirdAttribute);
 
         // Move first to index 1 (middle)
-        var moveMiddleRes = dataScheme.MoveAttributeRank(firstAttribute, 1);
+        var moveMiddleRes = dataScheme.MoveAttributeRank(Context, firstAttribute, 1);
         Assert.IsTrue(moveMiddleRes.Passed);
-        Assert.That(dataScheme.GetAttribute(0), Is.EqualTo(secondAttribute));
-        Assert.That(dataScheme.GetAttribute(1), Is.EqualTo(firstAttribute));
-        Assert.That(dataScheme.GetAttribute(2), Is.EqualTo(thirdAttribute));
+        Assert.That(dataScheme.GetAttribute(0).Result, Is.EqualTo(secondAttribute));
+        Assert.That(dataScheme.GetAttribute(1).Result, Is.EqualTo(firstAttribute));
+        Assert.That(dataScheme.GetAttribute(2).Result, Is.EqualTo(thirdAttribute));
     }
 
     [Test]
     public void Test_MoveAttributeRank_Invalid()
     {
         var dataScheme = new DataScheme("Foo");
-        var firstAttribute = dataScheme.AddAttribute("FirstAttribute", DataType.Text).AssertPassed();
-        var secondAttribute = dataScheme.AddAttribute("SecondAttribute", DataType.Text).AssertPassed();
+        var firstAttribute = dataScheme.AddAttribute(Context, "FirstAttribute", DataType.Text).AssertPassed();
+        var secondAttribute = dataScheme.AddAttribute(Context, "SecondAttribute", DataType.Text).AssertPassed();
 
         // Try to move to negative index
-        var moveNeg = dataScheme.MoveAttributeRank(firstAttribute, -1);
+        var moveNeg = dataScheme.MoveAttributeRank(Context, firstAttribute, -1);
         Assert.IsFalse(moveNeg.Passed);
 
         // Try to move to out-of-bounds index
-        var moveOob = dataScheme.MoveAttributeRank(firstAttribute, 5);
+        var moveOob = dataScheme.MoveAttributeRank(Context, firstAttribute, 5);
         Assert.IsFalse(moveOob.Passed);
 
         // Try to move attribute not in scheme
         var thirdAttribute = new AttributeDefinition(dataScheme, "ThirdAttribute", DataType.Text);
-        var moveMissing = dataScheme.MoveAttributeRank(thirdAttribute, 0);
+        var moveMissing = dataScheme.MoveAttributeRank(Context, thirdAttribute, 0);
         Assert.IsFalse(moveMissing.Passed);
     }
 }

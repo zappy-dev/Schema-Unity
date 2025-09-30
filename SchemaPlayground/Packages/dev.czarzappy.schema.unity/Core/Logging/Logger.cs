@@ -30,7 +30,7 @@ namespace Schema.Core.Logging
         private static string FormatMessage(string message, LogLevel msgSeverity, object context = null)
         {
             var sb = new StringBuilder();
-            sb.Append("[Schema] ");
+            sb.Append("[Schema]");
             if (context != null)
             {
                 sb.Append("[Context=").Append(context).Append("] ");

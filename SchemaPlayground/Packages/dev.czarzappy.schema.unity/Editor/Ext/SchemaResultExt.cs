@@ -1,9 +1,8 @@
 using Schema.Core;
 using UnityEditor;
 using UnityEngine;
-using static Schema.Core.SchemaResult;
 
-namespace Schema.Unity
+namespace Schema.Unity.Editor.Ext
 {
     /// <summary>
     /// Extension methods for converting Schema result statuses to Unity editor message types.

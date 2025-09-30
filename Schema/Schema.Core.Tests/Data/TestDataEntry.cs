@@ -5,6 +5,11 @@ namespace Schema.Core.Tests.Data;
 [TestFixture]
 public class TestDataEntry
 {
+    private static SchemaContext Context = new SchemaContext
+    {
+        Driver = nameof(TestDataEntry)
+    };
+    
     [Test]
     [TestCase(null)]
     [TestCase("")]
@@ -14,7 +19,7 @@ public class TestDataEntry
     {
         Assert.Throws<ArgumentException>(() => new DataEntry
         {
-            { attributeName, "data" }
+            { attributeName, "data", Context}
         });
     }
 
@@ -32,16 +37,16 @@ public class TestDataEntry
         // Missing attribute returns default 0
         Assert.That(entry.GetDataAsInt("missing"), Is.EqualTo(0));
 
-        entry.Add("int", 42);
+        entry.Add("int", 42, Context);
         Assert.That(entry.GetDataAsInt("int"), Is.EqualTo(42));
 
-        entry.Add("long", 42L);
+        entry.Add("long", 42L, Context);
         Assert.That(entry.GetDataAsInt("long"), Is.EqualTo(42));
 
-        entry.Add("stringNumeric", "123");
+        entry.Add("stringNumeric", "123", Context);
         Assert.That(entry.GetDataAsInt("stringNumeric"), Is.EqualTo(123));
 
-        entry.Add("stringBad", "notAnInt");
+        entry.Add("stringBad", "notAnInt", Context);
         Assert.That(entry.GetDataAsInt("stringBad"), Is.EqualTo(0));
     }
 
@@ -52,15 +57,15 @@ public class TestDataEntry
         Assert.That(entry.TryGetDataAsInt("missing", out var missingResult), Is.False);
         Assert.That(missingResult, Is.EqualTo(0));
 
-        entry.Add("int", 7);
+        entry.Add("int", 7, Context);
         Assert.That(entry.TryGetDataAsInt("int", out var intResult), Is.True);
         Assert.That(intResult, Is.EqualTo(7));
 
-        entry.Add("stringNumeric", "99");
+        entry.Add("stringNumeric", "99", Context);
         Assert.That(entry.TryGetDataAsInt("stringNumeric", out var strResult), Is.True);
         Assert.That(strResult, Is.EqualTo(99));
 
-        entry.Add("bad", "foo");
+        entry.Add("bad", "foo", Context);
         Assert.That(entry.TryGetDataAsInt("bad", out var badResult), Is.False);
         Assert.That(badResult, Is.EqualTo(0));
     }
@@ -71,19 +76,19 @@ public class TestDataEntry
         var entry = new DataEntry();
         Assert.That(entry.GetDataAsFloat("missing"), Is.EqualTo(0f));
 
-        entry.Add("float", 3.14f);
+        entry.Add("float", 3.14f, Context);
         Assert.That(entry.GetDataAsFloat("float"), Is.EqualTo(3.14f).Within(0.0001f));
 
-        entry.Add("double", 2.5d);
+        entry.Add("double", 2.5d, Context);
         Assert.That(entry.GetDataAsFloat("double"), Is.EqualTo(2.5f).Within(0.0001f));
 
-        entry.Add("int", 2);
+        entry.Add("int", 2, Context);
         Assert.That(entry.GetDataAsFloat("int"), Is.EqualTo(2f).Within(0.0001f));
 
-        entry.Add("stringNumeric", "1.25");
+        entry.Add("stringNumeric", "1.25", Context);
         Assert.That(entry.GetDataAsFloat("stringNumeric"), Is.EqualTo(1.25f).Within(0.0001f));
 
-        entry.Add("stringBad", "abc");
+        entry.Add("stringBad", "abc", Context);
         Assert.That(entry.GetDataAsFloat("stringBad"), Is.EqualTo(0f));
     }
 
@@ -94,15 +99,15 @@ public class TestDataEntry
         Assert.That(entry.TryGetDataAsFloat("missing", out var missing), Is.False);
         Assert.That(missing, Is.EqualTo(0f));
 
-        entry.Add("float", 3f);
+        entry.Add("float", 3f, Context);
         Assert.That(entry.TryGetDataAsFloat("float", out var floatVal), Is.True);
         Assert.That(floatVal, Is.EqualTo(3f));
 
-        entry.Add("stringNumeric", "2.5");
+        entry.Add("stringNumeric", "2.5", Context);
         Assert.That(entry.TryGetDataAsFloat("stringNumeric", out var floatParsed), Is.True);
         Assert.That(floatParsed, Is.EqualTo(2.5f).Within(0.0001f));
 
-        entry.Add("bad", "bar");
+        entry.Add("bad", "bar", Context);
         Assert.That(entry.TryGetDataAsFloat("bad", out var badVal), Is.False);
         Assert.That(badVal, Is.EqualTo(0f));
     }
@@ -113,13 +118,13 @@ public class TestDataEntry
         var entry = new DataEntry();
         Assert.That(entry.GetDataAsBool("missing"), Is.False);
 
-        entry.Add("bool", true);
+        entry.Add("bool", true, Context);
         Assert.That(entry.GetDataAsBool("bool"), Is.True);
 
-        entry.Add("stringBool", "false");
+        entry.Add("stringBool", "false", Context);
         Assert.That(entry.GetDataAsBool("stringBool"), Is.False);
 
-        entry.Add("stringBad", "notBool");
+        entry.Add("stringBad", "notBool", Context);
         Assert.That(entry.GetDataAsBool("stringBad"), Is.False);
     }
 
@@ -130,15 +135,15 @@ public class TestDataEntry
         Assert.That(entry.TryGetDataAsBool("missing", out var missing), Is.False);
         Assert.That(missing, Is.False);
 
-        entry.Add("bool", false);
+        entry.Add("bool", false, Context);
         Assert.That(entry.TryGetDataAsBool("bool", out var boolVal), Is.True);
         Assert.That(boolVal, Is.False);
 
-        entry.Add("stringBool", "true");
+        entry.Add("stringBool", "true", Context);
         Assert.That(entry.TryGetDataAsBool("stringBool", out var parsedBool), Is.True);
         Assert.That(parsedBool, Is.True);
 
-        entry.Add("bad", "xyz");
+        entry.Add("bad", "xyz", Context);
         Assert.That(entry.TryGetDataAsBool("bad", out var bad), Is.False);
         Assert.That(bad, Is.False);
     }
@@ -149,10 +154,10 @@ public class TestDataEntry
         var entry = new DataEntry();
         Assert.That(entry.GetDataAsString("missing"), Is.Empty);
 
-        entry.Add("string", "hello");
+        entry.Add("string", "hello", Context);
         Assert.That(entry.GetDataAsString("string"), Is.EqualTo("hello"));
 
-        entry.Add("int", 5);
+        entry.Add("int", 5, Context);
         Assert.That(entry.GetDataAsString("int"), Is.EqualTo("5"));
     }
 
@@ -163,11 +168,11 @@ public class TestDataEntry
         Assert.That(entry.TryGetDataAsString("missing", out var missing), Is.False);
         Assert.That(missing, Is.Null);
 
-        entry.Add("string", "foo");
+        entry.Add("string", "foo", Context);
         Assert.That(entry.TryGetDataAsString("string", out var str), Is.True);
         Assert.That(str, Is.EqualTo("foo"));
 
-        entry.Add("nullValue", null);
+        entry.Add("nullValue", null, Context);
         Assert.That(entry.TryGetDataAsString("nullValue", out var nullStr), Is.False);
         Assert.That(nullStr, Is.Null);
     }
@@ -179,16 +184,16 @@ public class TestDataEntry
         // Missing returns default (ValueA / 0)
         Assert.That(entry.GetDataAsEnum<SampleEnum>("missing"), Is.EqualTo(SampleEnum.ValueA));
 
-        entry.Add("enum", SampleEnum.ValueB);
+        entry.Add("enum", SampleEnum.ValueB, Context);
         Assert.That(entry.GetDataAsEnum<SampleEnum>("enum"), Is.EqualTo(SampleEnum.ValueB));
 
-        entry.Add("intEnum", 2);
+        entry.Add("intEnum", 2, Context);
         Assert.That(entry.GetDataAsEnum<SampleEnum>("intEnum"), Is.EqualTo(SampleEnum.ValueC));
 
-        entry.Add("stringEnum", "ValueA");
+        entry.Add("stringEnum", "ValueA", Context);
         Assert.That(entry.GetDataAsEnum<SampleEnum>("stringEnum"), Is.EqualTo(SampleEnum.ValueA));
 
-        entry.Add("bad", "NotAValue");
+        entry.Add("bad", "NotAValue", Context);
         Assert.That(entry.GetDataAsEnum<SampleEnum>("bad"), Is.EqualTo(SampleEnum.ValueA));
     }
 
@@ -199,19 +204,19 @@ public class TestDataEntry
         Assert.That(entry.TryGetDataAsEnum<SampleEnum>("missing", out var missing), Is.False);
         Assert.That(missing, Is.EqualTo(SampleEnum.ValueA));
 
-        entry.Add("enum", SampleEnum.ValueC);
+        entry.Add("enum", SampleEnum.ValueC, Context);
         Assert.That(entry.TryGetDataAsEnum<SampleEnum>("enum", out var enumVal), Is.True);
         Assert.That(enumVal, Is.EqualTo(SampleEnum.ValueC));
 
-        entry.Add("intEnum", 1);
+        entry.Add("intEnum", 1, Context);
         Assert.That(entry.TryGetDataAsEnum<SampleEnum>("intEnum", out var intEnum), Is.True);
         Assert.That(intEnum, Is.EqualTo(SampleEnum.ValueB));
 
-        entry.Add("stringEnum", "ValueA");
+        entry.Add("stringEnum", "ValueA", Context);
         Assert.That(entry.TryGetDataAsEnum<SampleEnum>("stringEnum", out var parsedEnum), Is.True);
         Assert.That(parsedEnum, Is.EqualTo(SampleEnum.ValueA));
 
-        entry.Add("bad", "Invalid");
+        entry.Add("bad", "Invalid", Context);
         Assert.That(entry.TryGetDataAsEnum<SampleEnum>("bad", out var badEnum), Is.False);
         Assert.That(badEnum, Is.EqualTo(SampleEnum.ValueA));
     }

@@ -39,6 +39,14 @@
     {
       "SchemeName": "Entities",
       "FilePath": "Content\\Entities.json"
+    },
+    {
+      "SchemeName": "RewardType",
+      "FilePath": "Content/RewardType.json"
+    },
+    {
+      "SchemeName": "Chests",
+      "FilePath": "Content/Chests.json"
     }
   ]
 }

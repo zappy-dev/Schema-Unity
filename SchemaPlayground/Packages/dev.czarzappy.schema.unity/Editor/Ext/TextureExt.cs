@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Schema.Unity.Editor
+namespace Schema.Unity.Editor.Ext
 {
     public static class TextureExt
     {
