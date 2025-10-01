@@ -95,7 +95,7 @@
       }
     },
     "dev.czarzappy.schema.unity": {
-      "version": "file:/Users/zmaldonado/src/Schema-Unity/SchemaPlayground/Packages/dev.czarzappy.schema.unity",
+      "version": "file:../../SchemaPlayground/Packages/dev.czarzappy.schema.unity",
       "depth": 0,
       "source": "local",
       "dependencies": {
