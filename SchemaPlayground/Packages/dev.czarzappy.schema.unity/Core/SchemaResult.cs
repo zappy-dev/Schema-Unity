@@ -81,6 +81,11 @@ namespace Schema.Core
         {
             return !conditional ? Fail(context: context, errorMessage: errorMessage) : Pass(successMessage: successMessage, context: context);
         }
+
+        public SchemaResult<TOut> CastError<TOut>()
+        {
+            return SchemaResult<TOut>.Fail(Message, Context);
+        }
     }
 
     public struct SchemaResult<TResult>
