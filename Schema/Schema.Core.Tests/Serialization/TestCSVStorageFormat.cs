@@ -2,6 +2,7 @@ using System.Collections;
 using Moq;
 using Schema.Core.Data;
 using Schema.Core.IO;
+using Schema.Core.Logging;
 using Schema.Core.Serialization;
 using Schema.Core.Tests.Ext;
 
@@ -78,7 +79,7 @@ public class TestCSVStorageFormat
         var schemeFilePath = "Test.csv";
 
         var csvContent = storageFormat.Serialize(testScheme).AssertPassed();
-        Console.WriteLine(csvContent);
+        Logger.Log(csvContent);
         var csvLines = CSVStorageFormat.SplitToRows(csvContent);
         mockFileSystem.Setup(fs => fs.ReadAllLines(Context, schemeFilePath))
             .Returns(SchemaResult<string[]>.Pass(csvLines)).Verifiable();

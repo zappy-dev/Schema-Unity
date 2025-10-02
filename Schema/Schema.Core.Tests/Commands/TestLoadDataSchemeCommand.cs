@@ -47,7 +47,7 @@ namespace Schema.Core.Tests.Commands
             // Assert
             Assert.IsTrue(result.IsSuccess, result.Message);
             Assert.That(Schema.DoesSchemeExist(Context, _schemeName).AssertPassed(), Is.True);
-            Schema.GetScheme(_schemeName, Context).TryAssert(out var loadedScheme);
+            Schema.GetScheme(Context, _schemeName).TryAssert(out var loadedScheme);
             Assert.That(loadedScheme, Is.EqualTo(_testScheme));
         }
 
