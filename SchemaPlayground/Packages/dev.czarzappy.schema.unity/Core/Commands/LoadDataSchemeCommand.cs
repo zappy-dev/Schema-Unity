@@ -53,7 +53,8 @@ namespace Schema.Core.Commands
             ReportProgress(_progress, 0.1f, "Validating scheme...");
             
             // 2. Check if scheme already exists and handle overwrite logic
-            _schemeExistedBefore = Schema.DoesSchemeExist(_scheme.SchemeName);
+            if (!Schema.DoesSchemeExist(Context, _scheme.SchemeName).Try(out _schemeExistedBefore, out var error))
+                return Fail(error.Message);
             
             if (_schemeExistedBefore)
             {

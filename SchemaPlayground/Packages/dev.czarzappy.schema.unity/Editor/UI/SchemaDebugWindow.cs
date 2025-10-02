@@ -14,7 +14,12 @@ namespace Schema.Unity.Editor
     {
         private void OnGUI()
         {
-            RenderDebugView();
+            var renderCtx = new SchemaContext
+            {
+                Driver = $"{nameof(SchemaDebugWindow)}_Render"
+            };
+            
+            RenderDebugView(renderCtx);
             
             EditorGUILayout.Separator();
             
@@ -22,42 +27,51 @@ namespace Schema.Unity.Editor
             EditorGUILayout.EnumPopup("Log Level", Logger.Level);
         }
 
-        private void RenderDebugView()
+        private void RenderDebugView(SchemaContext context)
         {
             RenderSchemaDebugSettings();
             
             using (new EditorGUI.DisabledScope())
             {
-                EditorGUILayout.Toggle("Is Schema Initialized?", IsInitialized);
+                var isInitRes = IsInitialized(context);
+                var isInit = isInitRes.Passed;
+                EditorGUILayout.Toggle("Is Schema Initialized?", isInit);
                 EditorGUILayout.Toggle("Is Load In Progress?", IsManifestLoadInProgress);
 
 
                 using (var guiEventScroll = new EditorGUILayout.ScrollViewScope(guiEventsScrollPos))
                 {
                     guiEventsScrollPos = guiEventScroll.scrollPosition;
-                    if (IsInitialized)
+                    if (isInit)
                     {
-                        EditorGUILayout.IntField("Num available schemes", AllSchemes.Count());
-
-                        using (new EditorGUI.IndentLevelScope())
+                        if (!GetAllSchemes(context).Try(out var allSchemes, out var allSchemesError))
                         {
-                            foreach (var scheme in AllSchemes)
+                            EditorGUILayout.HelpBox(allSchemesError.Message, MessageType.Error);
+                        }
+                        else
+                        {
+                            EditorGUILayout.IntField("Num available schemes", allSchemes.Count());
+
+                            using (new EditorGUI.IndentLevelScope())
                             {
-                                using (new EditorGUILayout.HorizontalScope())
+                                foreach (var scheme in allSchemes)
                                 {
-                                    EditorGUILayout.TextField(scheme);
-                                    var getRes = GetScheme(scheme);
-                                    EditorGUILayout.Toggle("Loaded?", getRes.Passed);
-                                    if (getRes.Failed)
+                                    using (new EditorGUILayout.HorizontalScope())
                                     {
-                                        EditorGUILayout.HelpBox(getRes.Message, MessageType.Error);
+                                        EditorGUILayout.TextField(scheme);
+                                        var getRes = GetScheme(scheme, context);
+                                        EditorGUILayout.Toggle("Loaded?", getRes.Passed);
+                                        if (getRes.Failed)
+                                        {
+                                            EditorGUILayout.HelpBox(getRes.Message, MessageType.Error);
+                                        }
                                     }
                                 }
-                            }
 
-                            foreach (var loadedScheme in LoadedSchemes)
-                            {
-                                EditorGUILayout.TextField(loadedScheme.Value.ToString());
+                                foreach (var loadedScheme in LoadedSchemes)
+                                {
+                                    EditorGUILayout.TextField(loadedScheme.Value.ToString());
+                                }
                             }
                         }
                     }
@@ -130,52 +144,62 @@ namespace Schema.Unity.Editor
 
                 if (GUILayout.Button("Fix Duplicate Entries"))
                 {
-                    var ctx = new SchemaContext
-                    {
-                        Driver = "Debug_User_Fix_Duplicate_Entries"
-                    };
-                    foreach (var schemeName in AllSchemes)
-                    {
-                        if (!GetScheme(schemeName).Try(out var scheme))
-                        {
-                            continue; // can't de-dupe these schemes easily
-                        }
-
-                        if (!scheme.GetIdentifierAttribute().Try(out var identifierAttribute))
-                        {
-                            identifierAttribute = scheme.GetAttribute(0).Result; // just use first attribute
-                        }
-
-                        var identifiers = scheme.GetValuesForAttribute(identifierAttribute).ToArray();
-                        bool[] foundEntry = new bool[identifiers.Length];
-                        int numDeleted = 0;
-                        for (int i = 0; i < scheme.EntryCount; i++)
-                        {
-                            var entry = scheme.GetEntry(i);
-                            var entryIdValue = entry.GetDataAsString(identifierAttribute.AttributeName);
-                            int identifierIdx = Array.IndexOf(identifiers, entryIdValue);
-
-                            if (identifierIdx != -1 && foundEntry[identifierIdx])
-                            {
-                                scheme.DeleteEntry(ctx, entry);
-                                numDeleted++;
-                            }
-                            else
-                            {
-                                foundEntry[identifierIdx] = true;
-                            }
-                        }
-
-                        if (numDeleted > 0)
-                        {
-                            LogWarning($"Scheme '{schemeName}' has deleted {numDeleted} entries.");
-                            SaveDataScheme(ctx, scheme, false);
-                        }
-                    }
+                    FixDuplicateEntries();
                 }
 
                 RenderGUIEvents();
             }
+        }
+
+        private static SchemaResult FixDuplicateEntries()
+        {
+            var ctx = new SchemaContext
+            {
+                Driver = "Debug_User_Fix_Duplicate_Entries"
+            };
+            
+            if (!GetAllSchemes(ctx).Try(out var allSchemes, out var allSchemesError)) return allSchemesError.Cast();
+
+            foreach (var schemeName in allSchemes)
+            {
+                if (!GetScheme(schemeName, ctx).Try(out var scheme))
+                {
+                    continue; // can't de-dupe these schemes easily
+                }
+
+                if (!scheme.GetIdentifierAttribute().Try(out var identifierAttribute))
+                {
+                    identifierAttribute = scheme.GetAttribute(0).Result; // just use first attribute
+                }
+
+                var identifiers = scheme.GetValuesForAttribute(identifierAttribute).ToArray();
+                bool[] foundEntry = new bool[identifiers.Length];
+                int numDeleted = 0;
+                for (int i = 0; i < scheme.EntryCount; i++)
+                {
+                    var entry = scheme.GetEntry(i);
+                    var entryIdValue = entry.GetDataAsString(identifierAttribute.AttributeName);
+                    int identifierIdx = Array.IndexOf(identifiers, entryIdValue);
+
+                    if (identifierIdx != -1 && foundEntry[identifierIdx])
+                    {
+                        scheme.DeleteEntry(ctx, entry);
+                        numDeleted++;
+                    }
+                    else
+                    {
+                        foundEntry[identifierIdx] = true;
+                    }
+                }
+
+                if (numDeleted > 0)
+                {
+                    LogWarning($"Scheme '{schemeName}' has deleted {numDeleted} entries.");
+                    if (!SaveDataScheme(ctx, scheme, false).Try(out var err)) return err;
+                }
+            }
+            
+            return SchemaResult.Pass();
         }
 
         private void RenderSchemaDebugSettings()
@@ -227,7 +251,11 @@ namespace Schema.Unity.Editor
                 
                 if (GUILayout.Button("Sim Click - Explorer Scheme"))
                 {
-                    var coroutine = SchemaEditorWindow.Instance.SimClick_ExplorerSelectSchemeByIndex(schemeIdx);
+                    var ctx = new SchemaContext
+                    {
+                        Driver = "Sim_Click_Explorer_Scheme"
+                    };
+                    var coroutine = SchemaEditorWindow.Instance.SimClick_ExplorerSelectSchemeByIndex(ctx, schemeIdx);
                     EditorCoroutineUtility.StartCoroutine(coroutine, this);
                 }
                 

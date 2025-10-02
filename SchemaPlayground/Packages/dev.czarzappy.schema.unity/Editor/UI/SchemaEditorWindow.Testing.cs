@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Schema.Core;
 using UnityEditor;
 using UnityEngine;
 using Logger = Schema.Core.Logging.Logger;
@@ -98,9 +99,10 @@ namespace Schema.Unity.Editor
             yield return EditorWindowExt.PumpFrames();
         }
 
-        internal IEnumerator SimClick_ExplorerSelectSchemeByIndex(int schemeIdx)
+        internal IEnumerator SimClick_ExplorerSelectSchemeByIndex(SchemaContext context, int schemeIdx)
         {
-            var numAvailableSchemes = Schema.Core.Schema.NumAvailableSchemes;
+            if (!Core.Schema.GetNumAvailableSchemes(context).Try(out int numAvailableSchemes, out var error)) yield break;
+            
             if (schemeIdx >= numAvailableSchemes || schemeIdx < 0)
             {
                 Logger.LogWarning($"Attempting to click on out-of-range scheme idx: {schemeIdx}");

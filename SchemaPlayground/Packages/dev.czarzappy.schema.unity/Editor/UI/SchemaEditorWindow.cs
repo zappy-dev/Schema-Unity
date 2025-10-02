@@ -20,6 +20,7 @@ using Schema.Unity.Editor.Ext;
 using static Schema.Core.Logging.Logger;
 using static Schema.Core.Schema;
 using static Schema.Core.SchemaResult;
+using static Schema.Unity.Editor.LayoutUtils;
 using static Schema.Unity.Editor.SchemaLayout;
 using Logger = Schema.Core.Logging.Logger;
 
@@ -176,10 +177,11 @@ namespace Schema.Unity.Editor
             ManifestImportPath = _defaultManifestLoadPath;
             // }
             // return;
-            LatestResponse = OnLoadManifest(new SchemaContext
+            var ctx = new SchemaContext
             {
                 Driver = "Editor_Initialization",
-            });
+            };
+            LatestResponse = OnLoadManifest(ctx);
             
             if (LatestResponse.Passed)
             {
@@ -195,7 +197,7 @@ namespace Schema.Unity.Editor
             if (!string.IsNullOrEmpty(storedSelectedSchema))
             {
                 LogDbgVerbose($"Selected schema found: {storedSelectedSchema}", this);
-                OnSelectScheme(storedSelectedSchema, "Restoring from Editor Preferences");
+                OnSelectScheme(storedSelectedSchema, ctx);
             }
 
             isInitialized = true;
@@ -251,20 +253,24 @@ namespace Schema.Unity.Editor
         
         #region UI Command Handling
 
-        private void OnSelectScheme(string schemeName, string context)
+        private void OnSelectScheme(string schemeName, SchemaContext context)
         {
             // Unfocus any selected control fields when selecting a new scheme
             ReleaseControlFocus();
-            var schemeNames = AllSchemes.ToArray();
-            var prevSelectedIndex = Array.IndexOf(schemeNames, schemeName);
-            if (prevSelectedIndex == -1)
+
+            if (GetAllSchemes(context).Try(out var allSchemes))
             {
-                return;
+                var schemeNames = allSchemes.ToArray();
+                var prevSelectedIndex = Array.IndexOf(schemeNames, schemeName);
+                if (prevSelectedIndex == -1)
+                {
+                    return;
+                }
+                selectedSchemaIndex = prevSelectedIndex;
             }
             
             LogDbgVerbose($"Opening Schema '{schemeName}' for editing, {context}...");
             SelectedSchemeName = schemeName;
-            selectedSchemaIndex = prevSelectedIndex;
             EditorPrefs.SetString(EDITORPREFS_KEY_SELECTEDSCHEME, schemeName);
             newAttributeName = string.Empty;
             
@@ -597,19 +603,19 @@ namespace Schema.Unity.Editor
             return AttributeSortOrder.None;
         }
 
-        private void FocusOnEntry(string referenceSchemeName, string referenceAttributeName, string currentValue)
+        private void FocusOnEntry(SchemaContext ctx, string referenceSchemeName, string referenceAttributeName, string currentValue)
         {
-            OnSelectScheme(referenceSchemeName, "Focus On Entry");
+            OnSelectScheme(referenceSchemeName, ctx);
         }
 
         #endregion
 
         #region Rendering Methods
-        private string GetTooltipMessage()
+        private string GetTooltipMessage(SchemaContext context)
         {
             // TODO: Need to split the Schema Instance providing Schema's self data from the one used for a Project... different scopes.
             // May need to consider this for the runtime as well.
-            if (!GetScheme("Tooltips").Try(out var tooltipDataScheme)) 
+            if (!GetScheme("Tooltips", context).Try(out var tooltipDataScheme)) 
                 return "Could not find Tooltips scheme";
 
             var tooltips = new TooltipsScheme(tooltipDataScheme);
@@ -628,6 +634,11 @@ namespace Schema.Unity.Editor
         
         private void OnGUI()
         {
+            var renderCtx = new SchemaContext
+            {
+                Driver = $"{nameof(SchemaEditorWindow)}_Render"
+            };
+            
             if (!isInitialized)
             {
                 GUILayout.Label("Initializing...");
@@ -666,11 +677,10 @@ namespace Schema.Unity.Editor
             
             EditorGUILayout.TextField("Project Path", ProjectPath);
             
-            
             if (LatestManifestLoadResponse.Message != null &&
                 LatestManifestLoadResponse.Failed)
             {
-                EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestManifestLoadResponse.Result}: {LatestManifestLoadResponse.Message}", LatestManifestLoadResponse.MessageType());
+                EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestManifestLoadResponse.Status}: {LatestManifestLoadResponse.Message}", LatestManifestLoadResponse.MessageType());
             }
             
             using (new EditorGUILayout.HorizontalScope())
@@ -754,13 +764,13 @@ namespace Schema.Unity.Editor
 
             using (var _ = _explorerViewMarker.Auto())
             {
-                RenderSchemaExplorer();
+                RenderSchemaExplorer(renderCtx);
             }
 
             DrawVerticalLine();
             using (var _ = _tableViewMarker.Auto())
             {
-                RenderTableView();
+                RenderTableView(renderCtx);
             }
             // Table View
             GUILayout.EndHorizontal();
@@ -783,43 +793,35 @@ namespace Schema.Unity.Editor
         /// <summary>
         /// Renders the Schema sidebar to view and interact with various Schema datatypes
         /// </summary>
-        private void RenderSchemaExplorer()
+        private void RenderSchemaExplorer(SchemaContext ctx)
         {
             using (new EditorGUILayout.VerticalScope(GUILayout.Width(400)))
             {
-                GUILayout.Label($"Schema Explorer ({AllSchemes.Count()} count):", EditorStyles.boldLabel, DoNotExpandWidthOptions);
-                
+                if (GetNumAvailableSchemes(ctx).Try(out var numSchemes))
+                {
+                    GUILayout.Label($"Schema Explorer ({numSchemes} count):", EditorStyles.boldLabel, DoNotExpandWidthOptions);
+
+                }
                 // New Schema creation form
                 using (new EditorGUILayout.HorizontalScope(DoNotExpandWidthOptions))
                 {
                     LogEvent(new Event(Event.current));
                     // Input field to add a new scheme
-                    GUI.SetNextControlName(CONTROL_NAME_NEW_SCHEME_NAME_FIELD);
-                    newSchemeName = EditorGUILayout.TextField( newSchemeName, DoNotExpandWidthOptions);
-                    
-                    // Logger.LogDbgVerbose($"GUI.GetNameOfFocusedControl(): {GUI.GetNameOfFocusedControl()}");
-                    // Logger.LogDbgVerbose($"[{Time.frameCount}] newSchemeName: {newSchemeName}");
 
-                    using (new EditorGUI.DisabledScope(disabled: string.IsNullOrEmpty(newSchemeName)))
+                    if (AddButton("Create New Schema"))
                     {
-                        if (AddButton("Create New Schema"))
-                        {
-                            CreateNewScheme(new SchemaContext
-                            {
-                                Driver = "User_Create_New_Schema"
-                            });
-                        }
+                        CreateNewSchemeWizard();
+                    }
 
-                        if (Event.current.type == EventType.Repaint)
-                        {
-                            // var r = GUILayoutUtility.GetLastRect();              // group-space
-                            // var screenTL = GUIUtility.GUIToScreenPoint(r.position);
-                            // var winTL    = (Vector2)position.position;           // window top-left in screen coords
-                            // CreateNewSchemeButtonWinRect = new Rect(screenTL - winTL, r.size);
-                            // CreateNewSchemeButtonWinRect = new Rect(r);
-                            CreateNewSchemeButtonWinRect = this.GetLastScreenRect();
-                            // Logger.LogDbgVerbose($"rect capture, r: {r}, {nameof(CreateNewSchemeButtonWinRect)}: {CreateNewSchemeButtonWinRect}");
-                        }
+                    if (Event.current.type == EventType.Repaint)
+                    {
+                        // var r = GUILayoutUtility.GetLastRect();              // group-space
+                        // var screenTL = GUIUtility.GUIToScreenPoint(r.position);
+                        // var winTL    = (Vector2)position.position;           // window top-left in screen coords
+                        // CreateNewSchemeButtonWinRect = new Rect(screenTL - winTL, r.size);
+                        // CreateNewSchemeButtonWinRect = new Rect(r);
+                        CreateNewSchemeButtonWinRect = this.GetLastScreenRect();
+                        // Logger.LogDbgVerbose($"rect capture, r: {r}, {nameof(CreateNewSchemeButtonWinRect)}: {CreateNewSchemeButtonWinRect}");
                     }
                 }
                 
@@ -831,42 +833,46 @@ namespace Schema.Unity.Editor
                 {
                     GenericMenu menu = new GenericMenu();
 
-                    foreach (var storageFormat in Schema.Core.Schema.Storage.AllFormats)
+                    if (GetStorage(ctx).Try(out var storage))
                     {
-                        if (!storageFormat.IsImportSupported)
+                        foreach (var storageFormat in storage.AllFormats)
                         {
-                            continue;
-                        }
-
-                        if (storageFormat is ScriptableObjectStorageFormat so)
-                        {
-                            foreach (var soType in TypeUtils.GetUserDefinedScriptableObjectTypes())
+                            if (!storageFormat.IsImportSupported)
                             {
-                                menu.AddItem(new GUIContent($"{storageFormat.DisplayName}/{soType.Name} - {soType.Assembly.GetName().Name}"), false, () =>
+                                continue;
+                            }
+
+                            if (storageFormat is ScriptableObjectStorageFormat so)
+                            {
+                                foreach (var soType in TypeUtils.GetUserDefinedScriptableObjectTypes())
                                 {
-                                    ImportScriptableObjectToDataScheme(new SchemaContext
+                                    menu.AddItem(new GUIContent($"{storageFormat.DisplayName}/{soType.Name} - {soType.Assembly.GetName().Name}"), false, () =>
                                     {
-                                        Driver = "User_Import_ScriptableObject"
-                                    }, soType);
+                                        ImportScriptableObjectToDataScheme(new SchemaContext
+                                        {
+                                            Driver = "User_Import_ScriptableObject"
+                                        }, soType);
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                menu.AddItem(new GUIContent(storageFormat.DisplayName), false, () =>
+                                {
+                                    var ctx = new SchemaContext
+                                    {
+                                        Driver = "User_Import_Schema"
+                                    };
+                                    if (storageFormat.TryImport(ctx, out var importedSchema, out var importFilePath))
+                                    {
+                                        SubmitAddSchemeRequest(ctx, importedSchema, importFilePath: importFilePath).FireAndForget();
+                                    }
                                 });
                             }
                         }
-                        else
-                        {
-                            menu.AddItem(new GUIContent(storageFormat.DisplayName), false, () =>
-                            {
-                                var ctx = new SchemaContext
-                                {
-                                    Driver = "User_Import_Schema"
-                                };
-                                if (storageFormat.TryImport(ctx, out var importedSchema, out var importFilePath))
-                                {
-                                    SubmitAddSchemeRequest(ctx, importedSchema, importFilePath: importFilePath).FireAndForget();
-                                }
-                            });
-                        }
+
                     }
-                            
+       
                     menu.ShowAsContext();
                 }
                     
@@ -882,7 +888,7 @@ namespace Schema.Unity.Editor
                         return $"{s.SchemeName}{dirtyPostfix}";
                     }
                     
-                    var schemeNames = GetSchemes()
+                    var schemeNames = GetSchemes(ctx)
                         .Select(s => (DisplayName: DisplayName(s), SchemeName: s.SchemeName, Scheme: s)).ToArray();
 
                     using (var schemeChange = new EditorGUI.ChangeCheckScope())
@@ -908,51 +914,24 @@ namespace Schema.Unity.Editor
                         if (schemeChange.changed)
                         {
                             var nextSelectedSchema = schemeNames[selectedSchemaIndex];
-                            OnSelectScheme(nextSelectedSchema.SchemeName, "Selected Schema in Explorer");
+                            OnSelectScheme(nextSelectedSchema.SchemeName, ctx);
                         }
                     }
                 }
             }
         }
 
+        private void CreateNewSchemeWizard()
+        {
+            // EditorUtility.dial
+            var wizardWindow = GetWindow<CreateNewSchemeWizardWindow>(utility: true, "Schema - Create New Scheme Wizard", focus: true);
+            wizardWindow.ShowUtility();
+        }
+
         private void LogEvent(Event current)
         {
             // Logger.LogDbgVerbose($"[{Time.frameCount}] Event.current: {Event.current}, isKey: {Event.current.isKey}");
             eventHistory.Add((Time.frameCount, current));
-        }
-        
-        
-
-        private SchemaResult CreateNewScheme(SchemaContext context)
-        {
-            var newSchema = new DataScheme(newSchemeName);
-            context.Scheme = newSchema;
-            
-            // Initialize with some starting data
-            var newAttrRes = newSchema.AddAttribute(context, "ID", DataType.Text, defaultValue: string.Empty, isIdentifier: true);
-            if (!newAttrRes.Try(out var newIdAttr))
-            {
-                return Fail(context, newAttrRes.Message);
-            }
-
-            var dataEntry = new DataEntry();
-            dataEntry.Add(newIdAttr.AttributeName, string.Empty, context);
-            var addEntryRes = newSchema.AddEntry(context, dataEntry);
-
-            if (addEntryRes.Failed)
-            {
-                return Fail(context, newAttrRes.Message);
-            }
-                            
-            // Create a relative path for the new schema file
-            string fileName = $"{newSchemeName}.{Schema.Core.Schema.Storage.DefaultSchemaStorageFormat.Extension}";
-            string relativePath = $"{DefaultContentDirectory}/{fileName}";
-            // string relativePath = fileName; // Default to just the filename (relative to Content folder)
-                            
-            SubmitAddSchemeRequest(context, newSchema, importFilePath: relativePath).FireAndForget();
-            newSchemeName = string.Empty; // clear out new scheme field name since it's unlikely someone wants to make a new scheme with the same name
-
-            return Pass($"Created new Scheme: {newSchemeName}", context);
         }
 
         public static void DrawUILine(Color color, int thickness = 2, int padding = 10)
@@ -992,6 +971,8 @@ namespace Schema.Unity.Editor
                 return assetGUIDAttrRes.Cast();
             }
             
+            if (!GetStorage(context).Try(out var storage, out var storageErr)) return storageErr.Cast();
+            
             var mappedFields = new List<FieldInfo>();
             foreach (var field in serializedFields)
             {
@@ -1023,7 +1004,7 @@ namespace Schema.Unity.Editor
                     // Enumeration
                     // First try to find if the enumeration already exists as another Scheme
                     // If it doesn't already, then prompt the user to create one
-                    if (!GetScheme(enumSchemeName).Try(out var enumScheme))
+                    if (!GetScheme(enumSchemeName, context).Try(out var enumScheme))
                     {
                         if (EditorUtility.DisplayDialog(operationTitle,
                                 $"No existing data scheme for enum '{enumSchemeName}'. Do you want to create one?", "Yes, create new Scheme", "Skip"))
@@ -1053,7 +1034,7 @@ namespace Schema.Unity.Editor
                             }
                                                     
                             // finally save new data scheme
-                            string enumSchemeFileName = $"{enumSchemeName}.{Schema.Core.Schema.Storage.DefaultSchemaStorageFormat.Extension}";
+                            string enumSchemeFileName = $"{enumSchemeName}.{storage.DefaultSchemaStorageFormat.Extension}";
                             SubmitAddSchemeRequest(context, enumScheme, importFilePath: enumSchemeFileName).FireAndForget();
                         }
                     }
@@ -1171,7 +1152,7 @@ namespace Schema.Unity.Editor
             }
 
             progress.Progress($"Loading final Data Scheme", 0.9f);
-            string fileName = $"{newSOSchemeName}.{Schema.Core.Schema.Storage.DefaultSchemaStorageFormat.Extension}";
+            string fileName = $"{newSOSchemeName}.{storage.DefaultSchemaStorageFormat.Extension}";
             SubmitAddSchemeRequest(context, dataScheme, importFilePath: fileName).FireAndForget();
             return Pass("Submitted request to add new scheme");
         }

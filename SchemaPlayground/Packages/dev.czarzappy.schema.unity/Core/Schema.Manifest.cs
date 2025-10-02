@@ -144,12 +144,18 @@ namespace Schema.Core
                     defaultScriptExportPath,
                     Path.Combine(DefaultContentDirectory, "Manifest.json"));
                 
-                var createRes = storage.FileSystem.CreateDirectory(context, defaultScriptExportPath);
-                if (createRes.Failed)
+                // Only attempt to create the directory if a non-empty path is provided
+                if (!string.IsNullOrWhiteSpace(defaultScriptExportPath))
                 {
-                    return createRes;
+                    var createRes = storage.FileSystem.CreateDirectory(context, defaultScriptExportPath);
+                    if (createRes.Failed)
+                    {
+                        return createRes;
+                    }
                 }
                 
+                // Prime the manifest as loaded before validation to avoid FS path checks requiring initialization
+                LoadedManifestScheme = new ManifestScheme(templateManifestScheme._);
                 var result = LoadDataScheme(context, templateManifestScheme._, overwriteExisting: true);
                 Logger.LogDbgVerbose(result.Message, result.Context);
                 if (result.Passed)

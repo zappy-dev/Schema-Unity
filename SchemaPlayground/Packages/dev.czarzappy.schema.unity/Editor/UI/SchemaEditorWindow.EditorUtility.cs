@@ -6,8 +6,6 @@ namespace Schema.Unity.Editor
 {
     internal partial class SchemaEditorWindow
     {
-        internal GUILayoutOption[] DoNotExpandWidthOptions = { GUILayout.ExpandWidth(false) };
-        internal GUILayoutOption[] ExpandWidthOptions = { GUILayout.ExpandWidth(true) };
         internal object FastTextField(object value, GUIStyle style, params GUILayoutOption[] options)
         {
             return EditorGUILayout.TextField(

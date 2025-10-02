@@ -21,6 +21,12 @@ namespace Schema.Core
         /// Determines whether to log stack traces for new Schema Results. Useful for debugging, but not recommended during production
         /// </summary>
         public bool LogStackTrace { get; set; } = false;
+
+#if SCHEMA_DEBUG
+        public bool LogFailure { get; set; } = true;
+#else
+        public bool LogFailure { get; set; } = false;
+#endif
     }
     
     public struct SchemaResult
@@ -69,7 +75,7 @@ namespace Schema.Core
             // TODO: Maybe create a preference for whether schema results automatically create a log?
             // TODO: Handle logging when creating an empty result
 // #if SCHEMA_DEBUG
-             if (status == RequestStatus.Failed)
+             if (SchemaResultSettings.Instance.LogFailure && status == RequestStatus.Failed)
              {
                  OnSchemaResultFailed(message, context);
              }
@@ -111,9 +117,9 @@ namespace Schema.Core
 
         #endregion
 
-        public bool Try(out string message)
+        public bool Try(out SchemaResult err)
         {
-            message = this.Message;
+            err = this;
             return this.status == RequestStatus.Passed;
         }
 
@@ -164,7 +170,7 @@ namespace Schema.Core
             // Number of times I comment / uncomment this: 5
             // Reason to uncomment: Helpful for debugging a publishing issue
             
-             if (status == RequestStatus.Failed)
+             if (SchemaResultSettings.Instance.LogFailure && status == RequestStatus.Failed)
              {
                  SchemaResult.OnSchemaResultFailed(message, context);
                  // string logMsg = $"[Context={context}] {message}";

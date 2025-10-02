@@ -187,14 +187,19 @@ namespace Schema.Unity.Editor
         }
         
         // Async version of adding a schema using command system
-        private Task SubmitAddSchemeRequest(SchemaContext context, DataScheme newSchema, string importFilePath = null)
+        internal Task SubmitAddSchemeRequest(SchemaContext context, DataScheme newSchema, string importFilePath = null)
         {
             // TODO: Replace this bad pattern, what if multiple operations need to queue up?
             // if (_operationInProgress) return;
 
             // Confirm overwrite if needed
             bool overwriteExisting = false;
-            if (DoesSchemeExist(newSchema.SchemeName))
+            if (!DoesSchemeExist(context, newSchema.SchemeName).Try(out bool doesExist, out var error))
+            {
+                var ct = new CancellationToken(true);
+                return Task.FromCanceled(ct);
+            }
+            if (doesExist)
             {
                 overwriteExisting = EditorUtility.DisplayDialog(
                     "Add Schema",
@@ -203,9 +208,6 @@ namespace Schema.Unity.Editor
                     "No");
                 if (!overwriteExisting) return Task.CompletedTask;
             }
-
-            // _operationInProgress = true;
-            // _currentOperationDescription = $"Adding schema '{newSchema.SchemeName}'";
 
             var progress = new Progress<CommandProgress>(UpdateProgress);
             SubmitCommandRequest(new CommandRequest
@@ -220,15 +222,16 @@ namespace Schema.Unity.Editor
                 {
                     if (result.IsSuccess)
                     {
-                        // persist data to file first
-                        Save(new SchemaContext
+                        var ctx = new SchemaContext
                         {
                             Scheme = newSchema,
                             Driver = "User_Add_New_Scheme"
-                        },true);
+                        };
+                        // persist data to file first
+                        Save(ctx, true);
                         
                         // then select the new scheme
-                        OnSelectScheme(newSchema.SchemeName, "Added schema");
+                        OnSelectScheme(newSchema.SchemeName, ctx);
                     }
                     else
                     {
@@ -237,38 +240,6 @@ namespace Schema.Unity.Editor
                 }
             });
             return Task.CompletedTask;
-            // try
-            // {
-            //     var command = new LoadDataSchemeCommand(
-            //         newSchema,
-            //         overwriteExisting: overwriteExisting,
-            //         importFilePath: importFilePath,
-            //         progress: progress);
-            //
-            //     var result = await commandProcessor.ExecuteAsync(command, _cancellationTokenSource.Token);
-            //
-            //     if (result.IsSuccess)
-            //     {
-            //         OnSelectScheme(newSchema.SchemeName, "Added schema");
-            //         // Persist changes
-            //         Save(true);
-            //     }
-            //     else
-            //     {
-            //         LogError(result.Message);
-            //     }
-            // }
-            // catch (OperationCanceledException)
-            // {
-            //     LogDbgVerbose("Add schema operation cancelled");
-            // }
-            // finally
-            // {
-            //     _operationInProgress = false;
-            //     _currentProgress = 0f;
-            //     _currentProgressMessage = string.Empty;
-            //     Repaint();
-            // }
         }
 
         private Task ExecuteSetDataOnEntryAsync(SchemaContext context, DataScheme scheme, DataEntry entry, string attributeName, object value)

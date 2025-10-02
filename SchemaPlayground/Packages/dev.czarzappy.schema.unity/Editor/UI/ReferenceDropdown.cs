@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Schema.Core;
 using Schema.Core.Data;
 using UnityEditor;
 using UnityEngine;
@@ -19,10 +20,10 @@ namespace Schema.Unity.Editor
         /// <param name="width">Optional width for the dropdown button.</param>
         /// <param name="style">Optional GUIStyle for the dropdown button.</param>
         /// <returns>The newly selected value if changed, otherwise the current value.</returns>
-        public static void Draw(string label, object currentValue, ReferenceDataType refType, Action<object> onNewValue, float width = 0,
+        public static void Draw(SchemaContext ctx, string label, object currentValue, ReferenceDataType refType, Action<object> onNewValue, float width = 0,
             GUIStyle style = null)
         {
-            if (GetScheme(refType.ReferenceSchemeName).Try(out var refScheme))
+            if (GetScheme(refType.ReferenceSchemeName, ctx).Try(out var refScheme))
             {
                 var values = refScheme.GetIdentifierValues().Select(v => v?.ToString() ?? "").ToList();
                 string displayValue = currentValue?.ToString() ?? "";

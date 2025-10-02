@@ -343,7 +343,7 @@ namespace Schema.Core
                             Logger.LogDbgWarning($"Entry {entry} failed attribute validate {attribute} in scheme: {scheme}");
                             if (scheme.IsManifest && (attribute.DataType is FilePathDataType || attribute.DataType is FolderDataType))
                             {
-                                Logger.LogWarning($"Error validating Manifest data for attribute: {attribute}, {fieldData}, error: {validateData.Message}");
+                                Logger.LogDbgWarning($"Error validating Manifest data for attribute: {attribute}, {fieldData}, error: {validateData.Message}");
                                 continue;
                             }
                             

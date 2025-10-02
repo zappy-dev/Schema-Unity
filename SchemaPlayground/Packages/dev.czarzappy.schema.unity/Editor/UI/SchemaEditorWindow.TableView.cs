@@ -17,6 +17,7 @@ using UnityEditorInternal;
 using UnityEngine;
 using static Schema.Core.Schema;
 using static Schema.Core.Logging.Logger;
+using static Schema.Unity.Editor.LayoutUtils;
 using static Schema.Unity.Editor.SchemaLayout;
 using Logger = Schema.Core.Logging.Logger;
 using Object = UnityEngine.Object;
@@ -100,18 +101,19 @@ namespace Schema.Unity.Editor
         private List<DataEntry> allEntries;
         private void RefreshTableEntriesForSelectedScheme()
         {
+            var refreshCtx = new SchemaContext
+            {
+                Driver = "Editor_Refresh_Table_Entries"
+            };
+            
             if (string.IsNullOrEmpty(selectedSchemeName) ||
-                !GetScheme(selectedSchemeName).Try(out var scheme))
+                !GetScheme(selectedSchemeName, refreshCtx).Try(out var scheme))
             {
                 allEntries = Enumerable.Empty<DataEntry>().ToList();
                 return;
             }
             
             Logger.LogDbgVerbose($"Refreshing Table Entries for scheme: {scheme}");
-            var refreshCtx = new SchemaContext
-            {
-                Driver = "Editor_Refresh_Table_Entries"
-            };
             var sortOrder = GetSortOrderForScheme(scheme);
             var realAllEntries = scheme.GetEntries(sortOrder, context: refreshCtx);
             
@@ -156,7 +158,7 @@ namespace Schema.Unity.Editor
             }
         }
         
-        private void RenderTableView()
+        private void RenderTableView(SchemaContext renderCtx)
         {
             if (string.IsNullOrEmpty(selectedSchemeName))
             {
@@ -164,7 +166,7 @@ namespace Schema.Unity.Editor
                 return;
             }
 
-            if (!GetScheme(selectedSchemeName).Try(out var scheme))
+            if (!GetScheme(selectedSchemeName, renderCtx).Try(out var scheme))
             {
                 EditorGUILayout.HelpBox("Schema does not exist.", MessageType.Warning);
                 return;
@@ -255,32 +257,7 @@ namespace Schema.Unity.Editor
                     if (EditorGUILayout.DropdownButton(new GUIContent("Export"),
                             FocusType.Keyboard, DoNotExpandWidthOptions))
                     {
-                        GenericMenu menu = new GenericMenu();
-
-                        foreach (var storageFormat in Core.Schema.Storage.AllFormats)
-                        {
-                            // do not allow exporting of Manifest Codegen for projects..
-                            // This is only true for the base project...
-                            // weird, so the Manifest that Schema itself uses may differ from the Manifest that developers will author...
-                            // I need to publish my manifest seperately from the manifest that is built for a project...
-                            
-                            // Okay, csharp code gen is part of publishing flow
-                            if (storageFormat is CSharpStorageFormat)
-                            {
-                                continue;
-                            }
-                            menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), false,
-                                () =>
-                                {
-                                    LatestResponse = storageFormat.Export(scheme, new SchemaContext
-                                    {
-                                        Scheme = scheme,
-                                        Driver = "User_Export_Scheme",
-                                    });
-                                });
-                        }
-
-                        menu.ShowAsContext();
+                        RenderExportOptions(scheme);
                     }
                 }
 
@@ -291,7 +268,7 @@ namespace Schema.Unity.Editor
                     tableViewHeaderHorizontalScrollPosition = tableScrollView.scrollPosition;
                     
                     // Freeze table header to top of the viewport
-                    RenderTableHeader(attributeCount, scheme);
+                    RenderTableHeader(renderCtx, attributeCount, scheme);
                     
                     using (var tableBodyScrollView = new EditorGUILayout.ScrollViewScope(tableViewBodyVerticalScrollPosition,
                                alwaysShowHorizontal: false,
@@ -336,7 +313,7 @@ namespace Schema.Unity.Editor
                         for (int i = visibleRange.start; i < visibleRange.end; i++)
                         {
                             var rowRect = GUILayoutUtility.GetRect(0, _tableLayout.RowHeight);
-                            RenderTableRow(rowRect, allEntries.ElementAt(i), i, attributeCount, scheme,
+                            RenderTableRow(renderCtx, rowRect, allEntries.ElementAt(i), i, attributeCount, scheme,
                                 tableCellControlIds, visibleEntryCount, visibleRange.start);
                             renderedCount++;
                         }
@@ -475,7 +452,47 @@ namespace Schema.Unity.Editor
             }
         }
 
-        private void RenderTableHeader(int attributeCount, DataScheme scheme)
+        private SchemaResult RenderExportOptions(DataScheme scheme)
+        {
+            GenericMenu menu = new GenericMenu();
+            var ctx = new SchemaContext
+            {
+                Driver = $"{nameof(RenderExportOptions)}"
+            };
+
+            if (!GetStorage(ctx).Try(out var storage, out var storageError))
+            {
+                return storageError.Cast();
+            }
+
+            foreach (var storageFormat in storage.AllFormats)
+            {
+                // do not allow exporting of Manifest Codegen for projects..
+                // This is only true for the base project...
+                // weird, so the Manifest that Schema itself uses may differ from the Manifest that developers will author...
+                // I need to publish my manifest seperately from the manifest that is built for a project...
+                            
+                // Okay, csharp code gen is part of publishing flow
+                if (storageFormat is CSharpStorageFormat)
+                {
+                    continue;
+                }
+                menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), (bool)false,
+                    (GenericMenu.MenuFunction)(() =>
+                    {
+                        LatestResponse = storageFormat.Export(scheme, new SchemaContext
+                        {
+                            Scheme = scheme,
+                            Driver = "User_Export_Scheme",
+                        });
+                    }));
+            }
+
+            menu.ShowAsContext();
+            return SchemaResult.Pass();
+        }
+
+        private void RenderTableHeader(SchemaContext context, int attributeCount, DataScheme scheme)
         {
             using (_tableHeaderMarker.Auto())
             {
@@ -579,7 +596,7 @@ namespace Schema.Unity.Editor
                                     {
                                         var referenceEntryOptions = new GenericMenu();
                 
-                                        if (GetScheme(refDataType.ReferenceSchemeName).Try(out var refSchema))
+                                        if (GetScheme(refDataType.ReferenceSchemeName, context).Try(out var refSchema))
                                         {
                                             foreach (var identifierValue in refSchema.GetIdentifierValues())
                                             {
@@ -785,45 +802,48 @@ namespace Schema.Unity.Editor
             
                             
             columnOptionsMenu.AddSeparator("Convert Type");
-            // render reference type conversions
-            foreach (var schemeName in AllSchemes.OrderBy(s => s))
+            if (GetAllSchemes(ctx).Try(out var allSchemes))
             {
-                if (GetScheme(schemeName).Try(out var dataSchema) 
-                    && dataSchema.GetIdentifierAttribute().Try(out var identifierAttribute))
+                // render reference type conversions
+                foreach (var schemeName in allSchemes.OrderBy(s => s))
                 {
-                    var referenceDataType = new ReferenceDataType(schemeName, identifierAttribute.AttributeName);
-                    bool isMatchingType = referenceDataType.Equals(attribute.DataType);
-                    columnOptionsMenu.AddItem(new GUIContent($"Convert Type/{referenceDataType.TypeName}"),
-                        on: isMatchingType, 
-                        () =>
-                        {
-                            var ctx = new SchemaContext
+                    if (GetScheme(schemeName, ctx).Try(out var dataSchema) 
+                        && dataSchema.GetIdentifierAttribute().Try(out var identifierAttribute))
+                    {
+                        var referenceDataType = new ReferenceDataType(schemeName, identifierAttribute.AttributeName);
+                        bool isMatchingType = referenceDataType.Equals(attribute.DataType);
+                        columnOptionsMenu.AddItem(new GUIContent($"Convert Type/{referenceDataType.TypeName}"),
+                            on: isMatchingType, 
+                            () =>
                             {
-                                Driver = "User_Convert_Attribute",
-                                AttributeName = attribute.AttributeName,
-                                Scheme = scheme,
-                            };
-                            LatestResponse =
-                                scheme.ConvertAttributeType(ctx, attributeName: attribute.AttributeName,
-                                    newType: referenceDataType);
-                        });
-                    
-                    // List variant
-                    columnOptionsMenu.AddItem(new GUIContent($"Convert Type/List/{referenceDataType.TypeName}"),
-                        on: isMatchingType, // TODO: fix this matching type logic
-                        () =>
-                        {
-                            var ctx = new SchemaContext
+                                var ctx = new SchemaContext
+                                {
+                                    Driver = "User_Convert_Attribute",
+                                    AttributeName = attribute.AttributeName,
+                                    Scheme = scheme,
+                                };
+                                LatestResponse =
+                                    scheme.ConvertAttributeType(ctx, attributeName: attribute.AttributeName,
+                                        newType: referenceDataType);
+                            });
+                        
+                        // List variant
+                        columnOptionsMenu.AddItem(new GUIContent($"Convert Type/List/{referenceDataType.TypeName}"),
+                            on: isMatchingType, // TODO: fix this matching type logic
+                            () =>
                             {
-                                Driver = "User_Convert_Attribute",
-                                AttributeName = attribute.AttributeName,
-                                Scheme = scheme,
-                            };
-                            var newListDataType = new ListDataType(referenceDataType, ctx);
-                            LatestResponse =
-                                scheme.ConvertAttributeType(ctx, attributeName: attribute.AttributeName,
-                                    newType: newListDataType);
-                        });
+                                var ctx = new SchemaContext
+                                {
+                                    Driver = "User_Convert_Attribute",
+                                    AttributeName = attribute.AttributeName,
+                                    Scheme = scheme,
+                                };
+                                var newListDataType = new ListDataType(referenceDataType, ctx);
+                                LatestResponse =
+                                    scheme.ConvertAttributeType(ctx, attributeName: attribute.AttributeName,
+                                        newType: newListDataType);
+                            });
+                    }
                 }
             }
                             
@@ -872,7 +892,7 @@ namespace Schema.Unity.Editor
         /// <summary>
         /// Renders a data cell based on the attribute data type
         /// </summary>
-        private void RenderDataCell(Rect cellRect, DataEntry entry, AttributeDefinition attribute, object entryValue, CellStyle cellStyle, int entryIdx, int attributeIdx, DataScheme scheme, int[] tableCellControlIds, int visibleEntryCount, int visibleRangeStart)
+        private void RenderDataCell(SchemaContext renderCtx, Rect cellRect, DataEntry entry, AttributeDefinition attribute, object entryValue, CellStyle cellStyle, int entryIdx, int attributeIdx, DataScheme scheme, int[] tableCellControlIds, int visibleEntryCount, int visibleRangeStart)
         {
             var originalColor = GUI.backgroundColor;
             GUI.backgroundColor = cellStyle.BackgroundColor;
@@ -887,7 +907,7 @@ namespace Schema.Unity.Editor
                 tableCellControlIds[localEntryIdx * scheme.AttributeCount + attributeIdx] = GUIUtility.GetControlID(FocusType.Passive);
             }
 
-            var ctx = new SchemaContext
+            var updateCtx = new SchemaContext
             {
                 Driver = "User_Update_Entry_Value",
                 Scheme = scheme,
@@ -898,11 +918,11 @@ namespace Schema.Unity.Editor
             {
                 case IntegerDataType _:
                     RenderIntegerCell(cellRect, Convert.ToInt32(entryValue), cellStyle, value => 
-                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
+                        UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case FloatingPointDataType _:
                     RenderFloatCell(cellRect, Convert.ToSingle(entryValue), cellStyle, value => 
-                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
+                        UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case BooleanDataType _:
                     bool boolValue = false;
@@ -913,38 +933,38 @@ namespace Schema.Unity.Editor
                     else if (entryValue is int i)
                         boolValue = i != 0;
                     RenderBooleanCell(cellRect, boolValue, cellStyle, value => 
-                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
+                        UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case FilePathDataType _:
                     RenderFilePathCell(cellRect, entryValue.ToString(), cellStyle, value => 
-                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
+                        UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case FolderDataType _:
                     RenderFolderCell(cellRect, entryValue.ToString(), cellStyle, value => 
-                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
+                        UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case ReferenceDataType refDataType:
-                    RenderReferenceCell(cellRect, entryValue, refDataType, cellStyle, value => 
-                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
+                    RenderReferenceCell(renderCtx, cellRect, entryValue, refDataType, cellStyle, value => 
+                        UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case DateTimeDataType _:
                     RenderDateTimeCell(cellRect, entryValue is DateTime dt ? dt : DateTime.Now, cellStyle, value => 
-                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
+                        UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case TextDataType _:
                     RenderTextFieldCell(cellRect, entryValue, cellStyle, value => 
-                        UpdateEntryValue(ctx, entry, attribute, value, scheme));
+                        UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case UnityAssetDataType unityAssetDataType:
                     RenderAssetCell(unityAssetDataType, cellRect, entryValue is Guid ? (Guid)entryValue : default, cellStyle,
-                        value => UpdateEntryValue(ctx, entry, attribute, value, scheme));
+                        value => UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case GuidDataType _:
                     RenderGuidCell(cellRect, entryValue is Guid ? (Guid)entryValue : default, cellStyle,
-                        value => UpdateEntryValue(ctx, entry, attribute, value, scheme));
+                        value => UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case ListDataType _:
-                    RenderListCell(cellRect, entryValue, cellStyle, value => UpdateEntryValue(ctx, entry,  attribute, value, scheme));
+                    RenderListCell(cellRect, entryValue, cellStyle, value => UpdateEntryValue(updateCtx, entry,  attribute, value, scheme));
                     break;
                 default:
                     RenderUnmappedFieldCell(cellRect, entryValue, cellStyle);
@@ -1126,7 +1146,7 @@ namespace Schema.Unity.Editor
         /// <summary>
         /// Renders a reference data type cell
         /// </summary>
-        private void RenderReferenceCell(Rect cellRect, object value, ReferenceDataType refDataType, CellStyle cellStyle, Action<object> onValueChanged)
+        private void RenderReferenceCell(SchemaContext context, Rect cellRect, object value, ReferenceDataType refDataType, CellStyle cellStyle, Action<object> onValueChanged)
         {
             var gotoButtonWidth = 20f;
             var refDropdownWidth = cellRect.width - gotoButtonWidth;
@@ -1139,7 +1159,7 @@ namespace Schema.Unity.Editor
             {
                 var referenceEntryOptions = new GenericMenu();
                 
-                if (GetScheme(refDataType.ReferenceSchemeName).Try(out var refSchema))
+                if (GetScheme(refDataType.ReferenceSchemeName, context).Try(out var refSchema))
                 {
                     foreach (var identifierValue in refSchema.GetIdentifierValues())
                     {
@@ -1155,7 +1175,14 @@ namespace Schema.Unity.Editor
             
             if (GUI.Button(gotoRect, "O"))
             {
-                FocusOnEntry(refDataType.ReferenceSchemeName, refDataType.ReferenceAttributeName, currentValue);
+                var ctx = new SchemaContext
+                {
+                    Driver = "User_Focus_Object_Reference",
+                    DataType = refDataType.TypeName
+                };
+                FocusOnEntry(ctx, refDataType.ReferenceSchemeName, 
+                    refDataType.ReferenceAttributeName, 
+                    currentValue);
                 ReleaseControlFocus();
             }
         }
@@ -1224,7 +1251,7 @@ namespace Schema.Unity.Editor
         /// <summary>
         /// Renders a single table row using rect-based rendering
         /// </summary>
-        private void RenderTableRow(Rect rowRect, DataEntry entry, int entryIdx, int attributeCount, DataScheme scheme, int[] tableCellControlIds, int visibleEntryCount, int visibleRangeStart)
+        private void RenderTableRow(SchemaContext renderCtx, Rect rowRect, DataEntry entry, int entryIdx, int attributeCount, DataScheme scheme, int[] tableCellControlIds, int visibleEntryCount, int visibleRangeStart)
         {
             var cellStyle = GetRowCellStyle(entryIdx);
             
@@ -1248,7 +1275,7 @@ namespace Schema.Unity.Editor
                 
                 using (_dataCellMarker.Auto()) 
                 {
-                    RenderDataCell(cellRect, entry, attribute, entryValue, cellStyle, entryIdx, attributeIdx, scheme, tableCellControlIds, visibleEntryCount, visibleRangeStart);
+                    RenderDataCell(renderCtx, cellRect, entry, attribute, entryValue, cellStyle, entryIdx, attributeIdx, scheme, tableCellControlIds, visibleEntryCount, visibleRangeStart);
                 }
                 
                 currentX += attribute.ColumnWidth;

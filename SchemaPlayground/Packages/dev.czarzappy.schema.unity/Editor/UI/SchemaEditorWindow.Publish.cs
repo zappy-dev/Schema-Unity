@@ -19,7 +19,7 @@ namespace Schema.Unity.Editor
             LogDbgVerbose($"Publishing {schemeName}");
             var schemeEntry = GetManifestEntryForScheme(schemeName);
             if (!schemeEntry.Try(out ManifestEntry manifestEntry) ||
-                !GetScheme(schemeName).Try(out var schemeToPublish))
+                !GetScheme(schemeName, context).Try(out var schemeToPublish))
             {
                 return Fail(context, $"Could not find manifest entry for scheme to publish, scheme: {schemeName}");
             }
@@ -63,9 +63,11 @@ namespace Schema.Unity.Editor
                 } 
                     break;
             }
+
+            if (!GetStorage(context).Try(out var storage, out var storageError)) return storageError.Cast();
             
             // Publish code
-            var exportRes = Storage.CSharpStorageFormat.Export(schemeToPublish, context);
+            var exportRes = storage.CSharpStorageFormat.Export(schemeToPublish, context);
             if (exportRes.Failed)
             {
                 return exportRes;
@@ -83,7 +85,9 @@ namespace Schema.Unity.Editor
         /// <returns></returns>
         private SchemaResult PublishToResources(DataScheme originalSchemeToPublish, SchemaContext context)
         {
-            var storageFormat = Storage.DefaultSchemaPublishFormat;
+            if (!GetStorage(context).Try(out var storage, out var storageError)) return storageError.Cast();
+
+            var storageFormat = storage.DefaultSchemaPublishFormat;
             string schemaPublishPath = $"{SchemaRuntime.DEFAULT_RESOURCE_PUBLISH_PATH}/{originalSchemeToPublish.SchemeName}.{storageFormat.Extension}";
 
             // prepare a new data scheme to publish
@@ -232,7 +236,9 @@ namespace Schema.Unity.Editor
         
         private SchemaResult PublishAllSchemes(SchemaContext context)
         {
-            return BulkPublishSchemes(context, AllSchemes.ToList());
+            if (!GetAllSchemes(context).Try(out var allSchemes, out var error)) return error.Cast();
+            
+            return BulkPublishSchemes(context, allSchemes.ToList());
             // using var progressScope = new ProgressScope("Schema - Publish All");
             // // TODO: need a way of generating an aggregate schema result
             // bool success = true;

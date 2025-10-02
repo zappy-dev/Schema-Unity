@@ -30,6 +30,10 @@ namespace Schema.Unity.Editor
 
         private void OnGUI()
         {
+            var renderCtx = new SchemaContext
+            {
+                Driver = $"{nameof(AttributeSettingsPrompt)}_OnGUI"
+            };
             // Text field for entering the width
             editAttribute.AttributeName = EditorGUILayout.TextField("Attribute Name", editAttribute.AttributeName);
             
@@ -47,7 +51,7 @@ namespace Schema.Unity.Editor
             // TODO: Unify this with the Table Cell rendering
             if (editAttribute.DataType is ReferenceDataType refType)
             {
-                ReferenceDropdown.Draw("Default Value", editAttribute.DefaultValue, refType, newValue =>
+                ReferenceDropdown.Draw(renderCtx, "Default Value", editAttribute.DefaultValue, refType, newValue =>
                 {
                     editAttribute.DefaultValue = newValue;
                 });

@@ -104,9 +104,15 @@ namespace Schema.Core
 
         #region Interface Commands
 
-        public static bool DoesSchemeExist(string schemeName)
+        public static SchemaResult<bool> DoesSchemeExist(SchemaContext ctx, string schemeName)
         {
-            return loadedSchemes.ContainsKey(schemeName);
+            var res = SchemaResult<bool>.New(ctx);
+            if (string.IsNullOrWhiteSpace(schemeName))
+            {
+                return res.Fail("Scheme name is empty");
+            }
+            
+            return res.Pass(loadedSchemes.ContainsKey(schemeName));
         }
 
         // TODO support async

@@ -7,6 +7,13 @@
       "dependencies": {},
       "url": "https://packages.unity.com"
     },
+    "com.unity.editorcoroutines": {
+      "version": "1.0.1",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://packages.unity.com"
+    },
     "com.unity.ext.nunit": {
       "version": "1.0.6",
       "depth": 1,
@@ -88,11 +95,13 @@
       }
     },
     "dev.czarzappy.schema.unity": {
-      "version": "file:../../../../Schema-Unity/SchemaPlayground/Packages/dev.czarzappy.schema.unity",
+      "version": "file:../../../SchemaPlayground/Packages/dev.czarzappy.schema.unity",
       "depth": 0,
       "source": "local",
       "dependencies": {
-        "com.unity.nuget.newtonsoft-json": "3.2.1"
+        "com.unity.nuget.newtonsoft-json": "3.2.1",
+        "com.unity.editorcoroutines": "1.0.1",
+        "com.unity.test-framework": "1.1.33"
       }
     },
     "com.unity.modules.ai": {

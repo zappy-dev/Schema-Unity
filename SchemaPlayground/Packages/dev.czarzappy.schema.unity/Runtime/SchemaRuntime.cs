@@ -52,7 +52,12 @@ namespace Schema.Runtime
             {
                 var manifestAsset = Resources.Load<TextAsset>(Manifest.MANIFEST_SCHEME_NAME);
 
-                var manifestDeserializeRes = Core.Schema.Storage.DefaultSchemaPublishFormat.Deserialize(context, manifestAsset.text);
+                if (!Core.Schema.GetStorage(context).Try(out var storage, out var storageErr))
+                {
+                    return storageErr.Cast();
+                }
+
+                var manifestDeserializeRes = storage.DefaultSchemaPublishFormat.Deserialize(context, manifestAsset.text);
 
                 if (manifestDeserializeRes.Failed)
                 {
