@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Text;
 using Schema.Core.Logging;
 
 namespace Schema.Core
@@ -9,6 +11,16 @@ namespace Schema.Core
         UNSET,
         Passed,
         Failed,
+    }
+    
+    public class SchemaResultSettings
+    {
+        public static SchemaResultSettings Instance = new SchemaResultSettings();
+        
+        /// <summary>
+        /// Determines whether to log stack traces for new Schema Results. Useful for debugging, but not recommended during production
+        /// </summary>
+        public bool LogStackTrace { get; set; } = false;
     }
     
     public struct SchemaResult
@@ -59,17 +71,32 @@ namespace Schema.Core
 // #if SCHEMA_DEBUG
              if (status == RequestStatus.Failed)
              {
-                 string logMsg = $"[Context={context}] {message}";
-                 Logger.LogError(logMsg);
+                 OnSchemaResultFailed(message, context);
              }
 // #endif
+        }
+
+        internal static void OnSchemaResultFailed(string message, object context)
+        {
+            var logMsgSb = new StringBuilder();
+            logMsgSb.Append($"[Context={context}] {message}");
+
+            if (SchemaResultSettings.Instance.LogStackTrace)
+            {
+                StackTrace stackTrace = new StackTrace();
+                logMsgSb.Append(stackTrace.ToString());
+            }
+                 
+            Logger.LogError(logMsgSb.ToString());
         }
         
         public override string ToString()
         {
             return $"SchemaResponse[status={status}, message={message}]";
         }
-    
+
+        #region Static Factory Methods
+        
         public static SchemaResult Fail(SchemaContext context, string errorMessage) => 
             new SchemaResult(status: RequestStatus.Failed, message: errorMessage, context: context);
 
@@ -80,6 +107,19 @@ namespace Schema.Core
             string successMessage = "")
         {
             return !conditional ? Fail(context: context, errorMessage: errorMessage) : Pass(successMessage: successMessage, context: context);
+        }
+
+        #endregion
+
+        public bool Try(out string message)
+        {
+            message = this.Message;
+            return this.status == RequestStatus.Passed;
+        }
+
+        public SchemaResult<T> CastError<T>()
+        {
+            return SchemaResult<T>.Fail(Message, context);
         }
     }
 
@@ -126,10 +166,11 @@ namespace Schema.Core
             
              if (status == RequestStatus.Failed)
              {
-                 string logMsg = $"[Context={context}] {message}";
-                 // Logger.LogDbgError(logMsg);
-                 // Reason to convert to non-dbg: Helpful for debugging list data type conversion error
-                 Logger.LogError(logMsg);
+                 SchemaResult.OnSchemaResultFailed(message, context);
+                 // string logMsg = $"[Context={context}] {message}";
+                 // // Logger.LogDbgError(logMsg);
+                 // // Reason to convert to non-dbg: Helpful for debugging list data type conversion error
+                 // Logger.LogError(logMsg);
              }
 // #endif
         }
@@ -138,17 +179,18 @@ namespace Schema.Core
         {
             return $"SchemaResponse[status={status}, Message={message}]";
         }
-    
-        public static SchemaResult<TResult> Fail(string errorMessage, object context) => 
-            new SchemaResult<TResult>(status: RequestStatus.Failed, message: errorMessage, result: default, context: context?.ToString());
 
-        public static SchemaResult<TResult> Pass(TResult result, string successMessage = "", object context = null) =>
-            new SchemaResult<TResult>(status: RequestStatus.Passed, message: successMessage, result: result, context: context?.ToString());
+        #region Implicit conversions
+
+        // public static implicit operator SchemaResult<Res>(Res result) where 
+        // {
+        //     // HACK: Prevent 
         
-        public static SchemaResult<TResult> CheckIf(bool conditional, TResult result, string errorMessage, string successMessage = "", object context = null)
-        {
-            return conditional ? Pass(result: result, successMessage: successMessage, context: context) : Fail(errorMessage: errorMessage, context: context);
-        }
+        //     
+        //     return Pass(result);
+        // }
+
+        #endregion
 
         public bool Try(out TResult result)
         {
@@ -168,11 +210,6 @@ namespace Schema.Core
             return SchemaResult<TOut>.Fail(Message, Context);
         }
 
-        public SchemaResult<TResult> Fail(string errorMessage)
-        {
-            return Fail(errorMessage, context);
-        }
-
         public SchemaResult<TResult> Pass(TResult result, string successMessage = "")
         {
             return Pass(result, successMessage, context: context);
@@ -183,15 +220,35 @@ namespace Schema.Core
             return conditional ? Pass(result: result, successMessage: successMessage, context: context) : Fail(errorMessage: errorMessage, context: context);
         }
 
-        public static SchemaResult<TResult> New(object context)
+        public SchemaResult<TResult> Fail(string errorMessage)
         {
-            var newRes = new SchemaResult<TResult>(status: RequestStatus.UNSET, default, null, context?.ToString());
-            return newRes;
+            return Fail(errorMessage, Context);
         }
 
         public SchemaResult Cast()
         {
             return new SchemaResult(status, message, context);
         }
+
+        #region Static Factory Methods
+        
+        public static SchemaResult<TResult> New(object context)
+        {
+            var newRes = new SchemaResult<TResult>(status: RequestStatus.UNSET, default, null, context?.ToString());
+            return newRes;
+        }
+    
+        public static SchemaResult<TResult> Fail(string errorMessage, object context) => 
+            new SchemaResult<TResult>(status: RequestStatus.Failed, message: errorMessage, result: default, context: context?.ToString());
+
+        public static SchemaResult<TResult> Pass(TResult result, string successMessage = "", object context = null) =>
+            new SchemaResult<TResult>(status: RequestStatus.Passed, message: successMessage, result: result, context: context?.ToString());
+        
+        public static SchemaResult<TResult> CheckIf(bool conditional, TResult result, string errorMessage, string successMessage = "", object context = null)
+        {
+            return conditional ? Pass(result: result, successMessage: successMessage, context: context) : Fail(errorMessage: errorMessage, context: context);
+        }
+
+        #endregion
     }
 }

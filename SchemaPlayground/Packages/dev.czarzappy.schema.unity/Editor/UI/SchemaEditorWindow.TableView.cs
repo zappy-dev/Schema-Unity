@@ -9,6 +9,7 @@ using Schema.Core.Data;
 using Schema.Core.DataStructures;
 using Schema.Core.IO;
 using Schema.Core.Serialization;
+using Schema.Runtime.Type;
 using Schema.Unity.Editor.Ext;
 using Unity.Profiling;
 using UnityEditor;
@@ -18,6 +19,7 @@ using static Schema.Core.Schema;
 using static Schema.Core.Logging.Logger;
 using static Schema.Unity.Editor.SchemaLayout;
 using Logger = Schema.Core.Logging.Logger;
+using Object = UnityEngine.Object;
 
 namespace Schema.Unity.Editor
 {
@@ -933,6 +935,10 @@ namespace Schema.Unity.Editor
                     RenderTextFieldCell(cellRect, entryValue, cellStyle, value => 
                         UpdateEntryValue(ctx, entry, attribute, value, scheme));
                     break;
+                case UnityAssetDataType unityAssetDataType:
+                    RenderAssetCell(unityAssetDataType, cellRect, entryValue is Guid ? (Guid)entryValue : default, cellStyle,
+                        value => UpdateEntryValue(ctx, entry, attribute, value, scheme));
+                    break;
                 case GuidDataType _:
                     RenderGuidCell(cellRect, entryValue is Guid ? (Guid)entryValue : default, cellStyle,
                         value => UpdateEntryValue(ctx, entry, attribute, value, scheme));
@@ -948,6 +954,7 @@ namespace Schema.Unity.Editor
             GUI.backgroundColor = originalColor;
         }
 
+        // TODO: Finish implementing lists
         private void RenderListCell(Rect cellRect, object entryValue, CellStyle cellStyle, Action<object> action)
         {
             // rendering list
@@ -975,14 +982,30 @@ namespace Schema.Unity.Editor
         {
             // var assetPath = AssetDatabase.GUIDToAssetPath(entryValue.ToString().Replace("-", string.Empty));
             // var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            EditorGUI.TextField(cellRect, entryValue.ToString(), cellStyle.FieldStyle);
+        }
+
+        private void RenderAssetCell(UnityAssetDataType assetDataType, Rect cellRect, Guid entryValue, CellStyle cellStyle, Action<string> onValueChanged)
+        {
+            // var assetPath = AssetDatabase.GUIDToAssetPath(entryValue.ToString().Replace("-", string.Empty));
+            // var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            Type assetType = assetDataType.ObjectType;
             if (AssetUtils.TryLoadAssetFromGUID(entryValue, out var asset))
             {
-                var assetType = asset.GetType();
-                EditorGUI.ObjectField(cellRect, asset, assetType, allowSceneObjects: false);
+                assetType = asset.GetType();
             }
-            else
+            
+            var newAsset = EditorGUI.ObjectField(cellRect, asset, assetType, allowSceneObjects: false);
+            if (newAsset != asset)
             {
-                EditorGUI.TextField(cellRect, entryValue.ToString(), cellStyle.FieldStyle);
+                if (AssetDatabase.TryGetGUIDAndLocalFileIdentifier(newAsset, out var guid, out long _))
+                {
+                    onValueChanged?.Invoke(guid);
+                }
+                else
+                {
+                    onValueChanged?.Invoke(null);
+                }
             }
         }
 
@@ -1006,7 +1029,7 @@ namespace Schema.Unity.Editor
         {
             // var newValue = EditorGUI.IntField(cellRect, value, cellStyle.FieldStyle);
             var newValue = SchemaGUI.FloatField(cellRect, value, cellStyle.FieldStyle);
-            if (newValue != value)
+            if (!Mathf.Approximately(newValue, value))
             {
                 onValueChanged?.Invoke(newValue);
             }

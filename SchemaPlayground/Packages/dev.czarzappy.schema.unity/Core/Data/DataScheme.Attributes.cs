@@ -143,7 +143,7 @@ namespace Schema.Core.Data
             SetDirty(context, true);
 
             // update all referencing attributes in other Schemes
-            foreach (var otherScheme in Schema.GetSchemes())
+            foreach (var otherScheme in Schema.GetSchemes(context))
             {
                 // skip checking my own schema.
                 // TODO: Handle cyclical references from an attribute in a scheme to itself?

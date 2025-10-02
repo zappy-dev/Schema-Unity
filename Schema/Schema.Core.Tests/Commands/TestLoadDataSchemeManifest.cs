@@ -1,5 +1,7 @@
+using Moq;
 using Schema.Core.Commands;
 using Schema.Core.Data;
+using Schema.Core.IO;
 using Schema.Core.Tests.Ext;
 
 namespace Schema.Core.Tests.Commands;
@@ -22,11 +24,16 @@ public class TestLoadDataSchemeManifest
         scheme.AddEntry(Context, new DataEntry { { AttrName, value, Context } });
         return scheme;
     }
+    
+    private IMock<IFileSystem> _mockFileSystem;
 
     [SetUp]
     public void Setup()
     {
         Schema.Reset();
+        _mockFileSystem = new  Mock<IFileSystem>();
+        Schema.SetStorage(new Storage(_mockFileSystem.Object));
+        Schema.InitializeTemplateManifestScheme(Context);
     }
 
     [Test]

@@ -12,7 +12,7 @@ namespace Schema.Core.Data
 {
     // Representing a data scheme in memory
     [Serializable]
-    public partial class DataScheme : ResultGenerator
+    public partial class DataScheme : ResultGenerator, IEqualityComparer<DataScheme>
     {
         #region Fields and Properties
         
@@ -262,6 +262,28 @@ namespace Schema.Core.Data
             if (!ListExt.ListsAreEqual(entries, other.entries)) return false;
             return true;
         }
+        
+
+        public bool Equals(DataScheme x, DataScheme y)
+        {
+            if (ReferenceEquals(x, y)) return true;
+            if (x is null) return false;
+            if (y is null) return false;
+            if (x.GetType() != y.GetType()) return false;
+            return x.SchemeName == y.SchemeName && Equals(x.attributes, y.attributes) && Equals(x.entries, y.entries) && x.isDirty == y.isDirty;
+        }
+
+        public int GetHashCode(DataScheme obj)
+        {
+            unchecked
+            {
+                var hashCode = (obj.SchemeName != null ? obj.SchemeName.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ (obj.attributes != null ? obj.attributes.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ (obj.entries != null ? obj.entries.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ obj.isDirty.GetHashCode();
+                return hashCode;
+            }
+        }
 
         public override bool Equals(object obj)
         {
@@ -284,12 +306,12 @@ namespace Schema.Core.Data
 
         public static bool operator ==(DataScheme left, DataScheme right)
         {
-            return Equals(left, right);
+            return Object.Equals(left, right);
         }
 
         public static bool operator !=(DataScheme left, DataScheme right)
         {
-            return !Equals(left, right);
+            return !Object.Equals(left, right);
         }
 
         #endregion

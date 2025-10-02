@@ -389,6 +389,8 @@ namespace Schema.Core.Data
         {
             return entryData.GetEnumerator();
         }
+        
+        public IReadOnlyDictionary<string, object> ToDictionary() => entryData;
 
         #region Equality Members
 

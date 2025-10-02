@@ -1,6 +1,7 @@
 using Moq;
 using Schema.Core.Commands;
 using Schema.Core.Data;
+using Schema.Core.IO;
 using Schema.Core.Logging;
 using Schema.Core.Tests.Ext;
 
@@ -17,6 +18,7 @@ namespace Schema.Core.Tests.Commands
         private Mock<IProgress<CommandProgress>> _mockProgress;
         private DataScheme _testScheme;
         private string _schemeName;
+        private Mock<IFileSystem> _mockFileSystem;
 
         [SetUp]
         public void Setup()
@@ -27,6 +29,10 @@ namespace Schema.Core.Tests.Commands
             _testScheme.AddAttribute(Context, "FieldA", DataType.Text).AssertPassed();
             _testScheme.AddEntry(Context, new DataEntry { { "FieldA", "Value1", Context } });
             _mockProgress = new Mock<IProgress<CommandProgress>>();
+            
+            _mockFileSystem = new Mock<IFileSystem>();
+            Schema.SetStorage(new Storage(_mockFileSystem.Object));
+            Schema.InitializeTemplateManifestScheme(Context);
         }
 
         [Test]
@@ -41,7 +47,7 @@ namespace Schema.Core.Tests.Commands
             // Assert
             Assert.IsTrue(result.IsSuccess, result.Message);
             Assert.That(Schema.DoesSchemeExist(_schemeName), Is.True);
-            Schema.GetScheme(_schemeName).TryAssert(out var loadedScheme);
+            Schema.GetScheme(_schemeName, Context).TryAssert(out var loadedScheme);
             Assert.That(loadedScheme, Is.EqualTo(_testScheme));
         }
 

@@ -1,4 +1,5 @@
 using Schema.Core.Data;
+using Schema.Core.Tests.Ext;
 
 namespace Schema.Core.Tests.Data;
 
@@ -17,10 +18,8 @@ public class TestDataEntry
     [TestCase("   ")]
     public void Test_Add_BadCase(string? attributeName)
     {
-        Assert.Throws<ArgumentException>(() => new DataEntry
-        {
-            { attributeName, "data", Context}
-        });
+        var res = new DataEntry();
+        res.Add( attributeName, "data", Context).AssertFailed();
     }
 
     private enum SampleEnum

@@ -10,10 +10,15 @@ public static class SchemaResultExt
     /// </summary>
     /// <param name="result">The Schema result to check.</param>
     /// <exception cref="AssertionException">Thrown when the result is null or has not failed.</exception>
-    public static void AssertFailed(this SchemaResult result)
+    public static void AssertFailed(this SchemaResult result, string errorMessage = "")
     {
         Assert.NotNull(result);
         Assert.IsTrue(result.Failed, result.ToString());
+
+        if (!string.IsNullOrEmpty(errorMessage))
+        {
+            Assert.That(result.Message, Is.EqualTo(errorMessage));
+        }
     }
     
     /// <summary>
@@ -50,18 +55,24 @@ public static class SchemaResultExt
         Assert.NotNull(result);
         Assert.IsTrue(result.Failed, result.ToString());
     }
-    
+
     /// <summary>
     /// Asserts that a generic SchemaResult has passed and returns its result payload.
     /// </summary>
     /// <typeparam name="TRes">The type of the result payload.</typeparam>
     /// <param name="result">The generic Schema result to check.</param>
+    /// <param name="expectedValue"></param>
     /// <returns>The result payload if the assertion passes.</returns>
     /// <exception cref="AssertionException">Thrown when the result is null or has not passed.</exception>
-    public static TRes AssertPassed<TRes>(this SchemaResult<TRes> result)
+    public static TRes AssertPassed<TRes>(this SchemaResult<TRes> result, TRes? expectedValue = default)
     {
         Assert.NotNull(result);
         Assert.IsTrue(result.Passed, result.ToString());
+
+        if (expectedValue != null)
+        {
+            Assert.That(result.Result, Is.EqualTo(expectedValue));
+        }
         return result.Result;
     }
 

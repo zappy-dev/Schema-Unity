@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using Schema.Core.Logging;
@@ -50,11 +51,20 @@ namespace Schema.Core.Data
         /// The default data type (Text).
         /// </summary>
         public static readonly DataType Default = Text;
-        
+
         /// <summary>
         /// Array of all built-in data types.
         /// </summary>
-        public static readonly DataType[] BuiltInTypes = {
+        public static IEnumerable<DataType> BuiltInTypes => CoreBuiltInTypes.Concat(_pluginTypes);
+
+        private static List<DataType> _pluginTypes = new List<DataType>();
+
+        public static void AddPluginType(DataType pluginType)
+        {
+            _pluginTypes.Add(pluginType);
+        }
+
+        public static readonly IReadOnlyList<DataType> CoreBuiltInTypes = new [] {
             Text,
             Integer,
             Float,
@@ -64,6 +74,8 @@ namespace Schema.Core.Data
             FilePath_RelativePaths,
             Folder_RelativePaths,
         };
+        // need to separate core data types from dynamically added ones..
+        
 
         /// <summary>
         /// Gets the name of the data type.

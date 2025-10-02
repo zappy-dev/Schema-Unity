@@ -15,14 +15,6 @@ namespace Schema.Core.Schemes
         public const string SCHEMA_NAME = "Manifest";
         
      
-        public static class Ids
-        {
-         
-            public const string MANIFEST = "Manifest";
-     
-        }
-
-     
         public static SchemaResult<ManifestScheme> Get()
         {
             if (GetScheme(SCHEMA_NAME).Try(out var scheme, out var error))

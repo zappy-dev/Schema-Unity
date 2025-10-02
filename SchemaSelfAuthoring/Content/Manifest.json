@@ -101,9 +101,9 @@
       "SchemeName": "TODOs",
       "PublishTarget": "DEFAULT",
       "FilePath": "Content/TODOs.json",
-      "CSharpExportPath": "Assets/Scripts/Schemes",
-      "CSharpNamespace": "",
-      "CSharpGenerateIds": "False"
+      "CSharpExportPath": "..\\SchemaPlayground\\Packages\\dev.czarzappy.schema.unity\\Core\\Schemes",
+      "CSharpNamespace": "Schema.Core.Schemes",
+      "CSharpGenerateIds": false
     }
   ]
 }

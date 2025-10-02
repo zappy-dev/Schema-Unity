@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Schema.Core.Data;
+using Schema.Core.Ext;
 using Schema.Core.Logging;
 using static Schema.Core.SchemaResult;
 
@@ -17,42 +18,66 @@ namespace Schema.Core
         /// <summary>
         /// Returns all the available valid scheme names.
         /// </summary>
-        public static IEnumerable<string> AllSchemes
+        public static SchemaResult<IEnumerable<string>> GetAllSchemes(SchemaContext context)
         {
-            get
+            var res = SchemaResult<IEnumerable<string>>.New(context);
+            var isInitRes = IsInitialized(context);
+            if (isInitRes.Failed)
             {
-                if (!IsInitialized)
+                return isInitRes.CastError<IEnumerable<string>>();
+            }
+
+            // return dataSchemes.Keys;
+
+            lock (manifestOperationLock)
+            {
+                if (!GetManifestScheme().Try(out var manifestScheme, out var manifestError))
                 {
-                    return Enumerable.Empty<string>();
+                    return manifestError.CastError<IEnumerable<string>>();
                 }
 
-                // return dataSchemes.Keys;
-
-                lock (manifestOperationLock)
-                {
-                    if (!GetManifestScheme().Try(out var manifestScheme))
-                    {
-                        return Enumerable.Empty<string>();
-                    }
-
-                    return manifestScheme.GetAllSchemeNames();
-                }
+                return res.Pass(manifestScheme.GetAllSchemeNames());
             }
         }
 
-        public static int NumAvailableSchemes => AllSchemes.Count();
-        public static IEnumerable<DataScheme> GetSchemes()
+        public static SchemaResult<int> GetNumAvailableSchemes(SchemaContext context)
         {
-            foreach (var schemeName in AllSchemes)
+            if (GetAllSchemes(context).Try(out var schemes, out var error))
             {
-                if (GetScheme(schemeName).Try(out var scheme))
+                return error.CastError<int>();
+            }
+
+            return SchemaResult<int>.Pass(schemes.Count());
+        }
+
+        public static IEnumerable<DataScheme> GetSchemes(SchemaContext context)
+        {
+            if (!GetAllSchemes(context).Try(out var schemes, out var error))
+            { 
+                yield break;
+            }
+            
+            foreach (var schemeName in schemes)
+            {
+                if (GetScheme(schemeName, context).Try(out var scheme))
                 {
                     yield return scheme;
                 }
             }
         }
-        
-        public static bool IsInitialized { get; private set; }
+
+        /// <summary>
+        /// Schema is not initialized until the Storage system is set and a Manifest Scheme is laoded.
+        /// </summary>
+        public static SchemaResult IsInitialized(SchemaContext context)
+        {
+            if (!GetStorage(context).Try(out var _, out var storageErr))
+            {
+                return storageErr.Cast();
+            }
+
+            return CheckIf(context, _loadedManifestScheme != null, "No Manifest Scheme Loaded");
+        }
         
         private static readonly object manifestOperationLock = new object();
 
@@ -69,13 +94,10 @@ namespace Schema.Core
         public static void Reset()
         {
             Logger.LogDbgWarning("Schema: Resetting...");
-            IsInitialized = false;
             loadedSchemes.Clear();
             manifestImportPath = String.Empty;
             nextManifestScheme = null;
             _loadedManifestScheme = null;
-
-            IsInitialized = true;
         }
         
         #endregion
@@ -88,33 +110,42 @@ namespace Schema.Core
         }
 
         // TODO support async
-        public static SchemaResult<DataScheme> GetScheme(string schemeName, SchemaContext? context = null)
+        public static SchemaResult<DataScheme> GetScheme(string schemeName, SchemaContext context)
         {
-            if (!IsInitialized)
+            var isInitRes = IsInitialized(context);
+            if (isInitRes.Failed)
             {
-                return SchemaResult<DataScheme>.Fail("Scheme not initialized!", context);
+                return isInitRes.CastError<DataScheme>();
             }
             
             var success = loadedSchemes.TryGetValue(schemeName, out var scheme);
+            var errorMessage = $"Scheme '{schemeName}' is not loaded.";
+            if (schemeName == Manifest.MANIFEST_SCHEME_NAME)
+            {
+                errorMessage =
+                    $"No Manifest Scheme loaded. To load a manifest, call {nameof(Schema)}.{nameof(InitializeTemplateManifestScheme)} to initialize an empty project " +
+                    $"or call either {nameof(Schema)}.{nameof(LoadManifestFromPath)} to load a Manifest from file.";
+            }
             return SchemaResult<DataScheme>.CheckIf(success, scheme, 
-                errorMessage: $"Scheme '{schemeName}' is not loaded.",
+                errorMessage: errorMessage,
                 successMessage: $"Scheme '{schemeName}' is loaded.", context);
         }
 
-        public static bool TryGetSchemeForAttribute(AttributeDefinition searchAttr, out DataScheme ownerScheme)
+        public static SchemaResult<DataScheme> GetOwnerSchemeForAttribute(SchemaContext context, AttributeDefinition searchAttr)
         {
-            if (!IsInitialized)
+            var res = SchemaResult<DataScheme>.New(context);
+                      var isInitRes = IsInitialized(context);
+            if (isInitRes.Failed)
             {
-                ownerScheme = null;
-                return false;
+                return isInitRes.CastError<DataScheme>();
             }
             
-            ownerScheme = loadedSchemes.Values.FirstOrDefault(scheme =>
+            var ownerScheme = loadedSchemes.Values.FirstOrDefault(scheme =>
             {
                 return scheme.GetAttribute(attr => attr.Equals(searchAttr)).Try(out _);
             });
             
-            return ownerScheme != null;
+            return res.CheckIf(ownerScheme != null, ownerScheme, $"No owner scheme found for attribute: {searchAttr}");
         }
 
         /// <summary>
@@ -129,8 +160,10 @@ namespace Schema.Core
         public static SchemaResult UpdateIdentifierValue(SchemaContext context, string schemeName,
             string identifierAttribute, object oldValue, object newValue)
         {
+            using var _ = new AttributeContextScope(ref context, identifierAttribute);
+            
             // 1. Update the identifier value in the specified scheme
-            if (!GetScheme(schemeName).Try(out var targetScheme))
+            if (!GetScheme(schemeName, context).Try(out var targetScheme))
                 return Fail(context, $"Scheme '{schemeName}' not found.");
 
             return UpdateIdentifierValue(context, targetScheme, identifierAttribute, oldValue, newValue);
@@ -157,7 +190,7 @@ namespace Schema.Core
                 return idUpdateResult;
             int totalUpdated = 0;
             // 2. Propagate to all referencing entries in all loaded schemes
-            foreach (var scheme in GetSchemes())
+            foreach (var scheme in GetSchemes(context))
             {
                 if (scheme.SchemeName == targetScheme.SchemeName)
                     continue;

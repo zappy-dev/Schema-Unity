@@ -37,13 +37,15 @@ namespace Schema.Core.Data
         /// <summary>
         /// Gets the base path, either from the provided base path or from the default project path
         /// </summary>
-        protected string ResolveBasePath()
+        protected string ResolveBasePath(SchemaContext context)
         {
             if (!string.IsNullOrEmpty(basePath))
                 return basePath;
                 
             // Try to get the default content path from Schema
-            if (!Schema.IsInitialized)
+            // TODO: Refactor to SchemaResult API
+            var isInitRes = Schema.IsInitialized(context);
+            if (isInitRes.Failed)
             {
                 return null;
             }
@@ -60,7 +62,7 @@ namespace Schema.Core.Data
         /// <summary>
         /// Converts a path to the appropriate format (relative or absolute) based on the data type settings
         /// </summary>
-        protected virtual string FormatPath(string path)
+        protected virtual string FormatPath(SchemaContext context, string path)
         {
             if (string.IsNullOrWhiteSpace(path))
                 return path;
@@ -68,7 +70,7 @@ namespace Schema.Core.Data
             if (!useRelativePaths)
                 return path;
                 
-            var contentBasePath = ResolveBasePath();
+            var contentBasePath = ResolveBasePath(context);
             if (string.IsNullOrEmpty(contentBasePath))
                 return path;
                 
@@ -84,7 +86,7 @@ namespace Schema.Core.Data
         /// <summary>
         /// Resolves a path to its absolute form for file system operations
         /// </summary>
-        protected string ResolvePath(string path)
+        protected string ResolvePath(SchemaContext context, string path)
         {
             if (string.IsNullOrWhiteSpace(path))
                 return path;
@@ -92,7 +94,7 @@ namespace Schema.Core.Data
             if (PathUtility.IsAbsolutePath(path))
                 return path;
                 
-            var basePath = ResolveBasePath();
+            var basePath = ResolveBasePath(context);
             if (string.IsNullOrEmpty(basePath))
                 return path;
                 

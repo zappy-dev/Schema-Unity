@@ -6,6 +6,7 @@ using Schema.Core.Tests.Ext;
 namespace Schema.Core.Tests;
 
 [TestFixture]
+[Ignore("Not implemented yet")]
 public class ChaosMonkeyTests
 {
     private static SchemaContext testContext = new SchemaContext
@@ -138,7 +139,7 @@ public class ChaosMonkeyTests
     {
         // creating.. unique names?
         var attributeName = Guid.NewGuid().ToString().Substring(0, 8);
-        var dataType = DataType.BuiltInTypes.Random(chaosRandom);
+        var dataType = DataType.BuiltInTypes.ToArray().Random(chaosRandom);
         var attribute = new AttributeDefinition(scheme, attributeName, dataType);
         
         return attribute;

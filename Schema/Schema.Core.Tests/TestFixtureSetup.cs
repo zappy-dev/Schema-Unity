@@ -10,5 +10,7 @@ public class TestFixtureSetup
     {
         Logger.SetLogger(new TestLogger());
         Logger.Level = Logger.LogLevel.ERROR;
+
+        SchemaResultSettings.Instance.LogStackTrace = true;
     }
 }

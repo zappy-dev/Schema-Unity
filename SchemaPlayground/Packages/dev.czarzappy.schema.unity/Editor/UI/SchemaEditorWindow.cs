@@ -285,6 +285,37 @@ namespace Schema.Unity.Editor
             return LatestResponse;
         }
 
+        class ManifestAttributeEqualityComparer : IEqualityComparer<AttributeDefinition>
+        {
+            internal static ManifestAttributeEqualityComparer Instance = new ManifestAttributeEqualityComparer();
+            
+            public bool Equals(AttributeDefinition a, AttributeDefinition b)
+            {
+                if (a == null && b == null)
+                {
+                    return true;
+                }
+
+                if (a == null || b == null)
+                {
+                    return false;
+                }
+                
+                // check if same attribute name
+                if (!Equals(a.AttributeName, b.AttributeName))
+                {
+                    return false;
+                }
+                
+                return true;
+            }
+
+            public int GetHashCode(AttributeDefinition obj)
+            {
+                return obj.GetHashCode();
+            }
+        }
+
         private void RunManifestMigrationWizard()
         {
             var context = new SchemaContext
@@ -302,13 +333,29 @@ namespace Schema.Unity.Editor
             var templateAttributes = templateManifest._.GetAttributes();
             // TODO: Should just check if attributes are equal...
             // also check if the manifest self entry is the same?
-            if (loadedManifestAttributes.SequenceEqual(templateAttributes) &&
-                LoadedManifestScheme.GetSelfEntry(context).Result.Equals(templateManifest.GetSelfEntry(context).Result)) return;
+            // Manifest self entry may be difference due to project modifications..
+            // When migrating, we should try to keep the project's modifications, while upgrading to any new changes..
+            var loadedManifestSelfEntry = LoadedManifestScheme.GetSelfEntry(context).Result;
+            var templateManifestSelfEntry = templateManifest.GetSelfEntry(context).Result;
+
+            var loadedEntryData = loadedManifestSelfEntry._.ToDictionary();
+            var templateEntryData = templateManifestSelfEntry._.ToDictionary();
+            var newKeys = templateEntryData.Keys.Except(loadedEntryData.Keys);
+            var overlapKeys = loadedEntryData.Keys.Intersect(templateEntryData.Keys);
+            
+            
+            // 1. Check if there are any differences between existing attributes
+            // 2. Check if there are any new attributes
+            // TODO: Some smarter wizard to choose which properties to take during a migration, which to skip, and committing that a migration was resolved to prevent future messages
+            if (loadedManifestAttributes.Where(attr => overlapKeys.Contains(attr.AttributeName))
+                    .SequenceEqual(templateAttributes.Where(attr => overlapKeys.Contains(attr.AttributeName)), ManifestAttributeEqualityComparer.Instance) &&
+                !newKeys.Any()) return;
             
             // auto-report differences
-            var sb = BuildDiffReport(context, LoadedManifestScheme, templateManifest);
+            var diffReport = new StringBuilder();
+            BuildDiffReport(context, diffReport, LoadedManifestScheme, templateManifest);
             bool shouldUpgrade = EditorUtility.DisplayDialog("Schema - Manifest Out-Of-Data",
-                sb.ToString(), "Upgrade", "Skip");
+                diffReport.ToString(), "Upgrade", "Skip");
             
             if (!shouldUpgrade) return;
 
@@ -388,39 +435,38 @@ namespace Schema.Unity.Editor
         /// Builds a human-readable report of differences between two manifests' attribute sets.
         /// Reports: added, removed, and modified attributes (per-field deltas).
         /// </summary>
-        private StringBuilder BuildDiffReport(SchemaContext context, ManifestScheme currentManifest, ManifestScheme templateManifest)
+        private void BuildDiffReport(SchemaContext context, StringBuilder diffReport, ManifestScheme currentManifest, ManifestScheme templateManifest)
         {
             var currentAttributes = currentManifest._.GetAttributes().ToDictionary(a => a.AttributeName);
             var templateAttributes = templateManifest._.GetAttributes().ToDictionary(a => a.AttributeName);
 
-            var sb = new StringBuilder();
-            sb.AppendLine("Your project is using an out-of-date Manifest version. Would you like to upgrade?");
-            sb.AppendLine();
+            diffReport.AppendLine("Your project is using an out-of-date Manifest version. Would you like to upgrade?");
+            diffReport.AppendLine();
 
             // Removed (exist in current, not in template)
             var removed = currentAttributes.Keys.Except(templateAttributes.Keys).OrderBy(k => k).ToList();
             if (removed.Count > 0)
             {
-                sb.AppendLine("Removed attributes:");
+                diffReport.AppendLine("Removed attributes:");
                 foreach (var name in removed)
                 {
                     var a = currentAttributes[name];
-                    sb.AppendLine($"\t- {a.AttributeName} ({a.DataType.TypeName})");
+                    diffReport.AppendLine($"\t- {a.AttributeName} ({a.DataType.TypeName})");
                 }
-                sb.AppendLine();
+                diffReport.AppendLine();
             }
 
             // Added (exist in template, not in current)
             var added = templateAttributes.Keys.Except(currentAttributes.Keys).OrderBy(k => k).ToList();
             if (added.Count > 0)
             {
-                sb.AppendLine("Added attributes:");
+                diffReport.AppendLine("Added attributes:");
                 foreach (var name in added)
                 {
                     var b = templateAttributes[name];
-                    sb.AppendLine($"\t+ {b.AttributeName} ({b.DataType.TypeName})");
+                    diffReport.AppendLine($"\t+ {b.AttributeName} ({b.DataType.TypeName})");
                 }
-                sb.AppendLine();
+                diffReport.AppendLine();
             }
 
             // Modified (exist in both by name but differ in fields)
@@ -437,33 +483,33 @@ namespace Schema.Unity.Editor
                 }
 
                 anyModified = true;
-                sb.AppendLine($"Modified attribute: {name}");
+                diffReport.AppendLine($"Modified attribute: {name}");
 
                 if (!a.DataType.Equals(b.DataType))
                 {
                     // TODO: More in-depth attribute diff report?
-                    sb.AppendLine($"\t{nameof(AttributeDefinition.DataType)}: {a.DataType?.TypeName} -> {b.DataType?.TypeName}");
+                    diffReport.AppendLine($"\t{nameof(AttributeDefinition.DataType)}: {a.DataType?.TypeName} -> {b.DataType?.TypeName}");
                 }
 
                 if (a.IsIdentifier != b.IsIdentifier)
                 {
-                    sb.AppendLine($"\t{nameof(AttributeDefinition.IsIdentifier)}: {a.IsIdentifier} -> {b.IsIdentifier}");
+                    diffReport.AppendLine($"\t{nameof(AttributeDefinition.IsIdentifier)}: {a.IsIdentifier} -> {b.IsIdentifier}");
                 }
 
                 if (a.ShouldPublish != b.ShouldPublish)
                 {
-                    sb.AppendLine($"\t{nameof(AttributeDefinition.ShouldPublish)}: {a.ShouldPublish} -> {b.ShouldPublish}");
+                    diffReport.AppendLine($"\t{nameof(AttributeDefinition.ShouldPublish)}: {a.ShouldPublish} -> {b.ShouldPublish}");
                 }
 
                 // UI fields (informational)
                 if (a.AttributeToolTip != b.AttributeToolTip)
                 {
-                    sb.AppendLine($"\t{nameof(AttributeDefinition.AttributeToolTip)}: '{a.AttributeToolTip}' -> '{b.AttributeToolTip}'");
+                    diffReport.AppendLine($"\t{nameof(AttributeDefinition.AttributeToolTip)}: '{a.AttributeToolTip}' -> '{b.AttributeToolTip}'");
                 }
 
                 if (a.ColumnWidth != b.ColumnWidth)
                 {
-                    sb.AppendLine($"\t{nameof(AttributeDefinition.ColumnWidth)}: {a.ColumnWidth} -> {b.ColumnWidth}");
+                    diffReport.AppendLine($"\t{nameof(AttributeDefinition.ColumnWidth)}: {a.ColumnWidth} -> {b.ColumnWidth}");
                 }
 
                 // Default value comparison (best-effort string rep)
@@ -471,7 +517,7 @@ namespace Schema.Unity.Editor
                 var bDefault = b.DefaultValue?.ToString();
                 if (!string.Equals(aDefault, bDefault, StringComparison.Ordinal))
                 {
-                    sb.AppendLine($"\t{nameof(AttributeDefinition.DefaultValue)}: '{aDefault}' -> '{bDefault}'");
+                    diffReport.AppendLine($"\t{nameof(AttributeDefinition.DefaultValue)}: '{aDefault}' -> '{bDefault}'");
                 }
 
                 // Reference data type details if applicable
@@ -479,37 +525,60 @@ namespace Schema.Unity.Editor
                 {
                     if (ar.ReferenceSchemeName != br.ReferenceSchemeName)
                     {
-                        sb.AppendLine($"\tReference Scheme: {ar.ReferenceSchemeName} -> {br.ReferenceSchemeName}");
+                        diffReport.AppendLine($"\tReference Scheme: {ar.ReferenceSchemeName} -> {br.ReferenceSchemeName}");
                     }
                     if (ar.ReferenceAttributeName != br.ReferenceAttributeName)
                     {
-                        sb.AppendLine($"\tReference Attribute: {ar.ReferenceAttributeName} -> {br.ReferenceAttributeName}");
+                        diffReport.AppendLine($"\tReference Attribute: {ar.ReferenceAttributeName} -> {br.ReferenceAttributeName}");
                     }
                     if (ar.SupportsEmptyReferences != br.SupportsEmptyReferences)
                     {
-                        sb.AppendLine($"\tAllow Empty Refs: {ar.SupportsEmptyReferences} -> {br.SupportsEmptyReferences}");
+                        diffReport.AppendLine($"\tAllow Empty Refs: {ar.SupportsEmptyReferences} -> {br.SupportsEmptyReferences}");
                     }
                 }
 
-                sb.AppendLine();
+                diffReport.AppendLine();
             }
 
             if (!anyModified && removed.Count == 0 && added.Count == 0)
             {
                 var currentSelfEntry = currentManifest.GetSelfEntry(context).Result;
                 var templateSelfEntry = templateManifest.GetSelfEntry(context).Result;
-                if (Equals(currentSelfEntry, templateSelfEntry))
+                if (Equals(currentSelfEntry, templateSelfEntry)) // TODO: acceptable modifications...
                 {
-                    sb.AppendLine("No differences detected.");
+                    diffReport.AppendLine("No differences detected.");
                 }
                 else
                 {
-                    sb.AppendLine("Manifest Self Entry is out-of-date.");
+                    diffReport.AppendLine("Manifest Self Entry is out-of-date.");
+                    var currentEntryData = currentSelfEntry._.ToDictionary();
+                    var templateEntryData = templateSelfEntry._.ToDictionary();
+                    
+                    var overlapKeys = currentEntryData.Keys.Intersect(templateEntryData.Keys).OrderBy(k => k).ToList();
+
+                    foreach (var overlapKey in overlapKeys)
+                    {
+                        var currentValue = currentEntryData[overlapKey];
+                        var templateValue = templateEntryData[overlapKey];
+                        if (!Equals(currentValue, templateValue))
+                        {
+                            diffReport.AppendLine($"- '{overlapKey}': '{currentValue}' => '{templateValue}'");
+                        }
+                    }
+                    
+                    var currentOnlyKeys =  currentEntryData.Keys.Except(overlapKeys).OrderBy(k => k);
+                    var templateOnlyKeys =  templateEntryData.Keys.Except(overlapKeys).OrderBy(k => k);
+
+                    foreach (var currentOnlyKey in currentOnlyKeys)
+                    {
+                        diffReport.AppendLine($"- DELETED KEY: {currentOnlyKey}");
+                    }
+                    foreach (var templateOnlyKey in templateOnlyKeys)
+                    {
+                        diffReport.AppendLine($"- NEW KEY: {templateOnlyKey}");
+                    }
                 }
             }
-
-
-            return sb;
         }
         
         private void SetColumnSort(DataScheme scheme, AttributeDefinition attribute, SortOrder sortOrder)
@@ -538,6 +607,8 @@ namespace Schema.Unity.Editor
         #region Rendering Methods
         private string GetTooltipMessage()
         {
+            // TODO: Need to split the Schema Instance providing Schema's self data from the one used for a Project... different scopes.
+            // May need to consider this for the runtime as well.
             if (!GetScheme("Tooltips").Try(out var tooltipDataScheme)) 
                 return "Could not find Tooltips scheme";
 
@@ -602,7 +673,6 @@ namespace Schema.Unity.Editor
                 EditorGUILayout.HelpBox($"[{latestResponseTime:T}] {LatestManifestLoadResponse.Result}: {LatestManifestLoadResponse.Message}", LatestManifestLoadResponse.MessageType());
             }
             
-            GUILayout.Label("Manifest Path");
             using (new EditorGUILayout.HorizontalScope())
             {
                 using (new EditorGUI.DisabledScope())
@@ -616,7 +686,7 @@ namespace Schema.Unity.Editor
                     path = ManifestImportPath;
 #endif
                         
-                        EditorGUILayout.TextField("Manifest Import Path", path);
+                        EditorGUILayout.TextField("Manifest Path", path);
                     }
                 }
 

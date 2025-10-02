@@ -25,6 +25,16 @@ namespace Schema.Core.Schemes
 
         #region Interface!
 
+        public static SchemaResult<DataScheme> GetScheme(string schemeName)
+        {
+            var ctx = new SchemaContext
+            {
+                Driver = "Codegen_Wrapper",
+            };
+            
+            return Schema.GetScheme(schemeName, ctx);
+        }
+        
         public TEntry GetEntryByIndex(int entryIndex)
         {
             return EntryFactory(DataScheme, DataScheme.GetEntry(entryIndex));

@@ -94,9 +94,10 @@ namespace Schema.Core
         /// </summary>
         public static SchemaResult<ManifestEntry> GetManifestSelfEntry(SchemaContext context)
         {
-            if (!IsInitialized)
+            var isInitRes = IsInitialized(context);
+            if (isInitRes.Failed)
             {
-                return SchemaResult<ManifestEntry>.Fail("Schema not initialized.", context);
+                return isInitRes.CastError<ManifestEntry>();
             }
 
             if (!GetManifestScheme(context).Try(out var manifestScheme, out var manifestError))
@@ -131,6 +132,11 @@ namespace Schema.Core
         /// <returns>A <see cref="SchemaResult"/> indicating success or failure.</returns>
         public static SchemaResult InitializeTemplateManifestScheme(SchemaContext context, string defaultScriptExportPath = "")
         {
+            if (!GetStorage(context).Try(out var storage, out var storageErr))
+            {
+                return storageErr.Cast();
+            }
+            
             lock (manifestOperationLock)
             {
                 // build template
@@ -138,7 +144,7 @@ namespace Schema.Core
                     defaultScriptExportPath,
                     Path.Combine(DefaultContentDirectory, "Manifest.json"));
                 
-                var createRes = Storage.FileSystem.CreateDirectory(context, defaultScriptExportPath);
+                var createRes = storage.FileSystem.CreateDirectory(context, defaultScriptExportPath);
                 if (createRes.Failed)
                 {
                     return createRes;
@@ -164,9 +170,11 @@ namespace Schema.Core
         {
             var res = SchemaResult<ManifestScheme>.New(context);
             
-            if (!IsInitialized)
+            
+            var isInitRes = IsInitialized(context);
+            if (isInitRes.Failed)
             {
-                return res.Fail("Attempting to access Manifest before initialization.");
+                return isInitRes.CastError<ManifestScheme>();
             }
 
             // if we are currently in the process of loading a new manifest, use that manifest instead
@@ -180,14 +188,13 @@ namespace Schema.Core
                 return res.Pass(_loadedManifestScheme, "Manifest scheme is already loaded");
             }
 
-            var dataSchemeRes = GetScheme(Manifest.MANIFEST_SCHEME_NAME);
-
-            if (dataSchemeRes.Failed)
+            if (!GetScheme(Manifest.MANIFEST_SCHEME_NAME, context).Try(out var manifest, 
+                    out var manifestError))
             {
-                return dataSchemeRes.CastError<ManifestScheme>();
+                return manifestError.CastError<ManifestScheme>();
             }
 
-            var manifestScheme = new ManifestScheme(dataSchemeRes.Result);
+            var manifestScheme = new ManifestScheme(manifest);
             LoadedManifestScheme = manifestScheme;
             
             return res.Pass(manifestScheme, "Manifest scheme is loaded");
@@ -202,9 +209,10 @@ namespace Schema.Core
         {
             var res = SchemaResult<ManifestEntry>.New(context);
             
-            if (!IsInitialized || scheme is null)
+            var isInitRes = IsInitialized(context);
+            if (isInitRes.Failed)
             {
-                return res.Fail(errorMessage: "Manifest scheme is not initialized");
+                return isInitRes.CastError<ManifestEntry>();
             }
             
             return GetManifestEntryForScheme(scheme.SchemeName, context);
@@ -218,10 +226,11 @@ namespace Schema.Core
         public static SchemaResult<ManifestEntry> GetManifestEntryForScheme(string schemeName, SchemaContext context = default)
         {
             var res = SchemaResult<ManifestEntry>.New(schemeName);
-            
-            if (!IsInitialized)
+
+            var isInitRes = IsInitialized(context);
+            if (isInitRes.Failed)
             {
-                return res.Fail("Manifest scheme is not initialized");
+                return isInitRes.CastError<ManifestEntry>();
             }
 
             if (string.IsNullOrWhiteSpace(schemeName))
@@ -231,8 +240,8 @@ namespace Schema.Core
 
             lock (manifestOperationLock)
             {
-                if (!GetManifestScheme(context).Try(out var manifestScheme))
-                    return res.Fail(errorMessage: "Manifest Scheme not found");
+                if (!GetManifestScheme(context).Try(out var manifestScheme, out var manifestError))
+                    return manifestError.CastError<ManifestEntry>();
                 
                 return manifestScheme.GetEntryForSchemeName(context, schemeName);
 

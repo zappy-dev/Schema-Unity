@@ -90,16 +90,16 @@ namespace Schema.Core.Data
             ShouldPublish = other.ShouldPublish;
         }
 
-        public SchemaResult<ReferenceDataType> CreateReferenceType()
+        public SchemaResult<ReferenceDataType> CreateReferenceType(SchemaContext ctx)
         {
             if (!IsIdentifier)
             {
                 return Fail<ReferenceDataType>("Attribute is not a identifier");
             }
             
-            if (!Schema.TryGetSchemeForAttribute(this, out var ownerScheme))
+            if (!Schema.GetOwnerSchemeForAttribute(ctx, this).Try(out var ownerScheme, out var ownerErr))
             {
-                return Fail<ReferenceDataType>($"{this} does not existing in any known scheme.");
+                return ownerErr.CastError<ReferenceDataType>();
             }
 
             var refDataType = new ReferenceDataType(ownerScheme.SchemeName, AttributeName);

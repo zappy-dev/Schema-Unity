@@ -24,6 +24,8 @@ namespace Schema.Unity.Editor
 
         private void RenderDebugView()
         {
+            RenderSchemaDebugSettings();
+            
             using (new EditorGUI.DisabledScope())
             {
                 EditorGUILayout.Toggle("Is Schema Initialized?", IsInitialized);
@@ -172,35 +174,38 @@ namespace Schema.Unity.Editor
                     }
                 }
 
-                // Controls for enabling / disabling debug mode
-                var buildTargetGroup = EditorUserBuildSettings.selectedBuildTargetGroup;
-                var defines = PlayerSettings.GetScriptingDefineSymbolsForGroup(buildTargetGroup);
-
-                if (defines.Contains("SCHEMA_DEBUG"))
-                {
-                    if (GUILayout.Button("Remove SCHEMA_DEBUG Scripting Define"))
-                    {
-                        var newDefines = string.Join(";", defines.Split(';').Where(d => d != "SCHEMA_DEBUG"));
-                        PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, newDefines);
-                        LogDbgVerbose("Removed SCHEMA_DEBUG scripting define.");
-                    }
-                }
-                else
-                {
-                    if (GUILayout.Button("Add SCHEMA_DEBUG Scripting Define"))
-                    {
-
-                        if (!string.IsNullOrEmpty(defines))
-                            defines += ";";
-                        defines += "SCHEMA_DEBUG";
-                        PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, defines);
-                        LogDbgVerbose("Added SCHEMA_DEBUG scripting define.");
-                    }
-                }
-
-
                 RenderGUIEvents();
             }
+        }
+
+        private void RenderSchemaDebugSettings()
+        {
+            // Controls for enabling / disabling debug mode
+            var buildTargetGroup = EditorUserBuildSettings.selectedBuildTargetGroup;
+            var defines = PlayerSettings.GetScriptingDefineSymbolsForGroup(buildTargetGroup);
+
+            if (defines.Contains("SCHEMA_DEBUG"))
+            {
+                if (GUILayout.Button("Disable Schema Debug Mode"))
+                {
+                    var newDefines = string.Join(";", defines.Split(';').Where(d => d != "SCHEMA_DEBUG"));
+                    PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, newDefines);
+                    LogDbgVerbose("Removed SCHEMA_DEBUG scripting define.");
+                }
+            }
+            else
+            {
+                if (GUILayout.Button("Enable Schema Debug Mode"))
+                {
+
+                    if (!string.IsNullOrEmpty(defines))
+                        defines += ";";
+                    defines += "SCHEMA_DEBUG";
+                    PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, defines);
+                    LogDbgVerbose("Added SCHEMA_DEBUG scripting define.");
+                }
+            }
+
         }
 
         private Vector2 guiEventsScrollPos = Vector2.zero;

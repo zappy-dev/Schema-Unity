@@ -22,9 +22,15 @@ namespace Schema.Core.Data
         {
             ReferenceSchemeName = schemeName;
             ReferenceAttributeName = identifierAttribute;
+
+            var ctx = new SchemaContext
+            {
+                Driver = "Reference_DataType_Constructor",
+                DataType = $"Reference/{ReferenceSchemeName} (ID: {ReferenceAttributeName})"
+            };
             
             // Set an initial default value
-            if (Schema.GetScheme(ReferenceSchemeName).Try(out var refScheme))
+            if (Schema.GetScheme(ReferenceSchemeName, ctx).Try(out var refScheme))
             {
                 var values = refScheme.GetIdentifierValues().Select(v => v?.ToString() ?? "").ToList();
                 DefaultValue = values.Count > 0 ? values[0] : "";
@@ -51,8 +57,10 @@ namespace Schema.Core.Data
 
         public SchemaResult<AttributeDefinition> GetReferencedIdentifierAttribute(SchemaContext context)
         {
+            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            
             // what if the referenced scheme is the self scheme?
-            if (!Schema.GetScheme(ReferenceSchemeName).Try(out var refSchema))
+            if (!Schema.GetScheme(ReferenceSchemeName, context).Try(out var refSchema))
             {
                 if (context.Scheme.SchemeName == ReferenceSchemeName)
                 {
@@ -79,6 +87,8 @@ namespace Schema.Core.Data
 
         public override SchemaResult CheckIfValidData(SchemaContext context, object value)
         {
+            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            
             if (value == null)
             {
                 return CheckIf(SupportsEmptyReferences, 
@@ -87,7 +97,7 @@ namespace Schema.Core.Data
             }
             
             // what if the referenced scheme is the self scheme?
-            if (!Schema.GetScheme(ReferenceSchemeName).Try(out var refSchema))
+            if (!Schema.GetScheme(ReferenceSchemeName, context).Try(out var refSchema))
             {
                 if (context.Scheme.SchemeName == ReferenceSchemeName)
                 {
@@ -169,11 +179,12 @@ namespace Schema.Core.Data
 
         public override SchemaResult<object> ConvertData(SchemaContext context, object value)
         {
+            using var _ = new DataTypeContextScope(ref context, this.TypeName);
             // this is incorrect
             // var data = value as string;
             
             // First, convert the value to the same data type as a reference's attribute
-            if (!Schema.GetScheme(ReferenceSchemeName).Try(out var refSchema))
+            if (!Schema.GetScheme(ReferenceSchemeName, context).Try(out var refSchema))
             {
                 if (context.Scheme != null && 
                     context.Scheme.SchemeName == ReferenceSchemeName)

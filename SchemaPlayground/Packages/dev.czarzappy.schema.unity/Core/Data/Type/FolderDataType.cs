@@ -42,9 +42,14 @@ namespace Schema.Core.Data
             }
             
             // Resolve the path to absolute for file system check
-            string resolvedPath = ResolvePath(filePath);
+            string resolvedPath = ResolvePath(context, filePath);
+            
+            if (!Schema.GetStorage(context).Try(out var storage, out var storageErr))
+            {
+                return storageErr.Cast();
+            }
 
-            bool directoryExists = Schema.Storage.FileSystem.DirectoryExists(context, resolvedPath);
+            bool directoryExists = storage.FileSystem.DirectoryExists(context, resolvedPath);
             return CheckIf(directoryExists, $"Directory '{resolvedPath}' do not exist", "Directory exists", context);
         }
 
@@ -56,14 +61,19 @@ namespace Schema.Core.Data
             }
             
             // Format the path according to our settings (relative/absolute)
-            string formattedPath = FormatPath(filePath);
+            string formattedPath = FormatPath(context, filePath);
             Logger.LogDbgVerbose($"Formatted path: {formattedPath}");
             
             // For validation, we need to resolve to absolute path
-            string resolvedPath = ResolvePath(filePath);
+            string resolvedPath = ResolvePath(context, filePath);
             Logger.LogDbgVerbose($"Resolved path: {resolvedPath}");
             
-            bool directoryExists = Schema.Storage.FileSystem.DirectoryExists(context, resolvedPath);
+            if (!Schema.GetStorage(context).Try(out var storage, out var storageErr))
+            {
+                return storageErr.CastError<object>();
+            }
+            
+            bool directoryExists = storage.FileSystem.DirectoryExists(context, resolvedPath);
             
             return CheckIf<object>(
                 directoryExists || allowEmptyPath && string.IsNullOrEmpty(resolvedPath), 

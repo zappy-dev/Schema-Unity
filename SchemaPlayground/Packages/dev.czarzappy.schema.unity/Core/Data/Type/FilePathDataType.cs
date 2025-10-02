@@ -42,9 +42,14 @@ namespace Schema.Core.Data
             }
             
             // Resolve the path to absolute for file system check
-            string resolvedPath = ResolvePath(filePath);
+            string resolvedPath = ResolvePath(context, filePath);
+
+            if (!Schema.GetStorage(context).Try(out var storage, out var storageErr))
+            {
+                return storageErr.Cast();
+            }
             
-            return Schema.Storage.FileSystem.FileExists(context, resolvedPath);
+            return storage.FileSystem.FileExists(context, resolvedPath);
         }
 
         public override SchemaResult<object> ConvertData(SchemaContext context, object value)
@@ -55,15 +60,20 @@ namespace Schema.Core.Data
             }
             
             // Format the path according to our settings (relative/absolute)
-            string formattedPath = FormatPath(filePath);
+            string formattedPath = FormatPath(context, filePath);
             Logger.LogDbgVerbose($"Formatted path: {formattedPath}");
             
             // For validation, we need to resolve to absolute path
-            string resolvedPath = ResolvePath(filePath);
+            string resolvedPath = ResolvePath(context, filePath);
             Logger.LogDbgVerbose($"Resolved path: {resolvedPath}");
             
+            if (!Schema.GetStorage(context).Try(out var storage, out var storageErr))
+            {
+                return storageErr.CastError<object>();
+            }
+            
             bool fileExists = !string.IsNullOrWhiteSpace(resolvedPath) && 
-                              Schema.Storage.FileSystem.FileExists(context, resolvedPath).Passed;
+                              storage.FileSystem.FileExists(context, resolvedPath).Passed;
             
             return CheckIf<object>(
                 fileExists || allowEmptyPath && string.IsNullOrEmpty(resolvedPath), 

@@ -63,7 +63,7 @@ namespace Schema.Core.Commands
                 }
                 
                 // Store the previous scheme for undo
-                var previousSchemeResult = Schema.GetScheme(_scheme.SchemeName);
+                var previousSchemeResult = Schema.GetScheme(_scheme.SchemeName, Context);
                 if (previousSchemeResult.Try(out _previousScheme))
                 {
                     Logger.LogDbgVerbose($"Stored previous scheme '{_previousScheme.SchemeName}' for undo", this);

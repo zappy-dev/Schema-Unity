@@ -1,5 +1,7 @@
 using System.Collections;
+using Moq;
 using Schema.Core.Data;
+using Schema.Core.IO;
 using Schema.Core.Tests.Ext;
 
 namespace Schema.Core.Tests.Data;
@@ -26,6 +28,10 @@ public class TestDataScheme
         testScheme = new DataScheme("Test");
         testScheme.AddAttribute(Context, EXISTING_STRING_ATTRIBUTE_NAME, DataType.Text).AssertPassed();
         testScheme.AddAttribute(Context, EXISTING_INTEGER_ATTRIBUTE_NAME, DataType.Integer).AssertPassed();
+
+        var mockFS = new Mock<IFileSystem>();
+        Schema.SetStorage(new Storage(mockFS.Object));
+        Schema.InitializeTemplateManifestScheme(Context);
     }
     
 
@@ -42,7 +48,7 @@ public class TestDataScheme
         rewardTypeScheme.AddEntry(Context, new DataEntry { { nameAttr.AttributeName, "COPPER" , Context } });
         rewardTypeScheme.Load(Context).AssertPassed();
         rewardTypeScheme.GetIdentifierAttribute().TryAssert(out var rewardTypeIdAttr);
-        rewardTypeIdAttr.CreateReferenceType().TryAssert(out var rewardTypeRefType);
+        rewardTypeIdAttr.CreateReferenceType(Context).TryAssert(out var rewardTypeRefType);
 
         // Schema B: LootRolls, referencing RewardTypes.Name
         var lootRollsScheme = new DataScheme("LootRolls");
@@ -236,7 +242,7 @@ public class TestDataScheme
         
         refScheme.GetIdentifierAttribute().TryAssert(out var identifierAttribute);
 
-        identifierAttribute.CreateReferenceType().TryAssert(out var refType);
+        identifierAttribute.CreateReferenceType(Context).TryAssert(out var refType);
 
         // prepare referencing data scheme
         var dataScheme = new DataScheme("Foo");

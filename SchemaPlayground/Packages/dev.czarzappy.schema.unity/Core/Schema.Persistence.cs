@@ -26,8 +26,24 @@ namespace Schema.Core
         {
             _storage = storage;
         }
-        
-        public static Storage Storage => _storage;
+
+        /// <summary>
+        /// Retrieves the Storage interface for serialization and IO operations
+        /// </summary>
+        /// <param name="context"></param>
+        /// <returns></returns>
+        public static SchemaResult<Storage> GetStorage(SchemaContext context)
+        {
+            var res = SchemaResult<Storage>.New(context);
+            
+            if (_storage == null)
+            {
+                    
+                return res.Fail($"No schema storage available. Use {nameof(Schema)}.{nameof(SetStorage)} to initialize the Storage system.");
+            }
+
+            return res.Pass(_storage);
+        }
         
         #region Persistence Operations
 
@@ -38,14 +54,20 @@ namespace Schema.Core
             string manifestLoadPath,
             IProgress<(float, string)> progress = null)
         {
+            var res = SchemaResult<ManifestLoadStatus>.New(context);
             if (string.IsNullOrWhiteSpace(manifestLoadPath))
             {
-                return SchemaResult<ManifestLoadStatus>.Fail("Manifest path is invalid: " + manifestLoadPath, context: context);
+                return res.Fail("Manifest path is invalid: " + manifestLoadPath);
             }
 
-            if (_storage.FileSystem.FileExists(context, manifestLoadPath).Failed)
+            if (!GetStorage(context).Try(out var storage, out var storageErr))
             {
-                return SchemaResult<ManifestLoadStatus>.Fail($"No Manifest scheme found.\nSearched the following path: {manifestLoadPath}\nLoad an existing manifest scheme or save the empty template.", context: context);
+                return storageErr.CastError<ManifestLoadStatus>();
+            }
+
+            if (storage.FileSystem.FileExists(context, manifestLoadPath).Failed)
+            {
+                return res.Fail($"No Manifest scheme found.\nSearched the following path: {manifestLoadPath}\nLoad an existing manifest scheme or save the empty template.");
             }
             
             progress?.Report((0f, $"Loading: {manifestLoadPath}..."));
@@ -142,11 +164,11 @@ namespace Schema.Core
                     loadedScheme.SetDirty(context, false); // is the loaded scheme dirty? type conversions?
                     if (isSelfEntry)
                     {
-                        if (!manifestDataScheme.Equals(loadedScheme))
-                        {
-                            // TODO: Clarify this message better
-                            Logger.LogError($"Mismatch between loaded manifest scheme and manifest scheme referenced by loaded manifest.", context: manifestDataScheme);
-                        }
+                        // if (!manifestDataScheme.Equals(loadedScheme))
+                        // {
+                        //     // TODO: Clarify this message better
+                        //     Logger.LogError($"Mismatch between loaded manifest scheme and manifest scheme referenced by loaded manifest.", context: manifestDataScheme);
+                        // }
 
                         continue;
                         // TODO: How best to handle loading the manifest schema while already loading the manifest schema?
@@ -247,6 +269,7 @@ namespace Schema.Core
         /// Load a new scheme into memory.
         /// Note: This does not persist the new data scheme to disk
         /// </summary>
+        /// <param name="context"></param>
         /// <param name="scheme">New scheme to load</param>
         /// <param name="overwriteExisting">If true, overwrites an existing scheme. If false, fails to overwrite an existing scheme if it exists</param>
         /// <param name="registerManifestEntry">If true, registers a new manifest entry in the currently loaded manifest for the given scheme if loaded.</param>
@@ -290,8 +313,7 @@ namespace Schema.Core
 
                 foreach (var attrName in attributesToRemove)
                 {
-                    using var _ = new AttributeContextScope(context, attrName);
-                    context.AttributeName = attrName;
+                    using var _ = new AttributeContextScope(ref context, attrName);
                     var removeRes = entry.RemoveData(context, attrName);
                     if (removeRes.Failed)
                     {
@@ -440,7 +462,13 @@ namespace Schema.Core
 
         public static SchemaResult Save(SchemaContext context, bool saveManifest = false)
         {
-            foreach (var scheme in GetSchemes())
+            var isInitRes = IsInitialized(context);
+            if (isInitRes.Failed)
+            {
+                return isInitRes;
+            }
+            
+            foreach (var scheme in GetSchemes(context))
             {
                 if (scheme.IsDirty)
                 {
@@ -561,20 +589,5 @@ namespace Schema.Core
         #endregion
         
         #endregion
-    }
-
-    public class AttributeContextScope : IDisposable
-    {
-        private SchemaContext context;
-        public AttributeContextScope(SchemaContext context, string attrName)
-        {
-            this.context = context;
-            context.AttributeName = attrName;
-        }
-
-        public void Dispose()
-        {
-            context.AttributeName = null;
-        }
     }
 }
