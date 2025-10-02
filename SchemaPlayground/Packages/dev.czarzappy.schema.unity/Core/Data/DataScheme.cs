@@ -116,7 +116,10 @@ namespace Schema.Core.Data
         public void Write(StringBuilder stringBuilder, bool verbose)
         {
             var isDirty = IsDirty ? "*" : "";
-            stringBuilder.Append($"DataScheme '{SchemeName}' [{AttributeCount}x{AllEntries.Count()}]{isDirty} ({RuntimeHelpers.GetHashCode(this)})");
+            stringBuilder.Append($"DataScheme '{SchemeName}' [{AttributeCount}x{AllEntries.Count()}]{isDirty}");
+#if SCHEMA_DEBUG
+            stringBuilder.Append($" ({RuntimeHelpers.GetHashCode(this)})");
+#endif
             if (verbose)
             {
                 

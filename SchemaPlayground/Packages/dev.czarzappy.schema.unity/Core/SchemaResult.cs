@@ -118,18 +118,17 @@ namespace Schema.Core
         {
             return !conditional ? Fail(context: context, errorMessage: errorMessage) : Pass(successMessage: successMessage, context: context);
         }
-
         #endregion
 
+        public SchemaResult<TOut> CastError<TOut>()
+        {
+            return SchemaResult<TOut>.Fail(Message, Context);
+        }
+        
         public bool Try(out SchemaResult err)
         {
             err = this;
             return this.status == RequestStatus.Passed;
-        }
-
-        public SchemaResult<T> CastError<T>()
-        {
-            return SchemaResult<T>.Fail(Message, context);
         }
     }
 

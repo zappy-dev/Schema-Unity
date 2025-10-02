@@ -246,11 +246,11 @@ namespace Schema.Core
             {
                 resolvedPath = PathUtility.MakeAbsolutePath(schemeFilePath, ProjectPath);
             }
-            
-            if (_storage.FileSystem.FileExists(context, resolvedPath).Failed)
+
+            var fileExistRes = _storage.FileSystem.FileExists(context, resolvedPath);
+            if (fileExistRes.Failed)
             {
-                return SchemaResult<DataScheme>.Fail($"{manifestEntry} Scheme file not found: {resolvedPath} (from {schemeFilePath})",
-                    context);
+                return fileExistRes.CastError<DataScheme>();
             }
                     
             progress?.Report(resolvedPath);
