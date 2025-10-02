@@ -46,7 +46,7 @@ namespace Schema.Core.Tests.Commands
 
             // Assert
             Assert.IsTrue(result.IsSuccess, result.Message);
-            Assert.That(Schema.DoesSchemeExist(_schemeName), Is.True);
+            Assert.That(Schema.DoesSchemeExist(Context, _schemeName).AssertPassed(), Is.True);
             Schema.GetScheme(_schemeName, Context).TryAssert(out var loadedScheme);
             Assert.That(loadedScheme, Is.EqualTo(_testScheme));
         }
@@ -89,14 +89,14 @@ namespace Schema.Core.Tests.Commands
             // Arrange
             var command = new LoadDataSchemeCommand(Context, _testScheme, overwriteExisting: true);
             await command.ExecuteAsync(CancellationToken.None);
-            Assert.That(Schema.DoesSchemeExist(_schemeName), Is.True);
+            Assert.That(Schema.DoesSchemeExist(Context, _schemeName).AssertPassed(), Is.True);
 
             // Act
             var undoResult = await command.UndoAsync(CancellationToken.None);
 
             // Assert
             Assert.IsTrue(undoResult.IsSuccess, undoResult.Message);
-            Assert.That(Schema.DoesSchemeExist(_schemeName), Is.False);
+            Assert.That(Schema.DoesSchemeExist(Context, _schemeName).AssertPassed(), Is.False);
         }
 
         [Test]

@@ -45,9 +45,7 @@ namespace Schema.Core.Data
                 {
                     // TODO: Figure out a better solution for adding entries that contain unknown attributes
                     Logger.LogWarning($"Skipping validation for unknown attribute: {attributeName}");
-                    continue;
-                    // skip attribute that doesn't exist, instead of failing to add completely?
-                    // return SchemaResult.Fail(context, $"No matching attribute found for '{kvp.Key}'");
+                    return SchemaResult.Fail(context, $"No matching attribute found for '{kvp.Key}'");
                 }
 
                 var entryValue = kvp.Value;

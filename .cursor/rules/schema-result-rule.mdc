@@ -1,0 +1,5 @@
+---
+description: For method signatures in the Schema.Core library, prefer returning SchemaResult or SchemaResult<TResult> for a specific result type. This result wrapper allows for a standarized way for handling errors, querying if a request was successful, and bubbling up errors without exceptions.
+globs:
+alwaysApply: true
+---

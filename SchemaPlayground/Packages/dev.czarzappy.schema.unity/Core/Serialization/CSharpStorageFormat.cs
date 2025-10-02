@@ -43,41 +43,48 @@ namespace Schema.Core.Serialization
         /// Identifiers must start with a letter or underscore (_).
         /// Identifiers can contain Unicode letter characters, decimal digit characters, Unicode connecting characters, Unicode combining characters, or Unicode formatting characters. For more information on Unicode categories, see the Unicode Category Database.
         /// </para>
+        /// <param name="ctx"></param>
         /// <param name="id"></param>
         /// <returns></returns>
         /// <see cref="https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/identifier-names"/>
-        private static bool IsValidIdentifierName(string id)
+        private static SchemaResult IsValidIdentifierName(SchemaContext ctx, string id)
         {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return Fail(ctx, "Identifier cannot be null or empty");
+            }
+            
             for (int i = 0; i < id.Length; i++)
             {
                 if (i == 0)
                 {
                     if (!(char.IsLetter(id[i]) || id[i] == '_'))
                     {
-                        return false;
+                        return Fail(ctx, "First character must be a letter or an underscore (_) for a valid identifier");
                     }
                 }
                 else
                 {
                     if (!(char.IsLetterOrDigit(id[i]) ||  id[i] == '_'))
                     {
-                        return false;
+                        return Fail(ctx, "Character must be a letter or an underscore (_) for a valid identifier");
                     }
                 }
             }
 
-            return true;
+            return Pass();
         }
         
         public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme scheme)
         {
+            using var _ = new SchemeContextScope(ref context, scheme);
             var baseSchemeClassIdentifier = scheme.SchemeName
                 .Replace(" ", string.Empty) // remove whitespace
                 .ToPascalCase();
 
-            if (!IsValidIdentifierName(baseSchemeClassIdentifier))
+            if (!IsValidIdentifierName(context, baseSchemeClassIdentifier).Try(out var err))
             {
-                return Fail(context, $"Cannot generate identifier for base class name '{baseSchemeClassIdentifier}'");
+                return Fail(context, $"Cannot generate identifier for base class name '{baseSchemeClassIdentifier}', reason: {err.Message}");
             }
             var schemeClassName = $"{baseSchemeClassIdentifier}Scheme";
             var entryClassName = $"{baseSchemeClassIdentifier}Entry";
@@ -128,9 +135,9 @@ $@"
                         .Replace("#", "POUND") // replace whitespace
                         .Replace(",", string.Empty) // replace commas
                         .ToUpper();
-                    if (!IsValidIdentifierName(sanitizedId))
+                    if (!IsValidIdentifierName(context, sanitizedId).Try(out var idErr))
                     {
-                        return Fail(context, $"Cannot generate identifier for '{sanitizedId}'");
+                        return Fail(context, $"Cannot generate identifier for '{sanitizedId}', reason: {idErr.Message}");
                     }
 
                     string idValueCode = string.Empty;
@@ -199,9 +206,9 @@ $@"
                     .Replace(" ", string.Empty) // remove whitespace
                     .ToPascalCase();
 
-                if (!IsValidIdentifierName(attributePropertyName))
+                if (!IsValidIdentifierName(context, attributePropertyName).Try(out var idErr))
                 {
-                    return Fail(context, $"Cannot generate identifier for attribute '{attributePropertyName}'");
+                    return Fail(context, $"Cannot generate identifier for attribute '{attributePropertyName}', reason: {idErr.Message}");
                 }
                 var attributeName = attributeDefinition.AttributeName;
 

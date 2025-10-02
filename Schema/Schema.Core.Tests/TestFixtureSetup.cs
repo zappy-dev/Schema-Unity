@@ -12,5 +12,7 @@ public class TestFixtureSetup
         Logger.Level = Logger.LogLevel.ERROR;
 
         SchemaResultSettings.Instance.LogStackTrace = true;
+        // Establish a deterministic project root for path resolution in tests
+        Schema.ProjectPath = "C:\\proj";
     }
 }

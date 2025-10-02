@@ -51,6 +51,10 @@ namespace Schema.Core
             {
                 var res = operation(entry);
                 success &= res.Passed;
+                if (res.Failed)
+                {
+                    Logger.LogError(res.Message, res.Context);
+                }
             }
 
             return CheckIf(context, success, errorMessage);

@@ -1,6 +1,7 @@
 using System.IO;
 using Schema.Core;
 using Schema.Core.Data;
+using Schema.Core.Ext;
 using Schema.Core.Serialization;
 using UnityEditor;
 using UnityEngine;
@@ -37,6 +38,7 @@ namespace Schema.Unity.Editor
             if (format is CSharpStorageFormat cSharpStorageFormat)
             {
                 cSharpStorageFormat.ManifestEntry = manifestEntry;
+                exportFileName = exportFileName.Substring(0, 1).ToUpper() +  exportFileName.Substring(1);
                 outputFilePath = Path.Combine(saveDirectory, exportFileName);
             }
             else

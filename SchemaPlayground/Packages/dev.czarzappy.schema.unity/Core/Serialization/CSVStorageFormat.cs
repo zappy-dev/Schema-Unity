@@ -62,9 +62,9 @@ namespace Schema.Core.Serialization
             {
                 AttributeName = h,
                 DataType = DataType
-                    .Text, // TODO: determine datatype, maybe scan entries or hint in header name, e.g header (type). Alternatively, use existing scheme's type info
-                DefaultValue = string.Empty,
+                    .Text,
                 ColumnWidth = AttributeDefinition.DefaultColumnWidth,
+                AttributeToolTip = string.Empty,
             }).ToArray();
 
             // validate and extract out raw data

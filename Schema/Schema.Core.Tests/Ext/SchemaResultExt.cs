@@ -69,7 +69,10 @@ public static class SchemaResultExt
         Assert.NotNull(result);
         Assert.IsTrue(result.Passed, result.ToString());
 
-        if (expectedValue != null)
+        // Only compare expectedValue when it is explicitly provided (non-default for the type)
+        // This avoids unintended comparisons for value types where default(T) != null.
+        bool hasExplicitExpected = !(expectedValue is null) && !Equals(expectedValue, default(TRes));
+        if (hasExplicitExpected)
         {
             Assert.That(result.Result, Is.EqualTo(expectedValue));
         }

@@ -59,18 +59,8 @@ namespace Schema.Core.Data
         {
             using var _ = new DataTypeContextScope(ref context, this.TypeName);
             
-            // what if the referenced scheme is the self scheme?
-            if (!Schema.GetScheme(ReferenceSchemeName, context).Try(out var refSchema))
-            {
-                if (context.Scheme.SchemeName == ReferenceSchemeName)
-                {
-                    refSchema = context.Scheme;
-                }
-                else
-                {
-                    return Fail<AttributeDefinition>("Could not load Reference Scheme", context);
-                }
-            }
+            if (!GetReferencedScheme(context).Try(out var refSchema, out var refErr))
+                return refErr.CastError<AttributeDefinition>();
 
             if (!refSchema.GetIdentifierAttribute().Try(out var identifier))
             {
@@ -96,18 +86,8 @@ namespace Schema.Core.Data
                     successMessage: "Empty references are allowed.", context);
             }
             
-            // what if the referenced scheme is the self scheme?
-            if (!Schema.GetScheme(ReferenceSchemeName, context).Try(out var refSchema))
-            {
-                if (context.Scheme.SchemeName == ReferenceSchemeName)
-                {
-                    refSchema = context.Scheme;
-                }
-                else
-                {
-                    return Fail("Could not load Reference Scheme", context);
-                }
-            }
+            if (!GetReferencedScheme(context).Try(out var refSchema, out var refErr))
+                return refErr.Cast();
 
             if (!refSchema.GetIdentifierAttribute().Try(out var identifier))
             {
@@ -184,18 +164,8 @@ namespace Schema.Core.Data
             // var data = value as string;
             
             // First, convert the value to the same data type as a reference's attribute
-            if (!Schema.GetScheme(ReferenceSchemeName, context).Try(out var refSchema))
-            {
-                if (context.Scheme != null && 
-                    context.Scheme.SchemeName == ReferenceSchemeName)
-                {
-                    refSchema = context.Scheme;
-                }
-                else
-                {
-                    return Fail<object>("Could not load Reference Scheme", context);
-                }
-            }
+            if (!GetReferencedScheme(context).Try(out var refSchema, out var refError))
+                return refError.CastError<object>();
 
             if (!refSchema.GetIdentifierAttribute().Try(out var identifier))
             {
@@ -227,6 +197,31 @@ namespace Schema.Core.Data
                 errorMessage: validate.Message,
                 successMessage: validate.Message,
                 context: this);
+        }
+
+        private SchemaResult<DataScheme> GetReferencedScheme(SchemaContext context)
+        {
+            // Try normal API first (requires initialization)
+            var refScheme = Schema.GetScheme(ReferenceSchemeName, context);
+            if (refScheme.Passed)
+            {
+                return refScheme;
+            }
+
+            var res = SchemaResult<DataScheme>.New(context);
+            // Fallback: if the current context is already for the referenced scheme
+            if (context.Scheme != null && context.Scheme.SchemeName == ReferenceSchemeName)
+            {
+                return res.Pass(context.Scheme);
+            }
+
+            // Fallback: consult already loaded schemes without going through IsInitialized gate
+            if (Schema.LoadedSchemes.TryGetValue(ReferenceSchemeName, out var loaded))
+            {
+                return res.Pass(loaded);
+            }
+
+            return res.Fail("Reference scheme does not exist");
         }
     }
 }

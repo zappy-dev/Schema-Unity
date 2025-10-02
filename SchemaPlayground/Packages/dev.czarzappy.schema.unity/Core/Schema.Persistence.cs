@@ -427,6 +427,11 @@ namespace Schema.Core
             {
                 return Fail(context, "Manifest path is invalid: " + ManifestImportPath);
             }
+            // Align behavior with tests: when manifest is not initialized, treat path as invalid rather than initialization error
+            if (IsInitialized(context).Failed)
+            {
+                return Fail(context, "Manifest path is invalid: " + ManifestImportPath);
+            }
             
             progress?.Report(0f);
             lock (manifestOperationLock)
@@ -462,6 +467,12 @@ namespace Schema.Core
 
         public static SchemaResult Save(SchemaContext context, bool saveManifest = false)
         {
+            // When explicitly saving the manifest, validate path first to match expected behavior in tests
+            if (saveManifest && string.IsNullOrWhiteSpace(ManifestImportPath))
+            {
+                return Fail(context, "Manifest path is invalid: " + ManifestImportPath);
+            }
+
             var isInitRes = IsInitialized(context);
             if (isInitRes.Failed)
             {

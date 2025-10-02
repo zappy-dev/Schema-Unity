@@ -15,44 +15,73 @@ namespace Schema.Core.Serialization
 
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            JObject jo = JObject.Load(reader);
-            
+            var jo = JObject.Load(reader);
+
             Type resolvedType = null;
-            
-            // check $type attribute for new underlying data type
-            // legacy serialization but fast to check
-            var type = jo["$type"];
-            if (type != null)
+
+            // Prefer explicit $type when provided (legacy/newtonsoft type hint)
+            var typeToken = jo["$type"] as JValue;
+            if (typeToken?.Type == JTokenType.String)
             {
-                resolvedType = Type.GetType(type.Value<string>());
+                resolvedType = Type.GetType(typeToken.Value as string);
             }
             else
             {
-                string typeName = jo["TypeName"].Value<string>();
-
-                var resolvedDataType = DataType.BuiltInTypes.FirstOrDefault(builtIn => builtIn.TypeName.Equals(typeName));
-                
-                if (resolvedDataType == null)
+                // Newer format: optional TypeName discriminator
+                if (jo.TryGetValue("TypeName", StringComparison.Ordinal, out var typeNameToken) &&
+                    typeNameToken.Type == JTokenType.String)
                 {
-                    if (typeName.Contains(ReferenceDataType.TypeNamePrefix))
+                    var typeName = typeNameToken.Value<string>();
+                    var resolvedDataType = DataType.BuiltInTypes.FirstOrDefault(builtIn => builtIn.TypeName.Equals(typeName));
+                    if (resolvedDataType != null)
+                    {
+                        resolvedType = resolvedDataType.GetType();
+                    }
+                    else if (!string.IsNullOrEmpty(typeName) && typeName.Contains(ReferenceDataType.TypeNamePrefix))
                     {
                         resolvedType = typeof(ReferenceDataType);
                     }
                 }
-                else
+
+                // Heuristic fallback by inspecting known property shapes when no discriminator is present
+                if (resolvedType == null)
                 {
-                    resolvedType = resolvedDataType.GetType();
+                    // ReferenceDataType shape
+                    if (jo.ContainsKey(nameof(ReferenceDataType.ReferenceSchemeName)) || 
+                        jo.ContainsKey(nameof(ReferenceDataType.ReferenceAttributeName)) || 
+                        jo.ContainsKey(nameof(ReferenceDataType.SupportsEmptyReferences)))
+                    {
+                        resolvedType = typeof(ReferenceDataType);
+                    }
+                    // FilePathDataType / FolderDataType share FSDataType props; default to FilePath
+                    else if (jo.ContainsKey(nameof(FilePathDataType.AllowEmptyPath)) || 
+                             jo.ContainsKey(nameof(FilePathDataType.UseRelativePaths)) || 
+                             jo.ContainsKey(nameof(FilePathDataType.BasePath)))
+                    {
+                        resolvedType = typeof(FilePathDataType);
+                    }
+                    // Integer vs Text based on DefaultValue json type
+                    else if (jo.TryGetValue(nameof(DataType.DefaultValue), StringComparison.Ordinal, out var defaultValueToken))
+                    {
+                        if (defaultValueToken.Type == JTokenType.Integer)
+                        {
+                            resolvedType = typeof(IntegerDataType);
+                        }
+                        else
+                        {
+                            // Treat strings and null as Text default (tests expect string default "")
+                            resolvedType = typeof(TextDataType);
+                        }
+                    }
                 }
             }
-            
-            if (resolvedType != null)
-            {
-                return jo.ToObject(resolvedType, serializer);
-            }
-            else
+
+            if (resolvedType == null)
             {
                 throw new JsonSerializationException($"DataTypeConverter: Unable to resolve underlying data type: {jo}");
             }
+
+            return jo.ToObject(resolvedType, serializer);
         }
 
         public override bool CanConvert(Type objectType)

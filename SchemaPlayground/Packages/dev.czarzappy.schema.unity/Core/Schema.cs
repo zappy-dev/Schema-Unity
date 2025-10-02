@@ -42,7 +42,8 @@ namespace Schema.Core
 
         public static SchemaResult<int> GetNumAvailableSchemes(SchemaContext context)
         {
-            if (GetAllSchemes(context).Try(out var schemes, out var error))
+            var allSchemesRes = GetAllSchemes(context);
+            if (!allSchemesRes.Try(out var schemes, out var error))
             {
                 return error.CastError<int>();
             }
@@ -74,6 +75,11 @@ namespace Schema.Core
             if (!GetStorage(context).Try(out var _, out var storageErr))
             {
                 return storageErr.Cast();
+            }
+
+            if (string.IsNullOrWhiteSpace(ProjectPath))
+            {
+                return Fail(context, "No project path specified.");
             }
 
             return CheckIf(context, _loadedManifestScheme != null, "No Manifest Scheme Loaded");
