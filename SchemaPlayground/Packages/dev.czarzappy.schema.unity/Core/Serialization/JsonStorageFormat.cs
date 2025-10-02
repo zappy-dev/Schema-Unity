@@ -34,6 +34,7 @@ namespace Schema.Core.Serialization
                 {
                     new DataTypeJsonConverter(),
                     new DataEntryJsonConverter(),
+                    new PluginDataTypeJsonConverter(),
                 },
                 Formatting = Formatting.Indented,
             };

@@ -615,7 +615,7 @@ namespace Schema.Unity.Editor
         {
             // TODO: Need to split the Schema Instance providing Schema's self data from the one used for a Project... different scopes.
             // May need to consider this for the runtime as well.
-            if (!GetScheme("Tooltips", context).Try(out var tooltipDataScheme)) 
+            if (!GetScheme(context, "Tooltips").Try(out var tooltipDataScheme)) 
                 return "Could not find Tooltips scheme";
 
             var tooltips = new TooltipsScheme(tooltipDataScheme);
@@ -1004,7 +1004,7 @@ namespace Schema.Unity.Editor
                     // Enumeration
                     // First try to find if the enumeration already exists as another Scheme
                     // If it doesn't already, then prompt the user to create one
-                    if (!GetScheme(enumSchemeName, context).Try(out var enumScheme))
+                    if (!GetScheme(context, enumSchemeName).Try(out var enumScheme))
                     {
                         if (EditorUtility.DisplayDialog(operationTitle,
                                 $"No existing data scheme for enum '{enumSchemeName}'. Do you want to create one?", "Yes, create new Scheme", "Skip"))

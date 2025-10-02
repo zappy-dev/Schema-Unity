@@ -63,7 +63,7 @@ namespace Schema.Core.Data
 
         public override object Clone()
         {
-            throw new System.NotImplementedException();
+            throw new System.NotImplementedException($"{nameof(ListDataType)}.{nameof(Clone)}");
         }
 
         public override SchemaResult CheckIfValidData(SchemaContext context, object value)

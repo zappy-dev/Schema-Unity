@@ -30,7 +30,7 @@ namespace Schema.Core.Data
             };
             
             // Set an initial default value
-            if (Schema.GetScheme(ReferenceSchemeName, ctx).Try(out var refScheme))
+            if (Schema.GetScheme(ctx, ReferenceSchemeName).Try(out var refScheme))
             {
                 var values = refScheme.GetIdentifierValues().Select(v => v?.ToString() ?? "").ToList();
                 DefaultValue = values.Count > 0 ? values[0] : "";
@@ -202,7 +202,7 @@ namespace Schema.Core.Data
         private SchemaResult<DataScheme> GetReferencedScheme(SchemaContext context)
         {
             // Try normal API first (requires initialization)
-            var refScheme = Schema.GetScheme(ReferenceSchemeName, context);
+            var refScheme = Schema.GetScheme(context, ReferenceSchemeName);
             if (refScheme.Passed)
             {
                 return refScheme;

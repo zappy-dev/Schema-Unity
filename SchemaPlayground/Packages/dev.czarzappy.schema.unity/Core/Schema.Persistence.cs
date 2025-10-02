@@ -218,9 +218,10 @@ namespace Schema.Core
         internal static SchemaResult<DataScheme> LoadSchemeFromManifestEntry(SchemaContext context, ManifestEntry manifestEntry,
             IProgress<string> progress = null)
         {
+            var res = SchemaResult<DataScheme>.New(context);
             if (manifestEntry == null)
             {
-                return SchemaResult<DataScheme>.Fail($"Failed to load manifest from {manifestEntry}", context);
+                return res.Fail($"Failed to load manifest from {manifestEntry}");
             }
             
             // valid manifest entries
@@ -228,15 +229,14 @@ namespace Schema.Core
 
             if (string.IsNullOrWhiteSpace(entrySchemaName))
             {
-                return SchemaResult<DataScheme>.Fail($"Failed to parse manifest entry '{manifestEntry}'", context);
+                return res.Fail($"Failed to parse manifest entry '{manifestEntry}'");
             }
                     
             var schemeFilePath = manifestEntry.FilePath;
 
             if (string.IsNullOrWhiteSpace(schemeFilePath))
             {
-                return SchemaResult<DataScheme>.Fail($"{manifestEntry} Invalid scheme file path: {schemeFilePath}",
-                    context);
+                return res.Fail($"{manifestEntry} Invalid scheme file path: {schemeFilePath}");
             }
             
             // Resolve relative path if needed
@@ -257,12 +257,12 @@ namespace Schema.Core
                 
             // TODO support async loading
             if (!_storage.DefaultSchemaStorageFormat.DeserializeFromFile(context, resolvedPath)
-                    .Try(out var loadedSchema))
+                    .Try(out var loadedSchema, out var loadErr))
             {
-                return SchemaResult<DataScheme>.Fail($"Failed to load scheme from file: {resolvedPath}", context: context);
+                return res.Fail($"Failed to load scheme from file: {resolvedPath}, reason: {loadErr}");
             }
             
-            return SchemaResult<DataScheme>.Pass(loadedSchema, $"Loaded scheme data from file", context);
+            return res.Pass(loadedSchema, $"Loaded scheme data from file");
         }
 
         /// <summary>
@@ -344,6 +344,12 @@ namespace Schema.Core
                             if (scheme.IsManifest && (attribute.DataType is FilePathDataType || attribute.DataType is FolderDataType))
                             {
                                 Logger.LogDbgWarning($"Error validating Manifest data for attribute: {attribute}, {fieldData}, error: {validateData.Message}");
+                                continue;
+                            }
+
+                            if (attribute.DataType is PluginDataType)
+                            {
+                                Logger.LogDbgWarning($"Attempting to load a scheme with unknown type: {attribute.DataType.TypeName}");
                                 continue;
                             }
                             

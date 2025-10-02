@@ -1,99 +1,93 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
+﻿using System.CommandLine;
 using Schema.Core;
-using Schema.Core.Data;
 using Schema.Core.IO;
+using Schema.Core.Logging;
+
+namespace Schema.CLI;
 
 /// <summary>
 /// Entry point for the Schema CLI. Provides commands to inspect and operate on Schema projects.
 /// </summary>
 internal static class Program
 {
-    /// <summary>
-    /// Main entry point. Supports the "status" command which locates a Manifest.json, loads it,
-    /// and reports available schemes for the project.
-    /// </summary>
-    /// <param name="args">Command line arguments.</param>
-    private static int Main(string[] args)
+    private struct CLICommandContext
     {
-        if (args.Length == 0 || IsHelp(args))
-        {
-            PrintUsage();
-            return 0;
-        }
-
-        var command = args[0].ToLowerInvariant();
-        switch (command)
-        {
-            case "status":
-                return RunStatus(args.Skip(1).ToArray());
-            case "view":
-                return RunView(args.Skip(1).ToArray());
-            default:
-                Console.Error.WriteLine($"Unknown command: {command}\n");
-                PrintUsage();
-                return 1;
-        }
+        public string ProjectRoot;
+        public string ManifestPath;
     }
 
-    private static int RunCommandBase(string[] args, Func<CLICommandContext, int> runCommand)
+    #region Constants
+    
+    private static readonly Option<string> ProjectOption = new("--project", "-p")
     {
-        // Defaults
-        string projectRoot = Directory.GetCurrentDirectory();
-        string explicitManifestPath = null;
+        Description = "Path to project root (defaults to current directory)"
+    };
+    private static readonly Option<string> ManifestOption = new("--manifest", "-m")
+    {
+        Description = "Path to explicit Manifest.json (overrides discovery)"
+    };
+    private static readonly Option<bool> VerboseOption = new("--verbose", "-v")
+    {
+        Description = "Enable verbose logging"
+    };
 
-        // Simple option parsing: --project/-p, --manifest/-m, or a single positional path
-        var argQueue = new Queue<string>(args);
-        while (argQueue.Count > 0)
+    #endregion
+    
+    private static int Main(string[] args)
+    {
+        Logger.SetLogger(new ConsoleLogger());
+        RootCommand rootCommand = new("Command-Line Interface for Schema");
+
+        Command statusCommand = new("status", "Show available schemes for a project by locating and loading Manifest.json");
+        rootCommand.Subcommands.Add(statusCommand);
+        statusCommand.Options.Add(ProjectOption);
+        statusCommand.Options.Add(ManifestOption);
+        statusCommand.Options.Add(VerboseOption);
+        statusCommand.SetAction(result =>
         {
-            var token = argQueue.Dequeue();
-            switch (token)
+            var exitCode = Initialize(result, out var ctx);
+            if (exitCode != 0)
             {
-                case "--project":
-                case "-p":
-                    if (argQueue.Count == 0)
-                    {
-                        Console.Error.WriteLine("Missing value for --project");
-                        return 2;
-                    }
-                    projectRoot = argQueue.Dequeue();
-                    break;
-                case "--manifest":
-                case "-m":
-                    if (argQueue.Count == 0)
-                    {
-                        Console.Error.WriteLine("Missing value for --manifest");
-                        return 2;
-                    }
-                    explicitManifestPath = argQueue.Dequeue();
-                    break;
-                case "--help":
-                case "-h":
-                    PrintStatusUsage();
-                    return 0;
-                default:
-                    // Treat unknown token as a positional project path if none set yet
-                    if (Directory.Exists(token) && projectRoot == null)
-                    {
-                        projectRoot = token;
-                    }
-                    else if (File.Exists(token) && explicitManifestPath == null)
-                    {
-                        explicitManifestPath = token;
-                    }
-                    else
-                    {
-                        Console.Error.WriteLine($"Unrecognized argument: {token}");
-                        PrintStatusUsage();
-                        return 2;
-                    }
-                    break;
+                return exitCode;
             }
-        }
+            
+            return RunStatus(ctx);
+        });
 
+        Command viewCommand = new("view", "View a given schema as a table");
+        viewCommand.Options.Add(ManifestOption);
+        viewCommand.Options.Add(ProjectOption);
+        viewCommand.Options.Add(VerboseOption);
+        Argument<string> schemeNameArg = new("Scheme Name");
+        viewCommand.Arguments.Add(schemeNameArg);
+        rootCommand.Subcommands.Add(viewCommand);
+        viewCommand.SetAction((result) =>
+        {
+            int exitCode = Initialize(result, out var ctx);
+            if (exitCode != 0) return exitCode;
+
+            string schemeName = result.GetValue(schemeNameArg);
+            
+            return RunView(ctx, schemeName);
+        });
+        
+        ParseResult parseResult = rootCommand.Parse(args);
+        return parseResult.Invoke();
+    }
+
+    private static int Initialize(ParseResult result, out CLICommandContext ctx)
+    {
+        var verbose = result.GetValue(VerboseOption);
+        if (verbose)
+        {
+            SchemaResultSettings.Instance.LogStackTrace = true;
+            SchemaResultSettings.Instance.LogFailure = true;
+        }
+        var projectRoot = result.GetValue(ProjectOption) ?? Directory.GetCurrentDirectory();
+        var explicitManifestPath = result.GetValue(ManifestOption);
+
+        ctx = default;
+        
         try
         {
             var manifestPath = FindManifestPath(projectRoot, explicitManifestPath);
@@ -112,20 +106,20 @@ internal static class Program
             var loadRes = Schema.Core.Schema.LoadManifestFromPath(context, manifestPath);
             if (!loadRes.Passed)
             {
-                Console.Error.WriteLine($"Failed to load manifest: {loadRes.Message}");
+                Console.Error.WriteLine($"Failed to load manifest:\n-{loadRes.Message}");
                 return 4;
             }
 
             if (!loadRes.Result.Equals(Schema.Core.Schema.ManifestLoadStatus.FULLY_LOADED)) {
-                Console.Error.WriteLine($"Failed to load manifest: {loadRes.Message}");
-                return 4;
+                Console.Error.WriteLine($"Failed to load manifest:\n-{loadRes.Message}");
             }
-
-            return runCommand(new CLICommandContext
+            
+            ctx = new CLICommandContext
             {
                 ProjectRoot = inferredProjectRoot,
                 ManifestPath = manifestPath
-            });
+            };
+            return 0;
         }
         catch (Exception ex)
         {
@@ -134,239 +128,63 @@ internal static class Program
         }
     }
 
-    private struct CLICommandContext
-    {
-        public string ProjectRoot;
-        public string ManifestPath;
-    }
-
+    #region Commands
     /// <summary>
     /// Executes the status command.
     /// </summary>
     /// <param name="args">Arguments following the "status" command.</param>
-    private static int RunStatus(string[] args)
+    private static int RunStatus(CLICommandContext cliCtx)
     {
-        return RunCommandBase(args, (ctx) =>
+        var ctx = new SchemaContext
         {
-            var schemes = Schema.Core.Schema.AllSchemes.ToList();
+            Driver = "CLI_Status"
+        };
             
-            Console.WriteLine($"Project Root: {ctx.ProjectRoot}");
-            Console.WriteLine($"Manifest:     {ctx.ManifestPath}");
-            Console.WriteLine($"Schemes ({schemes.Count}):");
-            foreach (var name in schemes)
-            {
-                if (Schema.Core.Schema.GetScheme(name).Try(out var scheme, out var error)) {
-                    Console.WriteLine($"  - {scheme.ToString()}");
-                }
-                else {
-                    Console.WriteLine($"  - {name} - {error.Message}");
-                }
+        if (!Schema.Core.Schema.GetAllSchemes(ctx).Try(out var allSchemes, out var schemeErr))
+        {
+            Console.Error.WriteLine(schemeErr);
+            return 2;
+        }
+            
+        var schemes = allSchemes.ToList();
+            
+        Logger.Log($"Project Root: {cliCtx.ProjectRoot}");
+        Logger.Log($"Manifest:     {cliCtx.ManifestPath}");
+        Logger.Log($"Schemes ({schemes.Count}):");
+        foreach (var name in schemes)
+        {
+            if (Schema.Core.Schema.GetScheme(ctx, name).Try(out var scheme, out var error)) {
+                Logger.Log($"  - {scheme.ToString()}");
             }
+            else {
+                Logger.Log($"  - {name} - {error.Message}");
+            }
+        }
             
-            return 0;
-        });
+        return 0;
+    }
+
+    private static int RunView(CLICommandContext cliCtx, string schemeName)
+    {
+        var ctx = new SchemaContext
+        {
+            Driver = "CLI_View"
+        };
         
-        // // Defaults
-        // string projectRoot = Directory.GetCurrentDirectory();
-        // string explicitManifestPath = null;
-        //
-        // // Simple option parsing: --project/-p, --manifest/-m, or a single positional path
-        // var argQueue = new Queue<string>(args);
-        // while (argQueue.Count > 0)
-        // {
-        //     var token = argQueue.Dequeue();
-        //     switch (token)
-        //     {
-        //         case "--project":
-        //         case "-p":
-        //             if (argQueue.Count == 0)
-        //             {
-        //                 Console.Error.WriteLine("Missing value for --project");
-        //                 return 2;
-        //             }
-        //             projectRoot = argQueue.Dequeue();
-        //             break;
-        //         case "--manifest":
-        //         case "-m":
-        //             if (argQueue.Count == 0)
-        //             {
-        //                 Console.Error.WriteLine("Missing value for --manifest");
-        //                 return 2;
-        //             }
-        //             explicitManifestPath = argQueue.Dequeue();
-        //             break;
-        //         case "--help":
-        //         case "-h":
-        //             PrintStatusUsage();
-        //             return 0;
-        //         default:
-        //             // Treat unknown token as a positional project path if none set yet
-        //             if (Directory.Exists(token) && projectRoot == null)
-        //             {
-        //                 projectRoot = token;
-        //             }
-        //             else if (File.Exists(token) && explicitManifestPath == null)
-        //             {
-        //                 explicitManifestPath = token;
-        //             }
-        //             else
-        //             {
-        //                 Console.Error.WriteLine($"Unrecognized argument: {token}");
-        //                 PrintStatusUsage();
-        //                 return 2;
-        //             }
-        //             break;
-        //     }
-        // }
-        //
-        // try
-        // {
-        //     var manifestPath = FindManifestPath(projectRoot, explicitManifestPath);
-        //     if (manifestPath == null)
-        //     {
-        //         Console.Error.WriteLine($"Could not find Manifest.json under '{projectRoot}'.\n" +
-        //                                 "Use --project to point at a project root or --manifest to an explicit file.");
-        //         return 3;
-        //     }
-        //
-        //     var inferredProjectRoot = InferProjectRootFromManifest(manifestPath);
-        //
-        //     InitializeSchemaForCli(inferredProjectRoot);
-        //
-        //     var context = new SchemaContext { Driver = "CLI_Status" };
-        //     var loadRes = Schema.Core.Schema.LoadManifestFromPath(context, manifestPath);
-        //     if (!loadRes.Passed)
-        //     {
-        //         Console.Error.WriteLine($"Failed to load manifest: {loadRes.Message}");
-        //         return 4;
-        //     }
-        //
-        //     if (!loadRes.Result.Equals(Schema.Core.Schema.ManifestLoadStatus.FULLY_LOADED)) {
-        //         Console.Error.WriteLine($"Failed to load manifest: {loadRes.Message}");
-        //         return 4;
-        //     }
-        //
-        //     var schemes = Schema.Core.Schema.AllSchemes.ToList();
-        //
-        //     Console.WriteLine($"Project Root: {inferredProjectRoot}");
-        //     Console.WriteLine($"Manifest:     {manifestPath}");
-        //     Console.WriteLine($"Schemes ({schemes.Count}):");
-        //     foreach (var name in schemes)
-        //     {
-        //         if (Schema.Core.Schema.GetScheme(name).Try(out var scheme, out var error)) {
-        //             Console.WriteLine($"  - {scheme.ToString()}");
-        //         }
-        //         else {
-        //             Console.WriteLine($"  - {name} - {error.Message}");
-        //         }
-        //     }
-        //
-        //     return 0;
-        // }
-        // catch (Exception ex)
-        // {
-        //     Console.Error.WriteLine($"Unexpected error: {ex.Message}");
-        //     return 99;
-        // }
-    }
-
-    private static int RunView(string[] args)
-    {
-        return RunCommandBase(args, (ctx) =>
+        if (!Schema.Core.Schema.GetScheme(ctx, schemeName).Try(out var scheme, out var error))
         {
-            if (Schema.Core.Schema.GetScheme("Entities").Try(out var scheme, out var error))
-            {
-                var maxWidth = new Dictionary<string, int>();
-                foreach (var attributeDefinition in scheme.GetAttributes())
-                {
-                    maxWidth[attributeDefinition.AttributeName] = attributeDefinition.AttributeName.Length;
-                }
-                
-                // pad entries
-                foreach (var entry in  scheme.AllEntries)
-                {
-                    foreach (var attribute in scheme.GetAttributes())
-                    {
-                        int newMaxWidth = entry.GetDataAsString(attribute.AttributeName).Length;
-                        if (maxWidth.TryGetValue(attribute.AttributeName, out var value))
-                        {
-                            newMaxWidth = (value > newMaxWidth) ? value :  newMaxWidth;
-                        }
+            Console.Error.WriteLine(error.Message);
+            return -1;
+        }
+            
+        Logger.Log(scheme.PrintTableView().ToString());
 
-                        maxWidth[attribute.AttributeName] = newMaxWidth;
-                    }
-                }
-                
-                var tableSB = new StringBuilder();
-
-                // table header, top
-                int numAttrs = scheme.AttributeCount;
-
-                int attrIdx = 0;
-                
-                void DrawTableRow(char start, char end, char bridge, char gap)
-                {
-                    attrIdx = 0;
-                    tableSB.Append(start);
-                    tableSB.Append(gap);
-                    foreach (var attribute in scheme.GetAttributes())
-                    {
-                        tableSB.Append(string.Empty.PadRight(maxWidth[attribute.AttributeName], gap));
-                        if (++attrIdx < numAttrs)
-                        {
-                            tableSB.Append(gap);
-                            tableSB.Append(bridge);
-                            tableSB.Append(gap);
-                        }
-                    }
-                    tableSB.Append(gap);
-                    tableSB.AppendLine(end.ToString());
-                }
-
-                DrawTableRow('┌', '┐', '┬', '─');
-                
-                // table header, attributes
-                tableSB.Append("│ ");
-                attrIdx = 0;
-                foreach (var attribute in 
-                         scheme.GetAttributes())
-                {
-                    tableSB.Append(attribute.AttributeName.PadRight(maxWidth[attribute.AttributeName]));
-                    if (++attrIdx < numAttrs) tableSB.Append(" │ ");
-                }
-                tableSB.AppendLine(" │");
-                
-                // table header, break
-                DrawTableRow('├', '┤', '┼', '─');
-
-                // table entries
-                foreach (var entry in scheme.AllEntries)
-                {
-                    tableSB.Append("│ ");
-                    attrIdx = 0;
-                    foreach (var attribute in scheme.GetAttributes())
-                    {
-                        tableSB.Append(entry.GetDataAsString(attribute.AttributeName).PadRight(maxWidth[attribute.AttributeName]));
-                        if (++attrIdx < numAttrs) tableSB.Append(" │ ");
-                    }
-
-                    tableSB.AppendLine(" │");
-                }
-                
-                // footer
-                DrawTableRow('└', '┘', '┴', '─');
-                
-                Console.Write(tableSB.ToString());
-
-                return 0;
-            }
-            else
-            {
-                return -1;
-            }
-        });
+        return 0;
     }
-    
+
+    #endregion
+
+    #region CLI Bootstrapping
     /// <summary>
     /// Initializes Schema core for CLI context with a local filesystem and sets the project path.
     /// </summary>
@@ -435,37 +253,6 @@ internal static class Program
 
         return manifestDir;
     }
-
-    /// <summary>
-    /// Returns true if help was requested.
-    /// </summary>
-    private static bool IsHelp(string[] args)
-    {
-        return args.Contains("--help") || args.Contains("-h");
-    }
-
-    /// <summary>
-    /// Prints general CLI usage help text.
-    /// </summary>
-    private static void PrintUsage()
-    {
-        Console.WriteLine("Schema CLI\n");
-        Console.WriteLine("Usage:");
-        Console.WriteLine("  schema status [--project <path>] [--manifest <file>]\n");
-        Console.WriteLine("Commands:");
-        Console.WriteLine("  status   Show available schemes for a project by locating and loading Manifest.json");
-        Console.WriteLine();
-        PrintStatusUsage();
-    }
-
-    /// <summary>
-    /// Prints usage for the status command.
-    /// </summary>
-    private static void PrintStatusUsage()
-    {
-        Console.WriteLine("status options:");
-        Console.WriteLine("  -p, --project  Path to project root (defaults to current directory)");
-        Console.WriteLine("  -m, --manifest Path to explicit Manifest.json (overrides discovery)");
-        Console.WriteLine("  -h, --help     Show this help for status");
-    }
+    
+    #endregion
 }

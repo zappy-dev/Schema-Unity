@@ -59,7 +59,7 @@ namespace Schema.Unity.Editor
                                     using (new EditorGUILayout.HorizontalScope())
                                     {
                                         EditorGUILayout.TextField(scheme);
-                                        var getRes = GetScheme(scheme, context);
+                                        var getRes = GetScheme(context, scheme);
                                         EditorGUILayout.Toggle("Loaded?", getRes.Passed);
                                         if (getRes.Failed)
                                         {
@@ -162,7 +162,7 @@ namespace Schema.Unity.Editor
 
             foreach (var schemeName in allSchemes)
             {
-                if (!GetScheme(schemeName, ctx).Try(out var scheme))
+                if (!GetScheme(ctx, schemeName).Try(out var scheme))
                 {
                     continue; // can't de-dupe these schemes easily
                 }

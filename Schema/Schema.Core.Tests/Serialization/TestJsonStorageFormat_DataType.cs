@@ -38,7 +38,6 @@ public class TestJsonStorageFormat_DataType
     public void Test_Serialize(string? expectedJsonString, bool _, DataType expectedData, bool expectedSuccess, string? altExpectedJsonString)
     {
         // Test code here
-
         if (dataTypeStorageFormat.Serialize(expectedData).TryAssertCondition(expectedSuccess, out var jsonString))
         {
             var realExpectedJsonString =
@@ -112,6 +111,17 @@ public class TestJsonStorageFormat_DataType
             yield return new TestCaseData("{\n  \"ReferenceSchemeName\": \"SpellStatus\",\n  \"ReferenceAttributeName\": \"Status\",\n  \"SupportsEmptyReferences\": true,\n  \"DefaultValue\": null\n}",
                 true,
                 new ReferenceDataType("SpellStatus", "Status"),
+                true,
+                null);
+            yield return new TestCaseData("{\n  \"$type\": \"Schema.Runtime.Type.UnityAssetDataType, Schema.Runtime\",\n  \"ObjectType\": \"UnityEngine.Texture, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null\",\n  \"DefaultValue\": null\n}",
+                true,
+                new PluginDataType("Schema.Runtime.Type.UnityAssetDataType, Schema.Runtime",
+                new (
+                )
+                {
+                    {"ObjectType", "UnityEngine.Texture, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null"},
+                    {"DefaultValue", null},
+                }),
                 true,
                 null);
         }

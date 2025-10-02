@@ -10,7 +10,7 @@ namespace Schema.Core.Serialization
     {
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            throw new NotImplementedException();
+            throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(WriteJson)}");
         }
 
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
@@ -20,10 +20,14 @@ namespace Schema.Core.Serialization
             Type resolvedType = null;
 
             // Prefer explicit $type when provided (legacy/newtonsoft type hint)
-            var typeToken = jo["$type"] as JValue;
+            var typeToken = jo[JsonUtils.PROPERTY_NAME_TYPE] as JValue;
             if (typeToken?.Type == JTokenType.String)
             {
                 resolvedType = Type.GetType(typeToken.Value as string);
+                if (resolvedType == null) // The object has a type but we don't know what it is in the current runtime, assume it's a plugin
+                {
+                    resolvedType = typeof(PluginDataType);
+                }
             }
             else
             {

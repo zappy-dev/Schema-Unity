@@ -194,7 +194,7 @@ namespace Schema.Core
                 return res.Pass(_loadedManifestScheme, "Manifest scheme is already loaded");
             }
 
-            if (!GetScheme(Manifest.MANIFEST_SCHEME_NAME, context).Try(out var manifest, 
+            if (!GetScheme(context, Manifest.MANIFEST_SCHEME_NAME).Try(out var manifest, 
                     out var manifestError))
             {
                 return manifestError.CastError<ManifestScheme>();

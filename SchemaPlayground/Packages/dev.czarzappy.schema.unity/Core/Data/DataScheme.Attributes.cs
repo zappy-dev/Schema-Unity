@@ -51,6 +51,12 @@ namespace Schema.Core.Data
                 return SchemaResult.Fail(context, "Attribute data type cannot be null.");
             }
             
+            // Ensure attributes always carry a concrete default value for population of entries
+            if (newAttribute.DefaultValue == null)
+            {
+                newAttribute.DefaultValue = newAttribute.DataType.CloneDefaultValue();
+            }
+            
             // Commit
             newAttribute._scheme = this;
             attributes.Add(newAttribute);

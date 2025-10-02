@@ -23,7 +23,7 @@ namespace Schema.Unity.Editor
         public static void Draw(SchemaContext ctx, string label, object currentValue, ReferenceDataType refType, Action<object> onNewValue, float width = 0,
             GUIStyle style = null)
         {
-            if (GetScheme(refType.ReferenceSchemeName, ctx).Try(out var refScheme))
+            if (GetScheme(ctx, refType.ReferenceSchemeName).Try(out var refScheme))
             {
                 var values = refScheme.GetIdentifierValues().Select(v => v?.ToString() ?? "").ToList();
                 string displayValue = currentValue?.ToString() ?? "";

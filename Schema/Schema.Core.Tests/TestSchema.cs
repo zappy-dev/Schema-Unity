@@ -15,7 +15,7 @@ public class TestSchema
     private Storage _storage;
     private Mock<IFileSystem> _mockFileSystem;
 
-    private static readonly SchemaContext Context = new SchemaContext
+    private static readonly SchemaContext Context = new()
     {
         Driver = nameof(TestSchema),
     };
@@ -64,7 +64,7 @@ public class TestSchema
         Assert.That(numAvailableSchemes, Is.EqualTo(2));
         Schema.GetAllSchemes(Context).TryAssert(out var allSchemes);
         Assert.That(allSchemes, Contains.Item(newScheme.SchemeName));
-        Schema.GetScheme(newSchemeName, Context).TryAssert(out var loadedScheme);
+        Schema.GetScheme(Context, newSchemeName).TryAssert(out var loadedScheme);
         Assert.That(loadedScheme, Is.EqualTo(newScheme));
     }
 

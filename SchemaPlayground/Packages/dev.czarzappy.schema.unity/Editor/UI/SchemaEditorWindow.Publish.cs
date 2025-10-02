@@ -19,7 +19,7 @@ namespace Schema.Unity.Editor
             LogDbgVerbose($"Publishing {schemeName}");
             var schemeEntry = GetManifestEntryForScheme(schemeName);
             if (!schemeEntry.Try(out ManifestEntry manifestEntry) ||
-                !GetScheme(schemeName, context).Try(out var schemeToPublish))
+                !GetScheme(context, schemeName).Try(out var schemeToPublish))
             {
                 return Fail(context, $"Could not find manifest entry for scheme to publish, scheme: {schemeName}");
             }

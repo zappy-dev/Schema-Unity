@@ -49,7 +49,7 @@ namespace Schema.Core.Schemes
                 Driver = "Codegen_Wrapper",
             };
             
-            return Schema.GetScheme(schemeName, ctx);
+            return Schema.GetScheme(ctx, schemeName);
         }
         
         /// <summary>

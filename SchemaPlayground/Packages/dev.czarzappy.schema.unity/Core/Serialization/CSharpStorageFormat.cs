@@ -24,12 +24,12 @@ namespace Schema.Core.Serialization
 
         public SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath)
         {
-            throw new System.NotImplementedException();
+            throw new System.NotImplementedException($"{nameof(CSharpStorageFormat)}.{nameof(DeserializeFromFile)}");
         }
 
         public SchemaResult<DataScheme> Deserialize(SchemaContext context, string content)
         {
-            throw new System.NotImplementedException();
+            throw new System.NotImplementedException($"{nameof(CSharpStorageFormat)}.{nameof(Deserialize)}");
         }
 
         // HACK
@@ -290,7 +290,7 @@ $@"
 
         public SchemaResult<string> Serialize(DataScheme scheme)
         {
-            throw new System.NotImplementedException();
+            throw new System.NotImplementedException($"{nameof(CSharpStorageFormat)}.{nameof(Serialize)}");
         }
     }
 }

@@ -107,7 +107,7 @@ namespace Schema.Unity.Editor
             };
             
             if (string.IsNullOrEmpty(selectedSchemeName) ||
-                !GetScheme(selectedSchemeName, refreshCtx).Try(out var scheme))
+                !GetScheme(refreshCtx, selectedSchemeName).Try(out var scheme))
             {
                 allEntries = Enumerable.Empty<DataEntry>().ToList();
                 return;
@@ -166,7 +166,7 @@ namespace Schema.Unity.Editor
                 return;
             }
 
-            if (!GetScheme(selectedSchemeName, renderCtx).Try(out var scheme))
+            if (!GetScheme(renderCtx, selectedSchemeName).Try(out var scheme))
             {
                 EditorGUILayout.HelpBox("Schema does not exist.", MessageType.Warning);
                 return;
@@ -596,7 +596,7 @@ namespace Schema.Unity.Editor
                                     {
                                         var referenceEntryOptions = new GenericMenu();
                 
-                                        if (GetScheme(refDataType.ReferenceSchemeName, context).Try(out var refSchema))
+                                        if (GetScheme(context, refDataType.ReferenceSchemeName).Try(out var refSchema))
                                         {
                                             foreach (var identifierValue in refSchema.GetIdentifierValues())
                                             {
@@ -807,7 +807,7 @@ namespace Schema.Unity.Editor
                 // render reference type conversions
                 foreach (var schemeName in allSchemes.OrderBy(s => s))
                 {
-                    if (GetScheme(schemeName, ctx).Try(out var dataSchema) 
+                    if (GetScheme(ctx, schemeName).Try(out var dataSchema) 
                         && dataSchema.GetIdentifierAttribute().Try(out var identifierAttribute))
                     {
                         var referenceDataType = new ReferenceDataType(schemeName, identifierAttribute.AttributeName);
@@ -1159,7 +1159,7 @@ namespace Schema.Unity.Editor
             {
                 var referenceEntryOptions = new GenericMenu();
                 
-                if (GetScheme(refDataType.ReferenceSchemeName, context).Try(out var refSchema))
+                if (GetScheme(context, refDataType.ReferenceSchemeName).Try(out var refSchema))
                 {
                     foreach (var identifierValue in refSchema.GetIdentifierValues())
                     {

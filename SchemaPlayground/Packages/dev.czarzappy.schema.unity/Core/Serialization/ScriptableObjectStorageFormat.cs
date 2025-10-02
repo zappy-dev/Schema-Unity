@@ -11,22 +11,22 @@ namespace Schema.Core.Serialization
     
         public SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath)
         {
-            throw new System.NotImplementedException();
+            throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(DeserializeFromFile)}");
         }
 
         public SchemaResult<DataScheme> Deserialize(SchemaContext context, string content)
         {
-            throw new System.NotImplementedException();
+            throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(Deserialize)}");
         }
 
         public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme data)
         {
-            throw new System.NotImplementedException();
+            throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(SerializeToFile)}");
         }
 
         public SchemaResult<string> Serialize(DataScheme data)
         {
-            throw new System.NotImplementedException();
+            throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(Serialize)}");
         }
     }
 }

@@ -5,8 +5,6 @@ public static class RandomExt
     public static int LogNext(this Random random, int inclusive, int exclusive)
     {
         var value = random.Next(inclusive, exclusive);
-        TestContext.WriteLine($"[0, {exclusive} => {value}");
-
         return value;
     }
 }

@@ -60,7 +60,7 @@ namespace Schema.Core
             
             foreach (var schemeName in schemes)
             {
-                if (GetScheme(schemeName, context).Try(out var scheme))
+                if (GetScheme(context, schemeName).Try(out var scheme))
                 {
                     yield return scheme;
                 }
@@ -122,16 +122,16 @@ namespace Schema.Core
         }
 
         // TODO support async
-        public static SchemaResult<DataScheme> GetScheme(string schemeName, SchemaContext context)
+        public static SchemaResult<DataScheme> GetScheme(SchemaContext context, string schemeName)
         {
-            var isInitRes = IsInitialized(context);
-            if (isInitRes.Failed)
-            {
-                return isInitRes.CastError<DataScheme>();
-            }
+            // var isInitRes = IsInitialized(context);
+            // if (isInitRes.Failed)
+            // {
+            //     return isInitRes.CastError<DataScheme>();
+            // }
             
             var success = loadedSchemes.TryGetValue(schemeName, out var scheme);
-            var errorMessage = $"Scheme '{schemeName}' is not loaded.";
+            var errorMessage = $"No Scheme '{schemeName}' loaded.";
             if (schemeName == Manifest.MANIFEST_SCHEME_NAME)
             {
                 errorMessage =
@@ -175,7 +175,7 @@ namespace Schema.Core
             using var _ = new AttributeContextScope(ref context, identifierAttribute);
             
             // 1. Update the identifier value in the specified scheme
-            if (!GetScheme(schemeName, context).Try(out var targetScheme))
+            if (!GetScheme(context, schemeName).Try(out var targetScheme))
                 return Fail(context, $"Scheme '{schemeName}' not found.");
 
             return UpdateIdentifierValue(context, targetScheme, identifierAttribute, oldValue, newValue);
