@@ -53,15 +53,10 @@ void Awake()
 ```
 Then query data via generated wrappers, for example:
 ```csharp
-// Example: Manifest
-var manifestRes = ManifestScheme.Get();
-if (manifestRes.Try(out var manifest))
+// Example: Get Player data from Entities
+if (EntitiesScheme.GetEntry(EntitiesScheme.Ids.PLAYER).Try(out var player))
 {
-    var entryRes = ManifestScheme.GetEntry(ExampleProject.Schemes.ManifestScheme.Ids.ENTITIES);
-    if (entryRes.Try(out var entry))
-    {
-        Debug.Log($"Entities path: {entry.FilePath}");
-    }
+    Debug.Log($"Player move speed: {player.MoveSpeed}");
 }
 ```
 
