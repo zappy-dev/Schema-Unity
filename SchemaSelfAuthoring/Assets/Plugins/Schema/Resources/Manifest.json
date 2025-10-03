@@ -85,7 +85,7 @@
       "SchemeName": "Manifest",
       "FilePath": "Content/Manifest.json",
       "PublishTarget": "DEFAULT",
-      "CSharpExportPath": "../SchemaPlayground/Packages/dev.czarzappy.schema.unity/Core/Schemes",
+      "CSharpExportPath": "../SchemaPlayground/Packages/com.devzappy.schema.unity/Core/Schemes",
       "CSharpNamespace": "Schema.Core.Schemes",
       "CSharpGenerateIds": false
     },
@@ -93,7 +93,7 @@
       "SchemeName": "Tooltips",
       "FilePath": "Content/Tooltips.json",
       "PublishTarget": "DEFAULT",
-      "CSharpExportPath": "..\\SchemaPlayground\\Packages\\dev.czarzappy.schema.unity\\Core\\Schemes",
+      "CSharpExportPath": "..\\SchemaPlayground\\Packages\\com.devzappy.schema.unity\\Core\\Schemes",
       "CSharpNamespace": "Schema.Core.Schemes",
       "CSharpGenerateIds": false
     }

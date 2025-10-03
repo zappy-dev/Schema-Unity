@@ -1,5 +1,14 @@
 {
   "dependencies": {
+    "com.devzappy.schema.unity": {
+      "version": "file:../../../SchemaPlayground/Packages/com.devzappy.schema.unity",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.2.1",
+        "com.unity.editorcoroutines": "1.0.1"
+      }
+    },
     "com.unity.collab-proxy": {
       "version": "2.0.4",
       "depth": 0,
@@ -92,16 +101,6 @@
       "dependencies": {
         "com.unity.modules.ui": "1.0.0",
         "com.unity.modules.imgui": "1.0.0"
-      }
-    },
-    "dev.czarzappy.schema.unity": {
-      "version": "file:../../../SchemaPlayground/Packages/dev.czarzappy.schema.unity",
-      "depth": 0,
-      "source": "local",
-      "dependencies": {
-        "com.unity.nuget.newtonsoft-json": "3.2.1",
-        "com.unity.editorcoroutines": "1.0.1",
-        "com.unity.test-framework": "1.1.33"
       }
     },
     "com.unity.modules.ai": {

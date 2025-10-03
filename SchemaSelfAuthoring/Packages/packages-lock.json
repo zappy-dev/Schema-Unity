@@ -94,8 +94,8 @@
         "com.unity.modules.imgui": "1.0.0"
       }
     },
-    "dev.czarzappy.schema.unity": {
-      "version": "file:../../SchemaPlayground/Packages/dev.czarzappy.schema.unity",
+    "com.devzappy.schema.unity": {
+      "version": "file:../../SchemaPlayground/Packages/com.devzappy.schema.unity",
       "depth": 0,
       "source": "local",
       "dependencies": {

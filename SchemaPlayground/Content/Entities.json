@@ -5,7 +5,6 @@
       "AttributeName": "ID",
       "DataType": {
         "$type": "Schema.Core.Data.TextDataType, Schema.Core",
-        "TypeName": "String",
         "DefaultValue": ""
       },
       "IsIdentifier": true,
@@ -18,7 +17,6 @@
       "AttributeName": "MoveSpeed",
       "DataType": {
         "$type": "Schema.Core.Data.FloatingPointDataType, Schema.Core",
-        "TypeName": "Float",
         "DefaultValue": 0.0
       },
       "IsIdentifier": false,
@@ -32,6 +30,10 @@
     {
       "ID": "Player",
       "MoveSpeed": 1.0
+    },
+    {
+      "ID": "Enemy",
+      "MoveSpeed": 0.5
     }
   ]
 }

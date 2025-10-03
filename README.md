@@ -28,7 +28,7 @@ Schema-Unity/
   SchemaPlayground/        # Unity project with sample content and editor extensions
     Content/
     Packages/
-      dev.czarzappy.schema.unity/
+      com.devzappy.schema.unity/
         Core/
         Editor/
   docs/                    # Guides and reference documentation
@@ -65,7 +65,7 @@ See the full [Quickstart](docs/Quickstart.md). Summary:
 
 - Use the Unity Editor tools (under `Tools > Scheme Editor`) to import, edit, and validate schema-based data.
 - Place your JSON/CSV data files in `SchemaPlayground/Content/`.
-- Extend or customize schema definitions in `SchemaPlayground/Packages/dev.czarzappy.schema.unity/Core/Data/`.
+- Extend or customize schema definitions in `SchemaPlayground/Packages/com.devzappy.schema.unity/Core/Data/`.
 
 ## Contributing
 

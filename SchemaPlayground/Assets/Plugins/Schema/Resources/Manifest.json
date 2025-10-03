@@ -5,7 +5,6 @@
       "AttributeName": "SchemeName",
       "DataType": {
         "$type": "Schema.Core.Data.TextDataType, Schema.Core",
-        "TypeName": "String",
         "DefaultValue": ""
       },
       "IsIdentifier": true,
@@ -21,7 +20,6 @@
         "AllowEmptyPath": true,
         "UseRelativePaths": true,
         "BasePath": null,
-        "TypeName": "FilePath",
         "DefaultValue": ""
       },
       "IsIdentifier": false,
@@ -41,12 +39,8 @@
       "FilePath": "Content\\Entities.json"
     },
     {
-      "SchemeName": "RewardType",
-      "FilePath": "Content/RewardType.json"
-    },
-    {
-      "SchemeName": "Chests",
-      "FilePath": "Content/Chests.json"
+      "SchemeName": "Quests",
+      "FilePath": "Content/Quests.json"
     }
   ]
 }

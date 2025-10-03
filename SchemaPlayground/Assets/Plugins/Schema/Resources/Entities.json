@@ -5,7 +5,6 @@
       "AttributeName": "ID",
       "DataType": {
         "$type": "Schema.Core.Data.TextDataType, Schema.Core",
-        "TypeName": "String",
         "DefaultValue": ""
       },
       "IsIdentifier": true,
@@ -18,7 +17,6 @@
       "AttributeName": "MoveSpeed",
       "DataType": {
         "$type": "Schema.Core.Data.FloatingPointDataType, Schema.Core",
-        "TypeName": "Float",
         "DefaultValue": 0.0
       },
       "IsIdentifier": false,
@@ -26,40 +24,16 @@
       "AttributeToolTip": "Move speed of the entity",
       "ColumnWidth": 150,
       "DefaultValue": 0.0
-    },
-    {
-      "AttributeName": "Health",
-      "DataType": {
-        "$type": "Schema.Core.Data.IntegerDataType, Schema.Core",
-        "TypeName": "Integer",
-        "DefaultValue": 0
-      },
-      "IsIdentifier": false,
-      "ShouldPublish": true,
-      "AttributeToolTip": null,
-      "ColumnWidth": 150,
-      "DefaultValue": 0
-    },
-    {
-      "AttributeName": "Name",
-      "DataType": {
-        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
-        "TypeName": "String",
-        "DefaultValue": ""
-      },
-      "IsIdentifier": false,
-      "ShouldPublish": true,
-      "AttributeToolTip": null,
-      "ColumnWidth": 150,
-      "DefaultValue": ""
     }
   ],
   "Entries": [
     {
       "ID": "Player",
-      "MoveSpeed": 10.0,
-      "Health": 0,
-      "Name": ""
+      "MoveSpeed": 1.0
+    },
+    {
+      "ID": "Enemy",
+      "MoveSpeed": 0.5
     }
   ]
 }

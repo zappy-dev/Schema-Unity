@@ -137,7 +137,7 @@ namespace Schema.Unity.Editor
             if (Event.current.type == EventType.MouseDown || Event.current.type == EventType.MouseUp)
             {
                 bool over = rect.Contains(Event.current.mousePosition);
-                Debug.Log($"[{context}] OnGUI saw {Event.current.type} at {Event.current.mousePosition}, " +
+                Logger.LogDbgVerbose($"[{context}] OnGUI saw {Event.current.type} at {Event.current.mousePosition}, " +
                           $"overBtn={over}, hot={GUIUtility.hotControl}, btnRect: {rect}");
             }
         }

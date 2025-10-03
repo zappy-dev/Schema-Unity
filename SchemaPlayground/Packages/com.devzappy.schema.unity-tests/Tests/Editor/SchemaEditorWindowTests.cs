@@ -65,10 +65,11 @@ namespace Schema.Unity.Editor.Tests
             
             Logger.LogDbgVerbose($"Schema Editor Window events: {window.ReportEvents()}");
 
-            var res = Schema.Core.Schema.GetScheme(newSchemeName, new SchemaContext
+            var ctx = new SchemaContext
             {
                 Driver = nameof(Test_Click_Create_New_Scheme_Button)
-            });
+            };
+            var res = Schema.Core.Schema.GetScheme(ctx, newSchemeName);
             
             Assert.IsTrue(res.Passed, res.Message);
         }
