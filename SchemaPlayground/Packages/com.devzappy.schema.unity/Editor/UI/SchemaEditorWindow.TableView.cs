@@ -719,6 +719,10 @@ namespace Schema.Unity.Editor
                 Scheme = scheme,
             };
             // attribute column ordering options
+            columnOptionsMenu.AddItem(new GUIContent("Move To Front"), isDisabled: attributeIdx == 0, () =>
+            {
+                scheme.MoveAttributeRank(ctx, attribute, 0);
+            });
             columnOptionsMenu.AddItem(new GUIContent("Move Left"), isDisabled: attributeIdx == 0, () =>
             {
                 scheme.IncreaseAttributeRank(ctx, attribute);
@@ -726,6 +730,10 @@ namespace Schema.Unity.Editor
             columnOptionsMenu.AddItem(new GUIContent("Move Right"), isDisabled: attributeIdx == attributeCount - 1, () =>
             {
                 scheme.DecreaseAttributeRank(ctx, attribute);
+            });
+            columnOptionsMenu.AddItem(new GUIContent("Move To Back"), isDisabled: attributeIdx == attributeCount - 1, () =>
+            {
+                scheme.MoveAttributeRank(ctx, attribute, attributeCount - 1);
             });
                             
             // Sorting options
