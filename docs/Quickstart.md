@@ -54,11 +54,10 @@ void Awake()
 Then query data via generated wrappers, for example:
 ```csharp
 // Example: Manifest
-// `ExampleProject.Schemes` is a namespace that can be updated in the Manifest Scheme for your project.
-var manifestRes = ExampleProject.Schemes.ManifestScheme.Get();
+var manifestRes = ManifestScheme.Get();
 if (manifestRes.Try(out var manifest))
 {
-    var entryRes = ExampleProject.Schemes.ManifestScheme.GetEntry(ExampleProject.Schemes.ManifestScheme.Ids.ENTITIES);
+    var entryRes = ManifestScheme.GetEntry(ExampleProject.Schemes.ManifestScheme.Ids.ENTITIES);
     if (entryRes.Try(out var entry))
     {
         Debug.Log($"Entities path: {entry.FilePath}");
