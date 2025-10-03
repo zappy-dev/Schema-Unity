@@ -40,12 +40,13 @@ Open `SchemaPlayground/` in Unity.
 - Published data is written under `Assets/Plugins/Schema/Resources/`.
 
 ### 5) Use at runtime
-Initialize Schema in your game startup:
+Initialize Schema **once** in your game startup:
 ```csharp
 using Schema.Runtime;
 
 void Awake()
 {
+    // Initialize Schema once your game starts, and check for any errors
     var init = SchemaRuntime.Initialize();
     if (init.Failed) Debug.LogError(init.Message);
 }
