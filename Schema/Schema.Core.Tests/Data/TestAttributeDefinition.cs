@@ -7,6 +7,11 @@ namespace Schema.Core.Tests.Data;
 [TestFixture]
 public class TestAttributeDefinition
 {
+    private static readonly SchemaContext Context = new SchemaContext
+    {
+        Driver = nameof(TestAttributeDefinition)
+    };
+    
     [Test, TestCaseSource(nameof(CopyTestCases))]
     public void Test_Clone(AttributeDefinition definition)
     {
@@ -20,10 +25,10 @@ public class TestAttributeDefinition
     {
         get
         {
-            yield return new AttributeDefinition(null, "Foo", DataType.Text);
-            yield return new AttributeDefinition(null, "Foo", DataType.Integer);
-            yield return new AttributeDefinition(null, "Foo", DataType.DateTime);
-            yield return new AttributeDefinition(null, "Foo", DataType.FilePath);
+            foreach (var builtInType in DataType.BuiltInTypes)
+            {
+                yield return new AttributeDefinition(null, "Foo", builtInType);
+            }
         }
     }
 
@@ -39,7 +44,7 @@ public class TestAttributeDefinition
     [Test, TestCaseSource(nameof(CreateReferenceType_TestCases))]
     public void Test_CreateReferenceType_BadCases(AttributeDefinition definition)
     {
-        definition.CreateReferenceType().AssertFailed();
+        definition.CreateReferenceType(Context).AssertFailed();
     }
 
     private static IEnumerable CreateReferenceType_TestCases

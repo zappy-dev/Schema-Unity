@@ -1,5 +1,25 @@
 {
   "dependencies": {
+    "com.devzappy.schema.unity": {
+      "version": "file:com.devzappy.schema.unity",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.2.1",
+        "com.unity.editorcoroutines": "1.0.1"
+      }
+    },
+    "com.devzappy.schema.unity-tests": {
+      "version": "file:com.devzappy.schema.unity-tests",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.devzappy.schema.unity": "0.1.0",
+        "com.unity.nuget.newtonsoft-json": "3.2.1",
+        "com.unity.editorcoroutines": "1.0.1",
+        "com.unity.test-framework": "1.1.33"
+      }
+    },
     "com.needle.compilation-visualizer": {
       "version": "https://github.com/needle-tools/compilation-visualizer.git",
       "depth": 0,
@@ -15,7 +35,7 @@
       "hash": "07434fccd016a2fabab284e0aff30a592881c318"
     },
     "com.unity.editorcoroutines": {
-      "version": "1.0.0",
+      "version": "1.0.1",
       "depth": 1,
       "source": "registry",
       "dependencies": {},
@@ -63,14 +83,6 @@
         "com.unity.modules.jsonserialize": "1.0.0"
       },
       "url": "https://packages.unity.com"
-    },
-    "dev.czarzappy.schema.unity": {
-      "version": "file:dev.czarzappy.schema.unity",
-      "depth": 0,
-      "source": "embedded",
-      "dependencies": {
-        "com.unity.nuget.newtonsoft-json": "3.2.1"
-      }
     },
     "com.unity.modules.ai": {
       "version": "1.0.0",

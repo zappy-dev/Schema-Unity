@@ -1,0 +1,32 @@
+﻿using Schema.Core.Data;
+
+namespace Schema.Core.Serialization
+{
+    public class ScriptableObjectStorageFormat : IStorageFormat<DataScheme>
+    {
+        public string Extension => ".asset";
+        public string DisplayName => "Scriptable Object";
+        public bool IsImportSupported => true;
+        public bool IsExportSupported => false;
+    
+        public SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath)
+        {
+            throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(DeserializeFromFile)}");
+        }
+
+        public SchemaResult<DataScheme> Deserialize(SchemaContext context, string content)
+        {
+            throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(Deserialize)}");
+        }
+
+        public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme data)
+        {
+            throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(SerializeToFile)}");
+        }
+
+        public SchemaResult<string> Serialize(DataScheme data)
+        {
+            throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(Serialize)}");
+        }
+    }
+}

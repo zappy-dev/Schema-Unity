@@ -1,0 +1,101 @@
+{
+  "SchemeName": "Manifest",
+  "Attributes": [
+    {
+      "AttributeName": "SchemeName",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "The name of the scheme",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "FilePath",
+      "DataType": {
+        "$type": "Schema.Core.Data.FilePathDataType, Schema.Core",
+        "AllowEmptyPath": true,
+        "UseRelativePaths": true,
+        "BasePath": null,
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Relative path to the staging file from this scheme",
+      "ColumnWidth": 300,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "PublishTarget",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Type of output format to use for publishing this data scheme",
+      "ColumnWidth": 150,
+      "DefaultValue": "DEFAULT"
+    },
+    {
+      "AttributeName": "CSharpExportPath",
+      "DataType": {
+        "$type": "Schema.Core.Data.FolderDataType, Schema.Core",
+        "AllowEmptyPath": true,
+        "UseRelativePaths": true,
+        "BasePath": null,
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Destination folder for generated C# code for this scheme",
+      "ColumnWidth": 300,
+      "DefaultValue": "Assets/Scripts/Schemes"
+    },
+    {
+      "AttributeName": "CSharpNamespace",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Namespace for generated C# code for this scheme",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "CSharpGenerateIds",
+      "DataType": {
+        "$type": "Schema.Core.Data.BooleanDataType, Schema.Core",
+        "DefaultValue": false
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Determines whether to generate Identifiers in emitted C#",
+      "ColumnWidth": 150,
+      "DefaultValue": "False"
+    }
+  ],
+  "Entries": [
+    {
+      "SchemeName": "Manifest",
+      "FilePath": "Content/Manifest.json",
+      "PublishTarget": "DEFAULT",
+      "CSharpExportPath": "../SchemaPlayground/Packages/com.devzappy.schema.unity/Core/Schemes",
+      "CSharpNamespace": "Schema.Core.Schemes",
+      "CSharpGenerateIds": false
+    },
+    {
+      "SchemeName": "Tooltips",
+      "FilePath": "Content/Tooltips.json",
+      "PublishTarget": "DEFAULT",
+      "CSharpExportPath": "..\\SchemaPlayground\\Packages\\com.devzappy.schema.unity\\Core\\Schemes",
+      "CSharpNamespace": "Schema.Core.Schemes",
+      "CSharpGenerateIds": false
+    }
+  ]
+}

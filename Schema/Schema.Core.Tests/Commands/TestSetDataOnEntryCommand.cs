@@ -7,6 +7,11 @@ namespace Schema.Core.Tests.Commands
     [TestFixture]
     public class TestSetDataOnEntryCommand
     {
+        internal static SchemaContext Context = new SchemaContext
+        {
+            Driver = nameof(TestSetDataOnEntryCommand),
+        };
+        
         private DataScheme _scheme;
         private DataEntry _entry;
         private const string AttributeName = "Name";
@@ -16,19 +21,19 @@ namespace Schema.Core.Tests.Commands
         { 
             Schema.Reset();
             _scheme = new DataScheme("People");
-            _scheme.AddAttribute(AttributeName, DataType.Text, "")
+            _scheme.AddAttribute(Context, AttributeName, DataType.Text, "")
                    .AssertPassed();
-            _entry = _scheme.CreateNewEmptyEntry(); // create an empty entry
+            _entry = _scheme.CreateNewEmptyEntry(Context); // create an empty entry
             _scheme.SetDataOnEntry(_entry, AttributeName, "Alice").AssertPassed();
             // Load scheme into global context so identifier checks work as expected
-            Schema.LoadDataScheme(_scheme, overwriteExisting: true);
+            Schema.LoadDataScheme(Context, _scheme, overwriteExisting: true);
         }
 
         [Test]
         public async Task ExecuteAsync_UpdatesEntryValue()
         {
             // Arrange
-            var cmd = new SetDataOnEntryCommand(_scheme, _entry, AttributeName, "Bob");
+            var cmd = new SetDataOnEntryCommand(Context, _scheme, _entry, AttributeName, "Bob");
 
             // Act
             var result = await cmd.ExecuteAsync(CancellationToken.None);
@@ -41,7 +46,7 @@ namespace Schema.Core.Tests.Commands
         [Test]
         public async Task UndoAsync_RevertsValue()
         {
-            var cmd = new SetDataOnEntryCommand(_scheme, _entry, AttributeName, "Charlie");
+            var cmd = new SetDataOnEntryCommand(Context, _scheme, _entry, AttributeName, "Charlie");
             await cmd.ExecuteAsync();
             Assert.That(_entry.GetDataAsString(AttributeName), Is.EqualTo("Charlie"));
 
@@ -53,7 +58,7 @@ namespace Schema.Core.Tests.Commands
         [Test]
         public async Task ExecuteAsync_InvalidAttribute_Fails()
         {
-            var badCmd = new SetDataOnEntryCommand(_scheme, _entry, "BadAttr", "Foo");
+            var badCmd = new SetDataOnEntryCommand(Context, _scheme, _entry, "BadAttr", "Foo");
             var result = await badCmd.ExecuteAsync();
             Assert.IsTrue(result.IsFailure);
         }
@@ -62,7 +67,7 @@ namespace Schema.Core.Tests.Commands
         public async Task CommandHistory_ExecuteUndoRedo_WorkCorrectly()
         {
             var history = new CommandProcessor();
-            var cmd = new SetDataOnEntryCommand(_scheme, _entry, AttributeName, "Eve");
+            var cmd = new SetDataOnEntryCommand(Context, _scheme, _entry, AttributeName, "Eve");
 
             // Execute
             var exec = await history.ExecuteAsync(cmd);
@@ -88,7 +93,7 @@ namespace Schema.Core.Tests.Commands
         {
             var cts = new CancellationTokenSource();
             await cts.CancelAsync(); // immediately cancel
-            var cmd = new SetDataOnEntryCommand(_scheme, _entry, AttributeName, "Zoe");
+            var cmd = new SetDataOnEntryCommand(Context, _scheme, _entry, AttributeName, "Zoe");
 
             var result = await cmd.ExecuteAsync(cts.Token);
             Assert.IsTrue(result.IsCancelled);
@@ -99,7 +104,7 @@ namespace Schema.Core.Tests.Commands
         [Test]
         public async Task UndoAsync_WithoutExecute_FailsGracefully()
         {
-            var cmd = new SetDataOnEntryCommand(_scheme, _entry, AttributeName, "Delta");
+            var cmd = new SetDataOnEntryCommand(Context, _scheme, _entry, AttributeName, "Delta");
             var undo = await cmd.UndoAsync();
             Assert.IsTrue(undo.IsFailure);
         }

@@ -1,0 +1,5 @@
+---
+description: Keep xmldoc comments up-to-date for classes and methods
+globs:
+alwaysApply: true
+---

@@ -1,3 +1,6 @@
 # .NET Artifacts
 **/*/[Bb]in/
 **/*/obj/
+
+**/*/TestResults/
+TestResults/

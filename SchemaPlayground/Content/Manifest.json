@@ -5,7 +5,6 @@
       "AttributeName": "SchemeName",
       "DataType": {
         "$type": "Schema.Core.Data.TextDataType, Schema.Core",
-        "TypeName": "String",
         "DefaultValue": ""
       },
       "IsIdentifier": true,
@@ -21,7 +20,6 @@
         "AllowEmptyPath": true,
         "UseRelativePaths": true,
         "BasePath": null,
-        "TypeName": "FilePath",
         "DefaultValue": ""
       },
       "IsIdentifier": false,
@@ -34,7 +32,6 @@
       "AttributeName": "PublishTarget",
       "DataType": {
         "$type": "Schema.Core.Data.TextDataType, Schema.Core",
-        "TypeName": "String",
         "DefaultValue": ""
       },
       "IsIdentifier": false,
@@ -50,20 +47,18 @@
         "AllowEmptyPath": true,
         "UseRelativePaths": true,
         "BasePath": null,
-        "TypeName": "Folder",
         "DefaultValue": ""
       },
       "IsIdentifier": false,
       "ShouldPublish": false,
       "AttributeToolTip": "Destination folder for generated C# code for this scheme",
       "ColumnWidth": 300,
-      "DefaultValue": "Assets/Scripts/Schemes"
+      "DefaultValue": "Assets\\Scripts\\Schemes"
     },
     {
       "AttributeName": "CSharpNamespace",
       "DataType": {
         "$type": "Schema.Core.Data.TextDataType, Schema.Core",
-        "TypeName": "String",
         "DefaultValue": ""
       },
       "IsIdentifier": false,
@@ -71,6 +66,18 @@
       "AttributeToolTip": "Namespace for generated C# code for this scheme",
       "ColumnWidth": 150,
       "DefaultValue": ""
+    },
+    {
+      "AttributeName": "CSharpGenerateIds",
+      "DataType": {
+        "$type": "Schema.Core.Data.BooleanDataType, Schema.Core",
+        "DefaultValue": false
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": false,
+      "AttributeToolTip": "Determines whether to generate Identifiers in emitted C#. It is generally useful to allow identifiers code to get generated, but optional to disable.",
+      "ColumnWidth": 150,
+      "DefaultValue": true
     }
   ],
   "Entries": [
@@ -78,15 +85,25 @@
       "SchemeName": "Manifest",
       "FilePath": "Content\\Manifest.json",
       "PublishTarget": "DEFAULT",
-      "CSharpExportPath": "Assets/Scripts/Schemes",
-      "CSharpNamespace": "ExampleProject.Schemes"
+      "CSharpExportPath": "Assets\\Scripts\\Schemes",
+      "CSharpNamespace": "ExampleProject.Schemes",
+      "CSharpGenerateIds": false
     },
     {
       "SchemeName": "Entities",
       "FilePath": "Content\\Entities.json",
       "PublishTarget": "DEFAULT",
       "CSharpExportPath": "Assets\\Scripts\\Schemes",
-      "CSharpNamespace": "ExampleProject.Schemes"
+      "CSharpNamespace": "ExampleProject.Schemes",
+      "CSharpGenerateIds": true
+    },
+    {
+      "SchemeName": "Quests",
+      "PublishTarget": "DEFAULT",
+      "FilePath": "Content/Quests.json",
+      "CSharpExportPath": "Assets\\Scripts\\Schemes",
+      "CSharpNamespace": "",
+      "CSharpGenerateIds": true
     }
   ]
 }

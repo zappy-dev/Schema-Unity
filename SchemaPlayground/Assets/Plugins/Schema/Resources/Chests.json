@@ -1,0 +1,85 @@
+{
+  "SchemeName": "Chests",
+  "Attributes": [
+    {
+      "AttributeName": "ID",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "TypeName": "String",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "RewardType1",
+      "DataType": {
+        "$type": "Schema.Core.Data.ReferenceDataType, Schema.Core",
+        "ReferenceSchemeName": "RewardType",
+        "ReferenceAttributeName": "ID",
+        "SupportsEmptyReferences": true,
+        "TypeName": "Reference/RewardType - ID",
+        "DefaultValue": "GOLD"
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": null,
+      "ColumnWidth": 150,
+      "DefaultValue": "GOLD"
+    },
+    {
+      "AttributeName": "Amount1",
+      "DataType": {
+        "$type": "Schema.Core.Data.IntegerDataType, Schema.Core",
+        "TypeName": "Integer",
+        "DefaultValue": 0
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": null,
+      "ColumnWidth": 150,
+      "DefaultValue": 0
+    },
+    {
+      "AttributeName": "RewardType2",
+      "DataType": {
+        "$type": "Schema.Core.Data.ReferenceDataType, Schema.Core",
+        "ReferenceSchemeName": "RewardType",
+        "ReferenceAttributeName": "ID",
+        "SupportsEmptyReferences": true,
+        "TypeName": "Reference/RewardType - ID",
+        "DefaultValue": "GOLD"
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": null,
+      "ColumnWidth": 150,
+      "DefaultValue": "GOLD"
+    },
+    {
+      "AttributeName": "Amount2",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "TypeName": "String",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": null,
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    }
+  ],
+  "Entries": [
+    {
+      "ID": "BIG_CHEST",
+      "RewardType1": "SEASHELLS",
+      "Amount1": 100,
+      "RewardType2": "SILVER",
+      "Amount2": "50"
+    }
+  ]
+}

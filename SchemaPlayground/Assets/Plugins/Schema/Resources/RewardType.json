@@ -1,0 +1,29 @@
+{
+  "SchemeName": "RewardType",
+  "Attributes": [
+    {
+      "AttributeName": "ID",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "TypeName": "String",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    }
+  ],
+  "Entries": [
+    {
+      "ID": "SEASHELLS"
+    },
+    {
+      "ID": "SILVER"
+    },
+    {
+      "ID": "GEMS"
+    }
+  ]
+}

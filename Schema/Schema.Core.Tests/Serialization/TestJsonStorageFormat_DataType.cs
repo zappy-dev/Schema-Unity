@@ -10,6 +10,10 @@ namespace Schema.Core.Tests.Serialization;
 [TestFixture]
 public class TestJsonStorageFormat_DataType
 {
+    private static SchemaContext Context = new SchemaContext
+    {
+        Driver = nameof(TestJsonStorageFormat_DataType)
+    };
     private JsonStorageFormat<DataType> dataTypeStorageFormat;
     
     [SetUp]
@@ -23,7 +27,7 @@ public class TestJsonStorageFormat_DataType
     public void Test_TryDeserialize(string testJsonString, bool expectedSuccess, object expectedData, bool _, string _2)
     {
         // Test code here
-        if (dataTypeStorageFormat.Deserialize(testJsonString)
+        if (dataTypeStorageFormat.Deserialize(Context, testJsonString)
             .TryAssertCondition(expectedSuccess, out var data))
         {
             Assert.That(data, Is.EqualTo(expectedData));
@@ -34,7 +38,6 @@ public class TestJsonStorageFormat_DataType
     public void Test_Serialize(string? expectedJsonString, bool _, DataType expectedData, bool expectedSuccess, string? altExpectedJsonString)
     {
         // Test code here
-
         if (dataTypeStorageFormat.Serialize(expectedData).TryAssertCondition(expectedSuccess, out var jsonString))
         {
             var realExpectedJsonString =
@@ -49,47 +52,47 @@ public class TestJsonStorageFormat_DataType
     {
         get
         {
-            yield return new TestCaseData("{\n  \"TypeName\": \"String\",\n  \"DefaultValue\": \"\"\n}",
+            yield return new TestCaseData("{\n  \"DefaultValue\": \"\"\n}",
                 true,
                 new TextDataType(),
                 true,
                 null);
-            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"UseRelativePaths\": false,\n  \"BasePath\": null,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"UseRelativePaths\": false,\n  \"BasePath\": null,\n  \"DefaultValue\": \"\"\n}",
                 true,
                 new FilePathDataType(allowEmptyPath: false),
                 true,
                 null);
-            yield return new TestCaseData("{\n  \"AllowEmptyPath\": true,\n  \"UseRelativePaths\": false,\n  \"BasePath\": null,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": true,\n  \"UseRelativePaths\": false,\n  \"BasePath\": null,\n  \"DefaultValue\": \"\"\n}",
                 true,
                 new FilePathDataType(allowEmptyPath: true),
                 true,
                 null);
-            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"UseRelativePaths\": false,\n  \"BasePath\": null,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"UseRelativePaths\": false,\n  \"BasePath\": null,\n  \"DefaultValue\": \"\"\n}",
                 true,
                 new FilePathDataType(allowEmptyPath: false),
                 true,
                 null);
-            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"UseRelativePaths\": true,\n  \"BasePath\": null,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"UseRelativePaths\": true,\n  \"BasePath\": null,\n  \"DefaultValue\": \"\"\n}",
                 true,
                 new FilePathDataType(allowEmptyPath: false, useRelativePaths: true),
                 true,
                 null);
-            yield return new TestCaseData("{\n  \"AllowEmptyPath\": true,\n  \"UseRelativePaths\": true,\n  \"BasePath\": null,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": true,\n  \"UseRelativePaths\": true,\n  \"BasePath\": null,\n  \"DefaultValue\": \"\"\n}",
                 true,
                 new FilePathDataType(allowEmptyPath: true, useRelativePaths: true),
                 true,
                 null);
-            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"UseRelativePaths\": true,\n  \"BasePath\": null,\n  \"TypeName\": \"FilePath\",\n  \"DefaultValue\": \"\"\n}",
+            yield return new TestCaseData("{\n  \"AllowEmptyPath\": false,\n  \"UseRelativePaths\": true,\n  \"BasePath\": null,\n  \"DefaultValue\": \"\"\n}",
                 true,
                 new FilePathDataType(false, useRelativePaths: true),
                 true,
                 null);
-            yield return new TestCaseData("{\n  \"TypeName\": \"Integer\",\n  \"DefaultValue\": 0\n}",
+            yield return new TestCaseData("{\n  \"DefaultValue\": 0\n}",
                 true,
                 new IntegerDataType(),
                 true,
                 null);
-            yield return new TestCaseData("{\n  \"TypeName\": \"Integer\",\n  \"DefaultValue\": 1\n}",
+            yield return new TestCaseData("{\n  \"DefaultValue\": 1\n}",
                 true,
                 new IntegerDataType(1),
                 true,
@@ -100,14 +103,25 @@ public class TestJsonStorageFormat_DataType
             //     new DateTimeDataType(DateTime.MinValue),
             //     true);
             // handle old serialization format
-            yield return new TestCaseData("{\n  \"$type\": \"Schema.Core.Data.ReferenceDataType, Schema.Core\",\n  \"ReferenceSchemeName\": \"SpellStatus\",\n \"ReferenceAttributeName\": \"Status\",\n   \"SupportsEmptyReferences\": true,\n    \"TypeName\": \"Reference/SpellStatus - Status\",\n \"DefaultValue\": null\n}",
+            yield return new TestCaseData("{\n  \"$type\": \"Schema.Core.Data.ReferenceDataType, Schema.Core\",\n  \"ReferenceSchemeName\": \"SpellStatus\",\n \"ReferenceAttributeName\": \"Status\",\n   \"SupportsEmptyReferences\": true,\n \"DefaultValue\": null\n}",
                 true,
                 new ReferenceDataType("SpellStatus", "Status"),
                 true,
-                "{\n  \"ReferenceSchemeName\": \"SpellStatus\",\n  \"ReferenceAttributeName\": \"Status\",\n  \"SupportsEmptyReferences\": true,\n  \"TypeName\": \"Reference/SpellStatus - Status\",\n  \"DefaultValue\": null\n}");
-            yield return new TestCaseData("{\n  \"ReferenceSchemeName\": \"SpellStatus\",\n  \"ReferenceAttributeName\": \"Status\",\n  \"SupportsEmptyReferences\": true,\n  \"TypeName\": \"Reference/SpellStatus - Status\",\n  \"DefaultValue\": null\n}",
+                "{\n  \"ReferenceSchemeName\": \"SpellStatus\",\n  \"ReferenceAttributeName\": \"Status\",\n  \"SupportsEmptyReferences\": true,\n  \"DefaultValue\": null\n}");
+            yield return new TestCaseData("{\n  \"ReferenceSchemeName\": \"SpellStatus\",\n  \"ReferenceAttributeName\": \"Status\",\n  \"SupportsEmptyReferences\": true,\n  \"DefaultValue\": null\n}",
                 true,
                 new ReferenceDataType("SpellStatus", "Status"),
+                true,
+                null);
+            yield return new TestCaseData("{\n  \"$type\": \"Schema.Runtime.Type.UnityAssetDataType, Schema.Runtime\",\n  \"ObjectType\": \"UnityEngine.Texture, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null\",\n  \"DefaultValue\": null\n}",
+                true,
+                new PluginDataType("Schema.Runtime.Type.UnityAssetDataType, Schema.Runtime",
+                new (
+                )
+                {
+                    {"ObjectType", "UnityEngine.Texture, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null"},
+                    {"DefaultValue", null},
+                }),
                 true,
                 null);
         }

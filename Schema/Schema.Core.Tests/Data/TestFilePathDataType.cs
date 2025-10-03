@@ -8,6 +8,10 @@ namespace Schema.Core.Tests.Data;
 [TestFixture]
 public class TestFilePathDataType
 {
+    private static SchemaContext Context = new SchemaContext
+    {
+        Driver = nameof(TestFilePathDataType)
+    };
     private Mock<IFileSystem> _mockFileSystem;
     
     [SetUp]
@@ -22,13 +26,13 @@ public class TestFilePathDataType
     public void ConvertData_AbsoluteFilePath_To_RelativeFilePath()
     {
         string absolutePath = "/Users/zappy/src/Schema-Unity/SchemaPlayground/Content/TODOs.json";
-        _mockFileSystem.Setup(fs => fs.FileExists(absolutePath)).Returns(SchemaResult.Pass());
+        _mockFileSystem.Setup(fs => fs.FileExists(Context, absolutePath)).Returns(SchemaResult.Pass());
         
         var fileType = new FilePathDataType(allowEmptyPath: true, useRelativePaths: true,
             basePath: "/Users/zappy/src/Schema-Unity/SchemaPlayground/Content");
 
-        fileType.CheckIfValidData(absolutePath, TestFixtureSetup.SchemaTestContext).AssertFailed();
-        fileType.ConvertData(absolutePath, TestFixtureSetup.SchemaTestContext).TryAssert(out var result);
+        fileType.CheckIfValidData(Context, absolutePath).AssertFailed();
+        fileType.ConvertData(Context, absolutePath).TryAssert(out var result);
         
         Assert.That(result, Is.EqualTo("TODOs.json"));
     }

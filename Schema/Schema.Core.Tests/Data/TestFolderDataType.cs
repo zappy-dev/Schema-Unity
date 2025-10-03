@@ -8,6 +8,10 @@ namespace Schema.Core.Tests.Data;
 [TestFixture]
 public class TestFolderDataType
 {
+	private static SchemaContext Context = new SchemaContext
+	{
+		Driver = nameof(TestFolderDataType)
+	};
 	private Mock<IFileSystem> _mockFileSystem;
 
 	[SetUp]
@@ -22,13 +26,13 @@ public class TestFolderDataType
 	public void ConvertData_AbsoluteDirectory_To_RelativeDirectory()
 	{
 		string absoluteDir = "/Users/zappy/src/Schema-Unity/SchemaPlayground/Content/Configs";
-		_mockFileSystem.Setup(fs => fs.DirectoryExists(absoluteDir)).Returns(SchemaResult.Pass());
+		_mockFileSystem.Setup(fs => fs.DirectoryExists(Context, absoluteDir)).Returns(true);
 
 		var folderType = new FolderDataType(allowEmptyPath: true, useRelativePaths: true,
 			basePath: "/Users/zappy/src/Schema-Unity/SchemaPlayground/Content");
 
-		folderType.CheckIfValidData(absoluteDir, TestFixtureSetup.SchemaTestContext).AssertFailed();
-		folderType.ConvertData(absoluteDir, TestFixtureSetup.SchemaTestContext).TryAssert(out var result);
+		folderType.CheckIfValidData(Context, absoluteDir).AssertFailed();
+		folderType.ConvertData(Context, absoluteDir).TryAssert(out var result);
 
 		Assert.That(result, Is.EqualTo("Configs"));
 	}
@@ -37,12 +41,12 @@ public class TestFolderDataType
 	public void CheckIfValidData_Fails_On_Absolute_When_Relative_Required()
 	{
 		string absoluteDir = "/abs/path/Content/Configs";
-		_mockFileSystem.Setup(fs => fs.DirectoryExists(absoluteDir)).Returns(SchemaResult.Pass());
+		_mockFileSystem.Setup(fs => fs.DirectoryExists(Context, absoluteDir)).Returns(true);
 
 		var folderType = new FolderDataType(allowEmptyPath: true, useRelativePaths: true,
 			basePath: "/abs/path/Content");
 
-		folderType.CheckIfValidData(absoluteDir, TestFixtureSetup.SchemaTestContext).AssertFailed();
+		folderType.CheckIfValidData(Context, absoluteDir).AssertFailed();
 	}
 
 	[Test]
@@ -51,8 +55,8 @@ public class TestFolderDataType
 		var folderType = new FolderDataType(allowEmptyPath: true, useRelativePaths: true,
 			basePath: "/base");
 
-		folderType.CheckIfValidData(string.Empty, TestFixtureSetup.SchemaTestContext).AssertPassed();
-		folderType.ConvertData(string.Empty, TestFixtureSetup.SchemaTestContext).AssertPassed();
+		folderType.CheckIfValidData(Context, string.Empty).AssertPassed();
+		folderType.ConvertData(Context, string.Empty).AssertPassed();
 	}
 
 	[Test]
@@ -61,12 +65,12 @@ public class TestFolderDataType
 		string relDir = "MissingDir";
 		string basePath = "/proj/Content";
 		string resolved = PathUtility.MakeAbsolutePath(relDir, basePath);
-		_mockFileSystem.Setup(fs => fs.DirectoryExists(resolved)).Returns(SchemaResult.Fail("nope"));
+		_mockFileSystem.Setup(fs => fs.DirectoryExists(Context, resolved)).Returns(false);
 
 		var folderType = new FolderDataType(allowEmptyPath: false, useRelativePaths: true,
 			basePath: basePath);
 
-		folderType.ConvertData(relDir, TestFixtureSetup.SchemaTestContext).AssertFailed<object>();
+		folderType.ConvertData(Context, relDir).AssertFailed<object>();
 	}
 
 	[Test]
@@ -75,12 +79,12 @@ public class TestFolderDataType
 		string relDir = "ExistingDir";
 		string basePath = "/proj/Content";
 		string resolved = PathUtility.MakeAbsolutePath(relDir, basePath);
-		_mockFileSystem.Setup(fs => fs.DirectoryExists(resolved)).Returns(SchemaResult.Pass());
+		_mockFileSystem.Setup(fs => fs.DirectoryExists(Context, resolved)).Returns(true);
 
 		var folderType = new FolderDataType(allowEmptyPath: false, useRelativePaths: true,
 			basePath: basePath);
 
-		folderType.ConvertData(relDir, TestFixtureSetup.SchemaTestContext).TryAssert(out var result);
+		folderType.ConvertData(Context, relDir).TryAssert(out var result);
 		Assert.That(result, Is.EqualTo(relDir));
 	}
 
@@ -88,7 +92,7 @@ public class TestFolderDataType
 	public void CheckIfValidData_Fails_For_NonString()
 	{
 		var folderType = new FolderDataType();
-		folderType.CheckIfValidData(123, TestFixtureSetup.SchemaTestContext).AssertFailed();
+		folderType.CheckIfValidData(Context, 123).AssertFailed();
 	}
 }
 
