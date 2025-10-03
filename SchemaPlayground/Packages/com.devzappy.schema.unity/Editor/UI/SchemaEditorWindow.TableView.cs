@@ -392,12 +392,19 @@ namespace Schema.Unity.Editor
                                 nextFocusedIndex = focusedIndex + attributeCount;
                             }
                             break;
-                        case KeyCode.LeftArrow:
-                            if (focusedIndex % attributeCount > 0)
-                            {
-                                nextFocusedIndex = focusedIndex - 1;
-                            }
-                            break;
+                        // Disabling left/right arrow key overriding, it messes with editing text
+                        // case KeyCode.LeftArrow:
+                        //     if (focusedIndex % attributeCount > 0)
+                        //     {
+                        //         nextFocusedIndex = focusedIndex - 1;
+                        //     }
+                        //     break;
+                        // case KeyCode.RightArrow:
+                        //     if (focusedIndex % attributeCount < attributeCount - 1)
+                        //     {
+                        //         nextFocusedIndex = focusedIndex + 1;
+                        //     }
+                        //     break;
                         case KeyCode.Return:
                         case KeyCode.KeypadEnter:
                             // try to go right if possible
@@ -406,12 +413,6 @@ namespace Schema.Unity.Editor
                                 nextFocusedIndex = focusedIndex + 1;
                             }
 
-                            break;
-                        case KeyCode.RightArrow:
-                            if (focusedIndex % attributeCount < attributeCount - 1)
-                            {
-                                nextFocusedIndex = focusedIndex + 1;
-                            }
                             break;
                     }
 
