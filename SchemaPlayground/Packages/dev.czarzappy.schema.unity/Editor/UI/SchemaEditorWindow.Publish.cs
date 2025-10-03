@@ -101,7 +101,9 @@ namespace Schema.Unity.Editor
             }
             
             // second clone data entries, stripped for only published entries
-            foreach (var entry in originalSchemeToPublish.GetEntries(context: context))
+            if (!originalSchemeToPublish.GetEntries(context: context).Try(out var entries, out var error)) return error.Cast();
+            
+            foreach (var entry in entries)
             {
                 var publishedEntry = new DataEntry();
 
@@ -215,7 +217,6 @@ namespace Schema.Unity.Editor
         {
             using var progressScope = new ProgressScope("Schema - Publish All");
             // TODO: need a way of generating an aggregate schema result
-            bool success = true;
             int progress = 1;
             int total = schemeNames.Count;
 

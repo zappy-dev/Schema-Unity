@@ -79,7 +79,7 @@ namespace Schema.Runtime.IO
             }
             catch (Exception ex)
             {
-                return SchemaResult<TextAsset>.Fail($"{sanitizedPath} does not exist in Resources folder.", context);
+                return SchemaResult<TextAsset>.Fail($"{sanitizedPath} does not exist in Resources folder, reason: {ex.Message}", context);
             }
         }
 

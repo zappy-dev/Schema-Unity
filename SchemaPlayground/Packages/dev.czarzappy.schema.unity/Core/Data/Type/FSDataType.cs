@@ -50,10 +50,10 @@ namespace Schema.Core.Data
                 return null;
             }
 
-            var manifestPath = Schema.ProjectPath;
-            if (!string.IsNullOrEmpty(manifestPath))
+            var projectPath = Schema.ProjectPath;
+            if (!string.IsNullOrEmpty(projectPath))
             {
-                return manifestPath;
+                return projectPath;
             }
             
             return null;

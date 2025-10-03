@@ -60,6 +60,12 @@ namespace Schema.Core
                 return res.Fail("Manifest path is invalid: " + manifestLoadPath);
             }
 
+            if (!PathUtility.IsAbsolutePath(manifestLoadPath))
+            {
+                manifestLoadPath = PathUtility.MakeAbsolutePath(ProjectPath, manifestLoadPath);
+                Logger.LogVerbose($"Converting manifest path to absolute path: {manifestLoadPath}");
+            }
+
             if (!GetStorage(context).Try(out var storage, out var storageErr))
             {
                 return storageErr.CastError<ManifestLoadStatus>();
@@ -134,7 +140,10 @@ namespace Schema.Core
                         $"Loading ({currentSchema}/{schemeCount}): {schemeFilePath}"));
                 });
                 var loadedSchemes = new List<DataScheme>();
-                foreach (var manifestEntry in nextManifestScheme.GetEntries())
+                if (!nextManifestScheme.GetEntries(context).Try(out var entries, out var error))
+                    return error.CastError<ManifestLoadStatus>();
+                
+                foreach (var manifestEntry in entries)
                 {
                     currentSchema++;
                     Logger.LogDbgVerbose($"Loading manifest entry {manifestEntry._}...", manifestDataScheme);
@@ -259,7 +268,7 @@ namespace Schema.Core
             if (!_storage.DefaultSchemaStorageFormat.DeserializeFromFile(context, resolvedPath)
                     .Try(out var loadedSchema, out var loadErr))
             {
-                return res.Fail($"Failed to load scheme from file: {resolvedPath}, reason: {loadErr}");
+                return res.Fail($"Failed to load scheme from file: {resolvedPath}, reason: {loadErr.Message}");
             }
             
             return res.Pass(loadedSchema, $"Loaded scheme data from file");
@@ -507,6 +516,12 @@ namespace Schema.Core
 
         public static SchemaResult SaveDataScheme(SchemaContext context, DataScheme scheme, bool alsoSaveManifest)
         {
+            var isInitRes = IsInitialized(context);
+            if (isInitRes.Failed)
+            {
+                return isInitRes;
+            }
+            
             Logger.LogDbgVerbose($"Saving {scheme} to file...", "Storage");
             if (scheme == null)
             {
@@ -545,7 +560,7 @@ namespace Schema.Core
                 // TODO: Unify with FS Data Type
                 // Resolve relative path if needed
                 string resolvedPath = savePath;
-                if (!PathUtility.IsAbsolutePath(savePath) && !string.IsNullOrEmpty(ManifestImportPath))
+                if (!PathUtility.IsAbsolutePath(savePath) && !string.IsNullOrEmpty(ProjectPath))
                 {
                     resolvedPath = PathUtility.MakeAbsolutePath(savePath, ProjectPath);
                     

@@ -238,22 +238,23 @@ namespace Schema.Core.Data
         
         #endregion
         
-        public IEnumerable<DataEntry> GetEntries(AttributeSortOrder sortOrder = default, SchemaContext context = default)
+        public SchemaResult<IEnumerable<DataEntry>> GetEntries(AttributeSortOrder sortOrder = default, SchemaContext context = default)
         {
+            var res = SchemaResult<IEnumerable<DataEntry>>.New(context);
             if (!sortOrder.HasValue)
             {
-                return entries;
+                return res.Pass(entries);
             }
 
             var attributeName = sortOrder.AttributeName;
-            if (!GetAttributeByName(attributeName, context).Try(out var attribute))
+            if (!GetAttributeByName(attributeName, context).Try(out var attribute, out var attrErr))
             {
-                throw new ArgumentException($"Attempted to get entries using invalid sort attribute: {attributeName}");
+                return attrErr.CastError<IEnumerable<DataEntry>>();
             }
 
-            return sortOrder.Order == SortOrder.Ascending ? 
+            return res.Pass(sortOrder.Order == SortOrder.Ascending ? 
                 entries.OrderBy(e => e.GetData(attribute).Result) : 
-                entries.OrderByDescending(e => e.GetData(attribute).Result);
+                entries.OrderByDescending(e => e.GetData(attribute).Result));
         }
 
         #region Equality

@@ -53,7 +53,7 @@ namespace Schema.Core.Commands
             ReportProgress(_progress, 0.1f, "Validating scheme...");
             
             // 2. Check if scheme already exists and handle overwrite logic
-            if (!Schema.DoesSchemeExist(Context, _scheme.SchemeName).Try(out _schemeExistedBefore, out var error))
+            if (!Schema.IsSchemeLoaded(Context, _scheme.SchemeName).Try(out _schemeExistedBefore, out var error))
                 return Fail(error.Message);
             
             if (_schemeExistedBefore)
@@ -74,7 +74,7 @@ namespace Schema.Core.Commands
             ReportProgress(_progress, 0.3f, "Processing scheme data...");
             
             // 3. Process and validate all entry data
-            await ProcessSchemeDataAsync(_scheme, cancellationToken);
+            ProcessSchemeData(_scheme, cancellationToken);
             
             ReportProgress(_progress, 0.7f, "Loading scheme into system...");
             
@@ -149,7 +149,7 @@ namespace Schema.Core.Commands
             }
         }
 
-        private async Task ProcessSchemeDataAsync(DataScheme scheme, CancellationToken cancellationToken)
+        private void ProcessSchemeData(DataScheme scheme, CancellationToken cancellationToken)
         {
             ThrowIfCancellationRequested(cancellationToken);
             
@@ -191,7 +191,6 @@ namespace Schema.Core.Commands
                                 {
                                     Fail(
                                         $"Failed to convert data for attribute '{attribute.AttributeName}': {conversionResult.Message}");
-                                    return;
                                 }
                             }
                             else

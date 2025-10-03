@@ -439,25 +439,28 @@ public class TestDataScheme
         {
             { sortAttribute, "b", Context },
         });
+        var entries = dataScheme.GetEntries(context: Context).AssertPassed();
         
-        Assert.That(dataScheme.GetEntries(), 
-            Is.EqualTo(dataScheme.GetEntries(AttributeSortOrder.None)));
-        Assert.That(dataScheme.GetEntries(), 
-            Is.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.None))));
-        Assert.That(dataScheme.GetEntries(), 
-            Is.Not.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Ascending))));
-        Assert.That(dataScheme.GetEntries(), 
-            Is.Not.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Descending))));
-        Assert.That(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Descending)), 
-            Is.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Ascending)).Reverse()));
-        Assert.That(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Ascending)), 
-            Is.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Descending)).Reverse()));
+        Assert.That(entries, 
+            Is.EqualTo(dataScheme.GetEntries(AttributeSortOrder.None, Context).AssertPassed()));
+        Assert.That(entries, 
+            Is.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.None), Context).AssertPassed()));
+        Assert.That(entries, 
+            Is.Not.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Ascending), Context).AssertPassed()));
+        Assert.That(entries, 
+            Is.Not.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Descending), Context).AssertPassed()));
+        
+        
+        Assert.That(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Descending), Context).AssertPassed(), 
+            Is.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Ascending), Context).AssertPassed().Reverse()));
+        Assert.That(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Ascending), Context).AssertPassed(), 
+            Is.EqualTo(dataScheme.GetEntries(new AttributeSortOrder(sortAttribute, SortOrder.Descending), Context).AssertPassed().Reverse()));
     }
 
     [Test, TestCaseSource(nameof(BadAttributeSortOrders))]
     public void Test_GetEntries_BadCase(AttributeSortOrder sortOrder)
     {
-        Assert.Throws<ArgumentException>(() => emptyScheme.GetEntries(sortOrder));
+        emptyScheme.GetEntries(sortOrder).AssertFailed();
     }
 
     private static IEnumerable BadAttributeSortOrders

@@ -322,7 +322,7 @@ namespace Schema.Unity.Editor
             }
         }
 
-        private void RunManifestMigrationWizard()
+        private SchemaResult RunManifestMigrationWizard()
         {
             var context = new SchemaContext
             {
@@ -355,7 +355,7 @@ namespace Schema.Unity.Editor
             // TODO: Some smarter wizard to choose which properties to take during a migration, which to skip, and committing that a migration was resolved to prevent future messages
             if (loadedManifestAttributes.Where(attr => overlapKeys.Contains(attr.AttributeName))
                     .SequenceEqual(templateAttributes.Where(attr => overlapKeys.Contains(attr.AttributeName)), ManifestAttributeEqualityComparer.Instance) &&
-                !newKeys.Any()) return;
+                !newKeys.Any()) return Pass();
             
             // auto-report differences
             var diffReport = new StringBuilder();
@@ -363,7 +363,7 @@ namespace Schema.Unity.Editor
             bool shouldUpgrade = EditorUtility.DisplayDialog("Schema - Manifest Out-Of-Data",
                 diffReport.ToString(), "Upgrade", "Skip");
             
-            if (!shouldUpgrade) return;
+            if (!shouldUpgrade) return Pass();
 
             var loadedAttributesLookup = loadedManifestAttributes.ToDictionary(a => a.AttributeName);
             var templateAttributesLookup = templateAttributes.ToDictionary(a => a.AttributeName);
@@ -392,8 +392,10 @@ namespace Schema.Unity.Editor
                 
             }
             
+            if (!LoadedManifestScheme.GetEntries(context: context).Try(out var entries, out var entriesErr)) return entriesErr.Cast();
+
             var migrateRes = BulkResult(
-                entries: LoadedManifestScheme.GetEntries(),
+                entries: entries,
                 operation: (entry) =>
                 {
                     // special case handling for the manifest scheme self entry...
@@ -430,11 +432,12 @@ namespace Schema.Unity.Editor
             if (migrateRes.Failed)
             {
                 EditorUtility.DisplayDialog("Schema - Manifest Migration Failed", migrateRes.Message, "Ok");
-                return;
+                return migrateRes;
             }
 
             LatestManifestLoadResponse = LoadManifest(context, templateManifest._);
             LatestResponse = CheckIf(context, LatestManifestLoadResponse.Passed, LatestManifestLoadResponse.Message);
+            return Pass();
         }
 
         /// <summary>
@@ -1124,7 +1127,7 @@ namespace Schema.Unity.Editor
                         var otherAsset = entries.FirstOrDefault((entry) =>
                         {
                             var (otherObject, otherDataEntry, _) = entry;
-                            return otherObject == entryValue;
+                            return ReferenceEquals(otherObject, entryValue);
                         });
 
                         if (otherAsset.dataEntry != default)
@@ -1147,7 +1150,6 @@ namespace Schema.Unity.Editor
                 {
                     Logger.LogError(res.Message, res.Context);
                     continue;
-                    return res;
                 }
             }
 

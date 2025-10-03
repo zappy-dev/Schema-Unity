@@ -23,7 +23,6 @@ namespace Schema.Core.Data
             if (value == null)
             {
                 return SchemaResult<object>.Pass(CloneDefaultValue());
-                return Fail<object>("Cannot convert null value to Guid", context);
             }
 
             string strValue = value.ToString();

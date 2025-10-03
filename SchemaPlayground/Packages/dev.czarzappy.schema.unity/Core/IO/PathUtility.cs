@@ -8,6 +8,8 @@ namespace Schema.Core.IO
     /// </summary>
     public static class PathUtility
     {
+        public static bool IsUnixSystem => Environment.OSVersion.Platform == PlatformID.Unix;
+        public static bool IsWindowsSystem => Environment.OSVersion.Platform == PlatformID.Win32NT;
         /// <summary>
         /// Sanitizes the given path by converting platform-specific directory separators to the current platform
         /// </summary>

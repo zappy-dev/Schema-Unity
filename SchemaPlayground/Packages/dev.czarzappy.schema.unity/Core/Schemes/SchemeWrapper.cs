@@ -86,9 +86,11 @@ namespace Schema.Core.Schemes
         /// Finds an entry using a predicate against typed entry wrappers.
         /// </summary>
         /// <param name="entryFilter">Predicate to match entries.</param>
-        public SchemaResult<TEntry> GetEntry(Func<TEntry, bool> entryFilter)
+        public SchemaResult<TEntry> GetEntry(Func<TEntry, bool> entryFilter, SchemaContext context = default)
         {
-            TEntry foundEntry = GetEntries().FirstOrDefault(entryFilter);
+            if (!GetEntries(context: context).Try(out var entries, out var error)) return error.CastError<TEntry>();
+
+            TEntry foundEntry = entries.FirstOrDefault(entryFilter);
             return SchemaResult<TEntry>.CheckIf(foundEntry != default, foundEntry, "Entry not found");
         }
 
@@ -96,9 +98,21 @@ namespace Schema.Core.Schemes
         /// Enumerates all entries as typed wrappers.
         /// </summary>
         /// <param name="context">Optional context.</param>
-        public IEnumerable<TEntry> GetEntries(SchemaContext context = default)
+        public SchemaResult<IEnumerable<TEntry>> GetEntries(SchemaContext context = default)
         {
-            return DataScheme.GetEntries(context: context).Select(e => EntryFactory(_, e));
+            if (!DataScheme.GetEntries(context: context).Try(out var entries, out var error)) return error.CastError<IEnumerable<TEntry>>();
+            
+            return SchemaResult<IEnumerable<TEntry>>.Pass(entries.Select(e => EntryFactory(_, e)));
+        }
+        
+        /// <summary>
+        /// Enumerates all entries as typed wrappers.
+        /// </summary>
+        public IEnumerable<TEntry> GetEntries()
+        {
+            if (!GetEntries(context: default).Try(out var entries, out var error)) return Enumerable.Empty<TEntry>();
+            
+            return entries;
         }
         
         #endregion

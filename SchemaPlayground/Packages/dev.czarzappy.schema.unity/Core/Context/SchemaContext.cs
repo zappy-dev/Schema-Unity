@@ -1,9 +1,10 @@
+using System;
 using System.Text;
 using Schema.Core.Data;
 
 namespace Schema.Core
 {
-    public struct SchemaContext
+    public struct SchemaContext : IEquatable<SchemaContext>
     {
         public DataScheme Scheme;
         public string AttributeName;
@@ -50,6 +51,28 @@ namespace Schema.Core
         public static SchemaContext operator | (SchemaContext left, SchemaContext right)
         {
             return Merge(left, right);
+        }
+
+        public bool Equals(SchemaContext other)
+        {
+            return Equals(Scheme, other.Scheme) && AttributeName == other.AttributeName && DataType == other.DataType && Driver == other.Driver;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is SchemaContext other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                var hashCode = (Scheme != null ? Scheme.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ (AttributeName != null ? AttributeName.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ (DataType != null ? DataType.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ (Driver != null ? Driver.GetHashCode() : 0);
+                return hashCode;
+            }
         }
     }
 }

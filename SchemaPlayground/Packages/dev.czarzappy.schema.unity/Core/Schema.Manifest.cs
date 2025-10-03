@@ -65,7 +65,7 @@ namespace Schema.Core
 
         public static string ProjectPath { get; set; }
         
-        private static string DefaultContentPath => Path.Combine(ProjectPath, DefaultContentDirectory);
+        public static string DefaultContentPath => Path.Combine(ProjectPath, DefaultContentDirectory);
         public static string DefaultContentDirectory = "Content";
 
         public static string GetContentPath(string schemeFileName)

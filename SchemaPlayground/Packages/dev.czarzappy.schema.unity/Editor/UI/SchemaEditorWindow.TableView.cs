@@ -115,7 +115,8 @@ namespace Schema.Unity.Editor
             
             Logger.LogDbgVerbose($"Refreshing Table Entries for scheme: {scheme}");
             var sortOrder = GetSortOrderForScheme(scheme);
-            var realAllEntries = scheme.GetEntries(sortOrder, context: refreshCtx);
+            if (!scheme.GetEntries(sortOrder, context: refreshCtx)
+                .Try(out var realAllEntries, out var entryError)) return;
             
             var compiledFilters = GetAttributeFiltersForScheme(scheme);
             if (compiledFilters.Count <= 0)

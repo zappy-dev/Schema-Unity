@@ -10,8 +10,14 @@ namespace Schema.Core.IO
         #region File Operations
         public SchemaResult<string> ReadAllText(SchemaContext context, string filePath)
         {
+            var res = SchemaResult<string>.New(context);
             var sanitizedPath = PathUtility.SanitizePath(filePath);
-            return SchemaResult<string>.Pass(File.ReadAllText(sanitizedPath));
+            if (!File.Exists(sanitizedPath))
+            {
+                return res.Fail("File not found: " + sanitizedPath);
+            }
+            
+            return res.Pass(File.ReadAllText(sanitizedPath));
         }
 
         public SchemaResult<string[]> ReadAllLines(SchemaContext context, string filePath)

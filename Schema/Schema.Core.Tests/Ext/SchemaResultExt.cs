@@ -67,14 +67,14 @@ public static class SchemaResultExt
     public static TRes AssertPassed<TRes>(this SchemaResult<TRes> result, TRes? expectedValue = default)
     {
         Assert.NotNull(result);
-        Assert.IsTrue(result.Passed, result.ToString());
+        Assert.IsTrue(result.Passed, result.Message);
 
         // Only compare expectedValue when it is explicitly provided (non-default for the type)
         // This avoids unintended comparisons for value types where default(T) != null.
         bool hasExplicitExpected = !(expectedValue is null) && !Equals(expectedValue, default(TRes));
         if (hasExplicitExpected)
         {
-            Assert.That(result.Result, Is.EqualTo(expectedValue));
+            Assert.That(result.Result, Is.EqualTo(expectedValue), result.Message);
         }
         return result.Result;
     }

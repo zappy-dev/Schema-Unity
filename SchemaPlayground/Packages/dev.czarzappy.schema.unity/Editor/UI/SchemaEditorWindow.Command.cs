@@ -194,7 +194,7 @@ namespace Schema.Unity.Editor
 
             // Confirm overwrite if needed
             bool overwriteExisting = false;
-            if (!DoesSchemeExist(context, newSchema.SchemeName).Try(out bool doesExist, out var error))
+            if (!IsSchemeLoaded(context, newSchema.SchemeName).Try(out bool doesExist, out var error))
             {
                 var ct = new CancellationToken(true);
                 return Task.FromCanceled(ct);

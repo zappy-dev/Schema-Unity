@@ -31,6 +31,7 @@ namespace Schema.Core
     
     public struct SchemaResult
     {
+        public const string MESSAGE_NOT_SET = "Message not set!";
         public static readonly SchemaResult NoOp = new SchemaResult(status: RequestStatus.Passed, "NoOp");
 
         /// <summary>
@@ -73,7 +74,7 @@ namespace Schema.Core
         public SchemaResult(RequestStatus status, string message, object context = null)
         {
             this.status = status;
-            this.message = message;
+            this.message = string.IsNullOrEmpty(message) ? MESSAGE_NOT_SET : message;
             this.context = context;;
 
             // TODO: Maybe create a preference for whether schema results automatically create a log?
@@ -162,8 +163,8 @@ namespace Schema.Core
         public SchemaResult(RequestStatus status, TResult result, string message, object context = null)
         {
             this.status = status;
+            this.message = (string.IsNullOrEmpty(message) ? SchemaResult.MESSAGE_NOT_SET : message);
             this.result = result;
-            this.message = message;
             this.context = context;;
 
             // TODO: Maybe create a preference for whether schema results automatically create a log?
@@ -175,7 +176,7 @@ namespace Schema.Core
             
              if (SchemaResultSettings.Instance.LogFailure && status == RequestStatus.Failed)
              {
-                 SchemaResult.OnSchemaResultFailed(message, context);
+                 SchemaResult.OnSchemaResultFailed(this.message, this.context);
                  // string logMsg = $"[Context={context}] {message}";
                  // // Logger.LogDbgError(logMsg);
                  // // Reason to convert to non-dbg: Helpful for debugging list data type conversion error

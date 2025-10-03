@@ -36,6 +36,9 @@ namespace Schema.Unity.Editor
                 var isInitRes = IsInitialized(context);
                 var isInit = isInitRes.Passed;
                 EditorGUILayout.Toggle("Is Schema Initialized?", isInit);
+                EditorGUILayout.TextField("Project Path", ProjectPath);
+                EditorGUILayout.TextField("Default Content Directory", DefaultContentDirectory);
+                EditorGUILayout.TextField("Default Content", DefaultContentPath);
                 EditorGUILayout.Toggle("Is Load In Progress?", IsManifestLoadInProgress);
 
 
@@ -147,7 +150,11 @@ namespace Schema.Unity.Editor
                     FixDuplicateEntries();
                 }
 
-                RenderGUIEvents();
+                showGUIEvents = EditorGUILayout.Toggle("Show GUI Events", showGUIEvents);
+                if (showGUIEvents)
+                {
+                    RenderGUIEvents();
+                }
             }
         }
 
@@ -234,6 +241,8 @@ namespace Schema.Unity.Editor
 
         private Vector2 guiEventsScrollPos = Vector2.zero;
         private int schemeIdx = 0;
+        private bool showGUIEvents;
+
         private void RenderGUIEvents()
         {
             EditorGUILayout.LabelField("GUI Events");

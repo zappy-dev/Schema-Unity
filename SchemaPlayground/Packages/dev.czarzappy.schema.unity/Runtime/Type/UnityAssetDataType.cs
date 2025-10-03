@@ -1,6 +1,7 @@
 ﻿using Schema.Core.Data;
 using UnityEditor;
 using UnityEngine;
+using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Runtime.Type
 {
@@ -22,7 +23,7 @@ namespace Schema.Runtime.Type
         static void Initialize()
         {
             AddPluginType(new UnityAssetDataType(typeof(Texture)));
-            Debug.Log("Initializing UnityAssetDataType");
+            Logger.LogVerbose("Initializing UnityAssetDataType");
         }
     }
 }

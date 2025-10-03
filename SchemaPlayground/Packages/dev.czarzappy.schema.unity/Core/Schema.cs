@@ -72,7 +72,7 @@ namespace Schema.Core
         /// </summary>
         public static SchemaResult IsInitialized(SchemaContext context)
         {
-            if (!GetStorage(context).Try(out var _, out var storageErr))
+            if (!GetStorage(context).Try(out _, out var storageErr))
             {
                 return storageErr.Cast();
             }
@@ -110,7 +110,13 @@ namespace Schema.Core
 
         #region Interface Commands
 
-        public static SchemaResult<bool> DoesSchemeExist(SchemaContext ctx, string schemeName)
+        /// <summary>
+        /// Is the scheme with the given schemeName loaded into memory?
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="schemeName">Name of scheme to check</param>
+        /// <returns></returns>
+        public static SchemaResult<bool> IsSchemeLoaded(SchemaContext ctx, string schemeName)
         {
             var res = SchemaResult<bool>.New(ctx);
             if (string.IsNullOrWhiteSpace(schemeName))

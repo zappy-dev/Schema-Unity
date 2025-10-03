@@ -75,6 +75,8 @@ namespace Schema.Core.Commands
         public bool IsCancelled => Status == CommandStatus.Cancelled;
         
         public Type ResultType { get; }
+        
+        #pragma warning disable CS8632 // Disable warning around object? type
         public object? Value { get; }
         
         internal CommandResult(Type resultType, object? value, CommandStatus status, string message, Exception exception, TimeSpan duration, bool canUndo)
@@ -87,6 +89,7 @@ namespace Schema.Core.Commands
             Duration = duration;
             CanUndo = canUndo;
         }
+        #pragma warning restore CS8632
         
         public bool TryGet<T>(out T value)
         {
