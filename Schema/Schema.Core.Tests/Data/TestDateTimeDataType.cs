@@ -35,11 +35,11 @@ public class TestDateTimeDataType
     [Test]
     public void ConvertData_ShouldSucceed_OnValidString()
     {
-        var dateStr = "2025-01-02 03:04:05";
+        var dateStr = "2025-01-02 03:04:05Z";
         var conversion = _type.ConvertData(Context, dateStr);
         Assert.That(conversion.Passed, Is.True);
         Assert.That(conversion.Result, Is.TypeOf<DateTime>());
-        Assert.That(((DateTime)conversion.Result), Is.EqualTo(DateTime.Parse(dateStr)));
+        Assert.That(((DateTime)conversion.Result), Is.EqualTo(DateTime.Parse(dateStr).ToUniversalTime()));
     }
 
     [Test]

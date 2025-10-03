@@ -28,6 +28,7 @@ namespace Schema.Core.Data
             var data = value as string;
             
             bool result = System.DateTime.TryParse(data, out var date);
+            date = date.ToUniversalTime(); // Always try to convert a date to UTC for consistency across devices
             return CheckIf<object>(result, date,
                 errorMessage: "Unable to convert value",
                 successMessage: "Converted value into DateTime", 

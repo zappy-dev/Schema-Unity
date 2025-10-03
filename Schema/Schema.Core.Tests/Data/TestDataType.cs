@@ -76,9 +76,13 @@ public class TestDataType
             // weird unhandled type conversion case
             yield return new TestCaseData(1, DataType.Integer, DataType.DateTime, false, null);
 
-            var testValidDateStr = "2024-01-01 01:02:03";
-            var testDate = DateTime.Parse(testValidDateStr);
+            var testValidDateStr = "2024-01-01 01:02:03Z";
+            var testDate = DateTime.Parse(testValidDateStr).ToUniversalTime();
             yield return new TestCaseData(testValidDateStr, DataType.Text, DataType.DateTime, true, testDate);
+            
+            var testValidDateStr2 = "2024-01-01T01:02:03Z";
+            var testDate2 = DateTime.Parse(testValidDateStr2).ToUniversalTime();
+            yield return new TestCaseData(testValidDateStr2, DataType.Text, DataType.DateTime, true, testDate2);
             
             yield return new TestCaseData(VALID_FILE_PATH, DataType.Text, DataType.FilePath_RelativePaths, true, VALID_FILE_PATH);
             yield return new TestCaseData(INVALID_FILE_PATH, DataType.Text, DataType.FilePath_RelativePaths, false, null);
