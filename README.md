@@ -1,5 +1,10 @@
 # Schema-Unity
 
+[![Unity CI](https://github.com/zappy-dev/Schema-Unity/actions/workflows/dotnet.yml/badge.svg?branch=main)](https://github.com/zappy-dev/Schema-Unity/actions/workflows/dotnet.yml)
+[![codecov](https://codecov.io/gh/zappy-dev/Schema-Unity/branch/main/graph/badge.svg)](https://codecov.io)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/zappy-dev?style=social)](https://github.com/sponsors/zappy-dev)
+[![Ko‑fi](https://img.shields.io/badge/Ko--fi-support-%23FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/devzappy)
+
 ![Try Schema](docs/schema_brand_600x300.png)
 
 Schema-Unity provides Unity integrations for the Schema content management tool, enabling robust, flexible, and maintainable management of game design data within Unity projects.
@@ -142,6 +147,10 @@ Contributions are welcome! See [docs/Contributing](docs/Contributing.md).
 ## Support
 
 For help, email support@devzappy.com.
+
+If you find Schema-Unity helpful and want to support ongoing development:
+- GitHub Sponsors: [https://github.com/sponsors/zappy-dev](https://github.com/sponsors/zappy-dev)
+- Ko‑fi: [https://ko-fi.com/devzappy](https://ko-fi.com/devzappy)
 
 ## License
 
