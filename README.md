@@ -1,6 +1,6 @@
 # Schema-Unity
 
-![Try Schema](docs/try_schema.png)
+![Try Schema](docs/schema_brand_600x300.png)
 
 Schema-Unity provides Unity integrations for the Schema content management tool, enabling robust, flexible, and maintainable management of game design data within Unity projects.
 
@@ -9,9 +9,47 @@ Schema-Unity provides Unity integrations for the Schema content management tool,
   
   ![Schema Table View](docs/images/schema_window_table_view.png)
 
-- Rich attribute type system with easy type selection
+- Rich attribute type system
   
   ![Scheme Type Selection](docs/images/scheme_type_selection.png)
+
+- Code Generation for Runtime usage
+
+```csharp
+public partial class ProfilesEntry : EntryWrapper
+{
+        /// <summary>
+        /// Represents a single entry (row) in the 'Profiles' data scheme.
+        /// </summary>
+        public ProfilesEntry(DataScheme dataScheme, DataEntry entry) : base(dataScheme, entry) {}
+
+     
+        /// <summary>
+        /// Gets the value of 'ID'.
+        /// </summary>
+     
+        public string ID => DataEntry.GetDataAsString("ID");
+     
+        /// <summary>
+        /// Gets the value of 'Personality Notes'.
+        /// </summary>
+     
+        public string PersonalityNotes => DataEntry.GetDataAsString("Personality Notes");
+     
+        /// <summary>
+        /// Gets the value of 'InitialPlayerConnection'.
+        /// </summary>
+     
+        public bool InitialPlayerConnection => DataEntry.GetDataAsBool("InitialPlayerConnection");
+     
+        /// <summary>
+        /// Gets the value of 'Profile Picture'.
+        /// </summary>
+     
+        public string ProfilePicture => DataEntry.GetDataAsString("Profile Picture");
+ 
+    }
+```
 
 ## Documentation
 
