@@ -2,6 +2,15 @@
 
 Schema-Unity provides Unity integrations for the Schema content management tool, enabling robust, flexible, and maintainable management of game design data within Unity projects.
 
+## Documentation
+
+- **Start here:** [docs/Overview](docs/Overview.md)
+- **Quickstart:** [docs/Quickstart](docs/Quickstart.md)
+- **Key Concepts:** [docs/KeyConcepts](docs/KeyConcepts.md)
+- **Unity Editor Guide:** [docs/EditorGuide](docs/EditorGuide.md)
+- **Runtime Integration:** [docs/RuntimeGuide](docs/RuntimeGuide.md)
+- **FAQ & Troubleshooting:** [docs/FAQ](docs/FAQ.md)
+
 ## Features
 
 - **Schema Core**: C# library for defining, loading, and validating data schemas.
@@ -22,14 +31,17 @@ Schema-Unity/
       dev.czarzappy.schema.unity/
         Core/
         Editor/
+  docs/                    # Guides and reference documentation
 ```
 
 ## Getting Started
 
+See the full [Quickstart](docs/Quickstart.md). Summary:
+
 ### Prerequisites
 
 - **Unity** (recommended version: 2021.3+)
-- **.NET SDK** (for building and testing core libraries)
+- **.NET SDK 8** (for building and testing core libraries)
 
 ### Setup
 
@@ -42,47 +54,27 @@ Schema-Unity/
 2. **Open in Unity:**
    - Open `SchemaPlayground/` as a Unity project.
 
-3. **Build Core Libraries:**
+3. **Build Core Libraries (optional for Unity-only workflows):**
    - Open `Schema/Schema.sln` in Visual Studio or Rider.
    - Build the solution to generate the core DLLs.
 
-4. **Run Tests:**
+4. **Run Tests (optional):**
    - Run tests in `Schema.Core.Tests` using your preferred .NET test runner.
 
 ## Usage
 
-- Use the Unity Editor tools (under `Window > Schema`) to import, edit, and validate schema-based data.
+- Use the Unity Editor tools (under `Tools > Scheme Editor`) to import, edit, and validate schema-based data.
 - Place your JSON/CSV data files in `SchemaPlayground/Content/`.
-- Extend or customize schema definitions in `Schema/Core/Data/`.
-
-## CI/CD & Build Verification
-
-This project includes comprehensive CI/CD workflows to ensure code quality:
-
-### .NET Core CI
-- **File**: `.github/workflows/dotnet.yml`
-- **Purpose**: Tests the core Schema library
-- **Coverage**: Runs unit tests with code coverage reporting
-- **Triggers**: Push/PR to main branch
-
-
-### Status Badges
-![.NET Build](https://github.com/zappy-dev/Schema-Unity/workflows/.NET%20Core%20CI/badge.svg)
+- Extend or customize schema definitions in `SchemaPlayground/Packages/dev.czarzappy.schema.unity/Core/Data/`.
 
 ## Contributing
 
-Contributions are welcome! To contribute:
+Contributions are welcome! See [docs/Contributing](docs/Contributing.md).
 
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature`).
-3. Make your changes and add tests.
-4. Commit and push your branch.
-5. Open a pull request describing your changes.
+## Support
+
+For help, email support@devzappy.com.
 
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contact
-
-For questions or support, open an issue or contact the maintainer.
