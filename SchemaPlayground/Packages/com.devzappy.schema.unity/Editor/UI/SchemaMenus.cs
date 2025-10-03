@@ -4,16 +4,16 @@ namespace Schema.Unity.Editor
 {
     public static class SchemaMenus
     {
-        [MenuItem("Tools/Scheme Editor", false, 1)]
+        [MenuItem("Tools/Schema Editor", false, 1)]
         public static void ShowEditorWindow()
         {
-            EditorWindow.GetWindow<SchemaEditorWindow>("Scheme Editor");
+            EditorWindow.GetWindow<SchemaEditorWindow>("Schema Editor");
         }
 
-        [MenuItem("Tools/Scheme Debugger")]
+        [MenuItem("Tools/Schema Debugger")]
         public static void ShowDebugWindow()
         {
-            EditorWindow.GetWindow<SchemaDebugWindow>("Scheme Debugger");
+            EditorWindow.GetWindow<SchemaDebugWindow>("Schema Debugger");
         }
 
 #if SCHEMA_DEBUG
