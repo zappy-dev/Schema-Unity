@@ -4,6 +4,21 @@
 - Unity 2021.3+ (LTS recommended)
 - .NET SDK 8 (optional; for building and running tests)
 
+### Install via Unity Package Manager (no download required)
+1) Open your Unity project
+2) Open `Window > Package Manager`
+3) Click the `+` button (top-left) and choose `Add package from git URL...`
+4) Paste this URL and click Add:
+   `https://github.com/zappy-dev/Schema-Unity.git?path=/SchemaPlayground/Packages/com.devzappy.schema.unity#main`
+5) Wait for the package to install. The Schema editor tools will be available under `Tools > Schema Editor`.
+
+### Try it now (sample project)
+If you cloned the repo:
+- Open `SchemaPlayground/` in Unity
+- Load `Assets/Scenes/SampleScene.unity`
+- Open `Tools > Schema Editor` and inspect `Manifest`, `Entities`, and `Quests`
+- Press Play; see `Assets/Scripts/Player2DController.cs` using Schema at runtime
+
 ### 1) Clone and open
 ```bash
 git clone https://github.com/zappy-dev/Schema-Unity.git
@@ -12,7 +27,7 @@ cd Schema-Unity
 Open `SchemaPlayground/` in Unity.
 
 ### 2) Explore the editor
-- Open `Tools > Scheme Editor`.
+- Open `Tools > Schema Editor`.
 - Select the `Manifest` scheme to see how other schemes (e.g., `Entities`, `Quests`) are registered.
 
 ### 3) Edit data

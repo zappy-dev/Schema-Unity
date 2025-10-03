@@ -1,8 +1,8 @@
 ## Unity Editor Guide
 
 ### Open the tools
-- `Tools > Scheme Editor`: Main data authoring UI.
-- `Tools > Scheme Debugger`: Inspect loaded state and debug diagnostics.
+- `Tools > Schema Editor`: Main data authoring UI.
+- `Tools > Schema Debugger`: Inspect loaded state and debug diagnostics.
 
 ### Editing schemes
 1. Select a scheme from the explorer.

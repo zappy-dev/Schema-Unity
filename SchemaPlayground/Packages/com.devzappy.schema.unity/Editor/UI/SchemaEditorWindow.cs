@@ -115,17 +115,11 @@ namespace Schema.Unity.Editor
         #endregion
 
         #region Unity Lifecycle Methods
-        
-        [MenuItem("Tools/Scheme Editor")]
-        public static void ShowWindow()
-        {
-            GetWindow<SchemaEditorWindow>("Scheme Editor");
-        }
 
         private void OnEnable()
         {
             Instance = this;
-            LogDbgVerbose("Scheme Editor enabled", this);
+            LogDbgVerbose("Schema Editor enabled", this);
             isInitialized = false;
             EditorApplication.update += InitializeSafely;
             RegisterCommandHistoryCallbacks();
@@ -656,7 +650,7 @@ namespace Schema.Unity.Editor
             
             InitializeStyles();
             debugIdx = 0;
-            GUILayout.Label("Scheme Editor", EditorStyles.largeLabel, 
+            GUILayout.Label("Schema Editor", EditorStyles.largeLabel, 
                 ExpandWidthOptions);
             
             if (!LatestManifestLoadResponse.Passed)
@@ -678,7 +672,18 @@ namespace Schema.Unity.Editor
                 }
             }
             
-            EditorGUILayout.TextField("Project Path", ProjectPath);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                // For hiding sensitive data
+                string relativeProjectPath = PathUtility.MakeRelativePath(ProjectPath, Application.dataPath);
+                var projectPathContent = new GUIContent("Project Path", ProjectPath);
+                EditorGUILayout.TextField(projectPathContent, relativeProjectPath);
+
+                if (GUILayout.Button("Open", DoNotExpandWidthOptions))
+                {
+                    EditorUtility.RevealInFinder(ProjectPath);
+                }
+            }
             
             if (LatestManifestLoadResponse.Message != null &&
                 LatestManifestLoadResponse.Failed)
@@ -698,8 +703,11 @@ namespace Schema.Unity.Editor
 #else
                     path = ManifestImportPath;
 #endif
+                        // For hiding sensitive data
+                        string relativeManifestPath = PathUtility.MakeRelativePath(ProjectPath, path);
                         
-                        EditorGUILayout.TextField("Manifest Path", path);
+                        var manifestPathContent = new GUIContent("Manifest Path", path);
+                        EditorGUILayout.TextField(manifestPathContent, relativeManifestPath);
                     }
                 }
 

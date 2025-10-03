@@ -9,12 +9,12 @@ Schema-Unity integrates the Schema content system into Unity. It lets designers 
 
 ### Core components
 - Schema Core (C#): Data model, types, serialization, storage abstraction.
-- Unity Editor tools: `Tools > Scheme Editor` and `Tools > Scheme Debugger` for editing and diagnostics.
+- Unity Editor tools: `Tools > Schema Editor` and `Tools > Schema Debugger` for editing and diagnostics.
 - Runtime integration: `Schema.Runtime.SchemaRuntime.Initialize()` loads published data from `Resources/`.
 
 ### Typical workflow
 1. Open the Unity project in `SchemaPlayground/`.
-2. Open `Tools > Scheme Editor` to view and edit schemes.
+2. Open `Tools > Schema Editor` to view and edit schemes.
 3. Modify entries (rows) and attributes (columns).
 4. Publish data to Resources and generate C# code.
 5. Access data at runtime using the generated wrappers.
