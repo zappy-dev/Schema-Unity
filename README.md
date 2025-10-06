@@ -72,29 +72,45 @@ public partial class ProfilesEntry : EntryWrapper
 - **Sample Content**: Example JSON and CSV files for rapid prototyping and testing.
 - **Extensible**: Easily add new data types, serialization formats, and editor extensions.
 
-## Project Structure
-
-```
-Schema-Unity/
-  Schema/                  # Core C# library and tests
-    Schema.Core/
-    Schema.Core.Tests/
-  SchemaPlayground/        # Unity project with sample content and editor extensions
-    Content/
-    Packages/
-      com.devzappy.schema.unity/
-        Core/
-        Editor/
-  docs/                    # Guides and reference documentation
-```
-
 ## Getting Started
 
 See the full [Quickstart](docs/Quickstart.md).
 
 ### 1) Quick Start: Integrate into an existing project (Unity Package Manager)
 
-Install via Git URL (no download required):
+#### Install via OpenUPM
+1. Open Edit/Project Settings/Package Manager
+2. Add a new Scoped Registry (or edit the existing OpenUPM entry)
+   - Name: `package.openupm.com`
+   - URL: `https://package.openupm.com`
+   - Scope(s): `com.devzappy.schema.unity`
+3. Click **Save** or **Apply**
+4. Open Window/Package Manager
+   - Click `+`
+   - Select `Add package by name...` or `Add package from git URL...`
+   - Paste `com.devzappy.schema.unity` into name
+   - Paste `0.1.0` into version
+   - Click **Add**
+   
+#### Alternatively, merge the snippet to Packages/manifest.json 
+```json
+{
+    "scopedRegistries": [
+        {
+            "name": "package.openupm.com",
+            "url": "https://package.openupm.com",
+            "scopes": [
+                "com.devzappy.schema.unity"
+            ]
+        }
+    ],
+    "dependencies": {
+        "com.devzappy.schema.unity": "0.1.0"
+    }
+}
+```
+
+#### Install via Git URL (no download required):
 1. Open your Unity project
 2. Open `Window > Package Manager`
 3. Click `+` and select `Add package from git URL...`
@@ -103,7 +119,7 @@ Install via Git URL (no download required):
    
    ![Open Schema Editor](docs/images/unity_open_schema_editor.png)
 
-Try it quickly (optional):
+#### Try it quickly (optional):
 - Create a simple scheme and entries, then publish and generate C#.
 - Initialize at runtime with `Schema.Runtime.SchemaRuntime.Initialize()`.
 
@@ -138,7 +154,23 @@ Add as local package from disk (optional):
 
 - Use the Unity Editor tools (under `Tools > Schema Editor`) to import, edit, and validate schema-based data.
 - Place your JSON/CSV data files in `SchemaPlayground/Content/`.
-- Extend or customize schema definitions in `SchemaPlayground/Packages/com.devzappy.schema.unity/Core/Data/`.
+- Extend or customize schema definitions in `SchemaPlayground/Packages/com.devzappy.schema.unity/Core/Data/`. 
+
+## Project Structure
+
+```
+Schema-Unity/
+  Schema/                  # Core C# library and tests
+    Schema.Core/
+    Schema.Core.Tests/
+  SchemaPlayground/        # Unity project with sample content and editor extensions
+    Content/
+    Packages/
+      com.devzappy.schema.unity/
+        Core/
+        Editor/
+  docs/                    # Guides and reference documentation
+```
 
 ## Contributing
 
