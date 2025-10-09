@@ -1,5 +1,7 @@
 # Schema-Unity
 
+[![openupm](https://img.shields.io/npm/v/com.devzappy.schema.unity?label=openupm&registry_uri=https://package.openupm.com)](https://openupm.com/packages/com.devzappy.schema.unity/)
+[![openupm](https://img.shields.io/badge/dynamic/json?color=brightgreen&label=downloads&query=%24.downloads&suffix=%2Fmonth&url=https%3A%2F%2Fpackage.openupm.com%2Fdownloads%2Fpoint%2Flast-month%2Fcom.devzappy.schema.unity)](https://openupm.com/packages/com.devzappy.schema.unity/)
 [![Unity CI](https://github.com/zappy-dev/Schema-Unity/actions/workflows/dotnet.yml/badge.svg?branch=main)](https://github.com/zappy-dev/Schema-Unity/actions/workflows/dotnet.yml)
 [![codecov](https://codecov.io/gh/zappy-dev/Schema-Unity/branch/main/graph/badge.svg)](https://codecov.io)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/zappy-dev?style=social)](https://github.com/sponsors/zappy-dev)
