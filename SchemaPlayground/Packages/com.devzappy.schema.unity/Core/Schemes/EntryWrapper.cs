@@ -6,10 +6,10 @@ namespace Schema.Core.Schemes
     [System.Serializable]
     public class EntryWrapper : IEquatable<EntryWrapper>
     {
-        protected readonly DataEntry DataEntry;
+        protected internal readonly DataEntry DataEntry;
         public DataEntry _ => DataEntry;
         
-        protected readonly DataScheme DataScheme;
+        protected internal readonly DataScheme DataScheme;
 
         public EntryWrapper(DataScheme dataScheme, DataEntry entry)
         {

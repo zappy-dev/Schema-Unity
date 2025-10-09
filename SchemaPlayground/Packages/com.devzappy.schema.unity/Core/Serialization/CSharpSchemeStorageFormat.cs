@@ -97,14 +97,23 @@ namespace Schema.Core.Serialization
         
         public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme scheme)
         {
+            if (!Serialize(context, scheme).Try(out var code, out var codeErr)) return codeErr.Cast();
+            
+            fileSystem.WriteAllText(context, filePath, code);
+            return Pass($"Wrote {scheme} to file: {filePath}", context);
+        }
+
+        public SchemaResult<string> Serialize(SchemaContext context, DataScheme scheme)
+        {
             using var _ = new SchemeContextScope(ref context, scheme);
+            var res = SchemaResult<string>.New(context);
             var baseSchemeClassIdentifier = scheme.SchemeName
                 .Replace(" ", string.Empty) // remove whitespace
                 .ToPascalCase();
 
             if (!IsValidIdentifierName(context, baseSchemeClassIdentifier).Try(out var err))
             {
-                return Fail(context, $"Cannot generate identifier for base class name '{baseSchemeClassIdentifier}', reason: {err.Message}");
+                return res.Fail($"Cannot generate identifier for base class name '{baseSchemeClassIdentifier}', reason: {err.Message}");
             }
             var schemeClassName = $"{baseSchemeClassIdentifier}Scheme";
             var entryClassName = $"{baseSchemeClassIdentifier}Entry";
@@ -167,7 +176,7 @@ $@"
                         .ToUpper();
                     if (!IsValidIdentifierName(context, sanitizedId).Try(out var idErr))
                     {
-                        return Fail(context, $"Cannot generate identifier for '{sanitizedId}', reason: {idErr.Message}");
+                        return res.Fail($"Cannot generate identifier for '{sanitizedId}', reason: {idErr.Message}");
                     }
 
                     string idValueCode = string.Empty;
@@ -181,7 +190,7 @@ $@"
                             idValueCode = identifierValue.ToString();
                             break;
                         default:
-                            return Fail(context, $"No code mapping for identifier data type: {idAttr}");
+                            return res.Fail($"No code mapping for identifier data type: {idAttr}");
                     }
                     
                     sb.Append(
@@ -219,7 +228,7 @@ $@"
         
         public {schemeClassName}(DataScheme dataScheme) : base(dataScheme) {{}}
         
-        protected override {entryClassName} EntryFactory(DataScheme dataScheme, DataEntry dataEntry) {{
+        protected override {entryClassName} EntryFactory({nameof(DataScheme)} dataScheme, {nameof(DataEntry)} dataEntry) {{
             return new {entryClassName}(dataScheme, dataEntry);
         }}
     }}
@@ -229,7 +238,7 @@ $@"
         /// <summary>
         /// Represents a single entry (row) in the '{scheme.SchemeName}' data scheme.
         /// </summary>
-        public {entryClassName}(DataScheme dataScheme, DataEntry entry) : base(dataScheme, entry) {{}}
+        public {entryClassName}({nameof(DataScheme)} dataScheme, {nameof(DataEntry)} entry) : base(dataScheme, entry) {{}}
 ");
             foreach (var attributeDefinition in scheme.GetAttributes()
                          .Where(a => a.ShouldPublish))
@@ -241,7 +250,7 @@ $@"
 
                 if (!IsValidIdentifierName(context, attributePropertyName).Try(out var idErr))
                 {
-                    return Fail(context, $"Cannot generate identifier for attribute '{attributePropertyName}', reason: {idErr.Message}");
+                    return res.Fail($"Cannot generate identifier for attribute '{attributePropertyName}', reason: {idErr.Message}");
                 }
                 var attributeName = attributeDefinition.AttributeName;
 
@@ -251,24 +260,9 @@ $@"
                 // string getDataMethod = "GetDataAsString";
                 // string csDataType = "string";
                 if (!attributeDefinition.DataType.GetDataMethod(context, attributeDefinition)
-                    .Try(out var getDataMethod, out var getDataError)) return getDataError.Cast();
+                    .Try(out var getDataMethod, out var getDataError)) return getDataError.CastError<string>();
                 
                 string csDataType = attributeDefinition.DataType.CSDataType;
-                // switch (attributeDefinition.DataType)
-                // {
-                //     case BooleanDataType _:
-                //         getDataMethod = "GetDataAsBool";
-                //         csDataType = "bool";
-                //         break;
-                //     case IntegerDataType _:
-                //         getDataMethod = "GetDataAsInt";
-                //         csDataType = "int";
-                //         break;
-                //     case FloatingPointDataType _:
-                //         getDataMethod = "GetDataAsFloat";
-                //         csDataType = "float";
-                //         break;
-                // }
 
                 // Add XML doc comment (use tooltip if available; otherwise provide a sensible default)
                 string propertyDocSummary = !string.IsNullOrWhiteSpace(attributeDefinition.AttributeToolTip)
@@ -290,7 +284,7 @@ $@"
         public {csDataType} {attributePropertyName}
         {{
             get => {getDataMethod};
-            set => DataScheme.SetDataOnEntry(DataEntry, ""{attributeName}"", value);
+            set => {nameof(EntryWrapper.DataScheme)}.SetDataOnEntry({nameof(EntryWrapper.DataEntry)}, ""{attributeName}"", value);
         }}
 ");
                 }
@@ -308,13 +302,7 @@ $@"
     }}
 {namespaceFooterCode}
 ");
-            fileSystem.WriteAllText(context, filePath, sb.ToString());
-            return Pass($"Wrote {scheme} to file: {filePath}", context);
-        }
-
-        public SchemaResult<string> Serialize(DataScheme scheme)
-        {
-            throw new System.NotImplementedException($"{nameof(CSharpSchemeStorageFormat)}.{nameof(Serialize)}");
+            return res.Pass(sb.ToString());
         }
     }
 }

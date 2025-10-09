@@ -324,6 +324,49 @@ namespace Schema.Core.Data
             data = null;
             return false;
         }
+
+        public List<T> GetDataAsList<T>(string attributeName)
+        {
+            if (!entryData.TryGetValue(attributeName, out var value))
+                return new List<T>();
+                
+            if (value == null)
+                return new List<T>();
+                
+            if (value is List<T> list)
+                return list;
+                
+            if (value is T[] array)
+                return new List<T>(array);
+                
+            if (value is IEnumerable<T> enumerable)
+                return new List<T>(enumerable);
+                
+            // Try to convert each element
+            if (value is IEnumerable nonGenericEnumerable)
+            {
+                var result = new List<T>();
+                foreach (var item in nonGenericEnumerable)
+                {
+                    if (item is T typedItem)
+                        result.Add(typedItem);
+                    else
+                    {
+                        try
+                        {
+                            result.Add((T)Convert.ChangeType(item, typeof(T)));
+                        }
+                        catch
+                        {
+                            // Skip items that can't be converted
+                        }
+                    }
+                }
+                return result;
+            }
+                
+            return new List<T>();
+        }
         #endregion
 
         /// <summary>

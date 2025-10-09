@@ -68,7 +68,7 @@ namespace Schema.Core.Serialization
 
         public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme data)
         {
-            if (!Serialize(data).Try(out var jsonData))
+            if (!Serialize(context, data).Try(out var jsonData))
             {
                 return Fail(context, "Failed to deserialize JSON");
             }
@@ -77,7 +77,7 @@ namespace Schema.Core.Serialization
             return Pass($"Wrote {data} to file {filePath}", context);
         }
 
-        public SchemaResult<string> Serialize(DataScheme data)
+        public SchemaResult<string> Serialize(SchemaContext context, DataScheme data)
         {
             var jsonContent = JsonConvert.SerializeObject(data, Formatting.Indented, settings);
             return SchemaResult<string>.Pass(jsonContent, successMessage: "Serialized json data", this);

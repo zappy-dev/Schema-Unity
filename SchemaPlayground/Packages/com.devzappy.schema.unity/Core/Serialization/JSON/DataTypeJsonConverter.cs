@@ -8,6 +8,9 @@ namespace Schema.Core.Serialization
 {
     public class DataTypeJsonConverter : JsonConverter
     {
+        public override bool CanRead => true;
+        public override bool CanWrite => false;
+
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(WriteJson)}");

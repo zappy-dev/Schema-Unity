@@ -36,7 +36,7 @@ public class TestJsonStorageFormat_DataEntry
             TestContext.WriteLine($"Inferred data type: {inferredDataType} for attribute: {attr}");
         }
         testScheme.AddEntry(Context, expectedData).AssertPassed();
-        var expectedSchemeJsonString = storageFormat.Serialize(testScheme).AssertPassed();
+        var expectedSchemeJsonString = storageFormat.Serialize(Context, testScheme).AssertPassed();
         
         StringAssert.Contains(testDataEntryJsonString.SanitizeWhitespace(), expectedSchemeJsonString.SanitizeWhitespace());
         
@@ -66,7 +66,7 @@ public class TestJsonStorageFormat_DataEntry
 
         testScheme.AddEntry(Context, expectedData).AssertPassed();
 
-        if (storageFormat.Serialize(testScheme).TryAssertCondition(expectedSuccess, out var jsonString))
+        if (storageFormat.Serialize(Context, testScheme).TryAssertCondition(expectedSuccess, out var jsonString))
         {
             var realExpectedJsonString =
                 altExpectedJsonString != null ? altExpectedJsonString : expectedJsonString;

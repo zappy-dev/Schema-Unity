@@ -162,7 +162,7 @@ namespace Schema.Core.Serialization
                 return Fail(context, $"Scheme cannot be null");
             }
 
-            if (!Serialize(scheme).Try(out var csvContent))
+            if (!Serialize(context, scheme).Try(out var csvContent))
             {
                 return Fail(context, "Failed to deserialize scheme");
             }
@@ -173,7 +173,7 @@ namespace Schema.Core.Serialization
             return Pass($"Wrote {scheme} to file: {filePath}");
         }
 
-        public SchemaResult<string> Serialize(DataScheme scheme)
+        public SchemaResult<string> Serialize(SchemaContext context, DataScheme scheme)
         {
             StringBuilder csvContent = new StringBuilder();
 

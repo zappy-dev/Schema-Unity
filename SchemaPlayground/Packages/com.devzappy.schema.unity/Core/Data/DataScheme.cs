@@ -158,10 +158,13 @@ namespace Schema.Core.Data
             {
                 return SchemaResult.Fail(context, "Element not found");
             }
+            
+            // Early out if element is already at target position (no-op)
             if (entryIdx == targetIndex)
             {
-                return SchemaResult.Fail(context, "Element cannot be the same as the target.");
+                return SchemaResult.Pass($"Element already at target position {targetIndex}", context);
             }
+            
             data.RemoveAt(entryIdx);
             data.Insert(targetIndex, element);
 
@@ -255,7 +258,7 @@ namespace Schema.Core.Data
             if (x is null) return false;
             if (y is null) return false;
             if (x.GetType() != y.GetType()) return false;
-            return x.SchemeName == y.SchemeName && Equals(x.attributes, y.attributes) && Equals(x.entries, y.entries) && x.isDirty == y.isDirty;
+            return x.SchemeName == y.SchemeName && ListExt.ListsAreEqual(x.attributes, y.attributes) && ListExt.ListsAreEqual(x.entries, y.entries) && x.isDirty == y.isDirty;
         }
 
         public int GetHashCode(DataScheme obj)
@@ -263,8 +266,8 @@ namespace Schema.Core.Data
             unchecked
             {
                 var hashCode = (obj.SchemeName != null ? obj.SchemeName.GetHashCode() : 0);
-                hashCode = (hashCode * 397) ^ (obj.attributes != null ? obj.attributes.GetHashCode() : 0);
-                hashCode = (hashCode * 397) ^ (obj.entries != null ? obj.entries.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ ListExt.GetListHashCode(obj.attributes);
+                hashCode = (hashCode * 397) ^ ListExt.GetListHashCode(obj.entries);
                 hashCode = (hashCode * 397) ^ obj.isDirty.GetHashCode();
                 return hashCode;
             }
@@ -283,8 +286,8 @@ namespace Schema.Core.Data
             unchecked
             {
                 var hashCode = (SchemeName != null ? SchemeName.GetHashCode() : 0);
-                hashCode = (hashCode * 397) ^ (attributes != null ? attributes.GetHashCode() : 0);
-                hashCode = (hashCode * 397) ^ (entries != null ? entries.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ ListExt.GetListHashCode(attributes);
+                hashCode = (hashCode * 397) ^ ListExt.GetListHashCode(entries);
                 return hashCode;
             }
         }

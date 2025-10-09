@@ -79,7 +79,7 @@ public class TestCSVStorageFormat
     {
         var schemeFilePath = "Test.csv";
 
-        var csvContent = storageFormat.Serialize(testScheme).AssertPassed();
+        var csvContent = storageFormat.Serialize(Context, testScheme).AssertPassed();
         Logger.Log(csvContent);
         var csvLines = CsvSchemeStorageFormat.SplitToRows(csvContent);
         mockFileSystem.Setup(fs => fs.ReadAllLines(Context, schemeFilePath))

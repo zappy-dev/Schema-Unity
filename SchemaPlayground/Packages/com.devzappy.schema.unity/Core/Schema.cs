@@ -158,6 +158,7 @@ namespace Schema.Core
                 return isInitRes.CastError<DataScheme>();
             }
             
+            // TODO: What if multiple schemes have an attribute with the same name (i.e. ID)?
             var ownerScheme = loadedSchemes.Values.FirstOrDefault(scheme =>
             {
                 return scheme.GetAttribute(attr => attr.AttributeName.Equals(searchAttr)).Try(out _);

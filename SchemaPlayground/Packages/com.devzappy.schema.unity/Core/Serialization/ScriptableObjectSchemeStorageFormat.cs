@@ -24,7 +24,7 @@ namespace Schema.Core.Serialization
             throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(SerializeToFile)}");
         }
 
-        public SchemaResult<string> Serialize(DataScheme data)
+        public SchemaResult<string> Serialize(SchemaContext context, DataScheme data)
         {
             throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(Serialize)}");
         }

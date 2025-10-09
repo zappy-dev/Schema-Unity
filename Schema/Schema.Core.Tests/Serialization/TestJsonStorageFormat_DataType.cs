@@ -48,7 +48,7 @@ public class TestJsonStorageFormat_DataType
         testScheme.AddAttribute(Context, "testAttribute", expectedData);
         
         // Test code here
-        if (_storageFormat.Serialize(testScheme).TryAssertCondition(expectedSuccess, out var jsonString))
+        if (_storageFormat.Serialize(Context, testScheme).TryAssertCondition(expectedSuccess, out var jsonString))
         {
             var realExpectedJsonString =
                 altExpectedJsonString != null ? altExpectedJsonString : expectedJsonString;

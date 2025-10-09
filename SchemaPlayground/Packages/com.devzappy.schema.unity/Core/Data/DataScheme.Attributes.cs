@@ -85,9 +85,9 @@ namespace Schema.Core.Data
                 {
                     var entryData = entry.GetData(attribute).Result;
 
-                    if (!DataType.ConvertValue(context, entryData, attribute.DataType, newType).Try(out convertedData))
+                    if (!DataType.ConvertValue(context, entryData, attribute.DataType, newType).Try(out convertedData, out var convertErr))
                     {
-                        return SchemaResult.Fail(context, $"Cannot convert attribute {attributeName} to type {newType}");
+                        return SchemaResult.Fail(context, $"Cannot convert attribute {attributeName} to type {newType}, reason: {convertErr}");
                     }
                 }
                         

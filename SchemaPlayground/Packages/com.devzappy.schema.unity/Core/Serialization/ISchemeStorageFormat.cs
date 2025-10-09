@@ -56,8 +56,9 @@ namespace Schema.Core.Serialization
         /// <summary>
         /// Serializes a <see cref="DataScheme"/> into a string payload.
         /// </summary>
+        /// <param name="context"></param>
         /// <param name="data">The <see cref="DataScheme"/> to serialize.</param>
         /// <returns>A <see cref="SchemaResult{T}"/> containing the serialized string or errors.</returns>
-        SchemaResult<string> Serialize(DataScheme data);
+        SchemaResult<string> Serialize(SchemaContext context, DataScheme data);
     }
 }
