@@ -14,6 +14,8 @@ public class TestFixtureSetup
 
         SchemaResultSettings.Instance.LogFailure = true;
         SchemaResultSettings.Instance.LogStackTrace = true;
+        SchemaResultSettings.Instance.LogVerboseScheme = true;
+        
         // Establish a deterministic project root for path resolution in tests
         if (PathUtility.IsWindowsSystem)
         {

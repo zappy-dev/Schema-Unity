@@ -475,7 +475,7 @@ namespace Schema.Unity.Editor
                 // I need to publish my manifest seperately from the manifest that is built for a project...
                             
                 // Okay, csharp code gen is part of publishing flow
-                if (storageFormat is CSharpStorageFormat)
+                if (storageFormat is CSharpSchemeStorageFormat)
                 {
                     continue;
                 }
@@ -914,6 +914,7 @@ namespace Schema.Unity.Editor
             
             if (localEntryIdx >= 0 && localEntryIdx < visibleEntryCount)
             {
+                // TODO: 
                 tableCellControlIds[localEntryIdx * scheme.AttributeCount + attributeIdx] = GUIUtility.GetControlID(FocusType.Passive);
             }
 
@@ -1316,7 +1317,7 @@ namespace Schema.Unity.Editor
             {
                 using (_dataConvertMarker.Auto())
                 {
-                    if (DataType.ConvertData(ctx, entryValue, DataType.Default, attribute.DataType).Try(out var convertedValue))
+                    if (DataType.ConvertValue(ctx, entryValue, DataType.Default, attribute.DataType).Try(out var convertedValue))
                     {
                         entryValue = convertedValue;
                         entry.SetData(ctx, attribute.AttributeName, entryValue);

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Text;
 using Moq;
 using Schema.Core.Data;
 using Schema.Core.IO;
@@ -14,38 +15,65 @@ public class TestJsonStorageFormat_DataEntry
     {
         Driver = nameof(TestJsonStorageFormat_DataEntry)
     };
-    private IStorageFormat<DataEntry> storageFormat;
+    private ISchemeStorageFormat storageFormat;
     
     [SetUp]
     public void OnTestSetup()
     {
         var mockFileSystem = new Mock<IFileSystem>();
-        storageFormat = new JsonStorageFormat<DataEntry>(mockFileSystem.Object);
+        storageFormat = new JsonSchemeStorageFormat(mockFileSystem.Object);
     }
     
     [Test, TestCaseSource(nameof(DataEntryTestCases))]
-    public void Test_TryDeserialize_DataEntry(string testJsonString, bool expectedSuccess, object expectedData, bool _, string _2)
+    public void Test_SerializeDeserialize_DataEntry(string testDataEntryJsonString, bool expectedSuccess, DataEntry expectedData, bool _, string _2)
     {
-        // Test code here
-        if (storageFormat.Deserialize(Context, testJsonString)
-            .TryAssertCondition(expectedSuccess, out var data))
+        var testScheme = new DataScheme("test");
+        foreach (var (attr, value) in expectedData)
         {
-            Assert.That(data, Is.EqualTo(expectedData));
+            var inferredDataType = DataType.InferDataTypeForValues(Context, value).AssertPassed();
+            
+            testScheme.AddAttribute(Context, attr, inferredDataType).AssertPassed();
+            TestContext.WriteLine($"Inferred data type: {inferredDataType} for attribute: {attr}");
         }
+        testScheme.AddEntry(Context, expectedData).AssertPassed();
+        var expectedSchemeJsonString = storageFormat.Serialize(testScheme).AssertPassed();
+        
+        StringAssert.Contains(testDataEntryJsonString.SanitizeWhitespace(), expectedSchemeJsonString.SanitizeWhitespace());
+        
+        // Test code here
+        var outputScheme = storageFormat.Deserialize(Context, expectedSchemeJsonString).AssertPassed();
+        var outputEntry = outputScheme.GetEntry(0);
+        Assert.That(outputEntry, Is.EqualTo(expectedData), () =>
+        {
+            var diffReport = new StringBuilder();
+            DataEntry.BuildDiffReport(Context, diffReport, expectedData, outputEntry);
+            return diffReport.ToString();
+        });
     }
     
     [Test, TestCaseSource(nameof(DataEntryTestCases))]
     public void Test_Serialize_DataEntry(string? expectedJsonString, bool _, DataEntry expectedData, bool expectedSuccess, string? altExpectedJsonString)
     {
         // Test code here
+        var testScheme = new DataScheme("test");
+        foreach (var (attr, value) in expectedData)
+        {
+            var inferredDataType = DataType.InferDataTypeForValues(Context, value).AssertPassed();
+            
+            testScheme.AddAttribute(Context, attr, inferredDataType).AssertPassed();
+            TestContext.WriteLine($"Inferred data type: {inferredDataType} for attribute: {attr}");
+        }
 
-        if (storageFormat.Serialize(expectedData).TryAssertCondition(expectedSuccess, out var jsonString))
+        testScheme.AddEntry(Context, expectedData).AssertPassed();
+
+        if (storageFormat.Serialize(testScheme).TryAssertCondition(expectedSuccess, out var jsonString))
         {
             var realExpectedJsonString =
                 altExpectedJsonString != null ? altExpectedJsonString : expectedJsonString;
 
-            realExpectedJsonString = realExpectedJsonString.ReplaceLineEndings();
-            Assert.That(jsonString, Is.EqualTo(realExpectedJsonString), "Expect that serialized data matched expected JSON string.");
+            realExpectedJsonString = realExpectedJsonString.SanitizeWhitespace();
+            jsonString = jsonString.SanitizeWhitespace();
+            StringAssert.Contains(realExpectedJsonString, jsonString);
         }
     }
 

@@ -7,6 +7,8 @@ namespace Schema.Core.Data
     public class ListDataType : DataType
     {
         public override string TypeName => $"List of {ElementType.TypeName}";
+        public override SchemaResult<string> GetDataMethod(SchemaContext context, AttributeDefinition attribute) => throw new NotImplementedException();
+        public override string CSDataType => throw new NotImplementedException();
         public DataType ElementType { get; private set; }
 
         public ListDataType()
@@ -66,8 +68,9 @@ namespace Schema.Core.Data
             throw new System.NotImplementedException($"{nameof(ListDataType)}.{nameof(Clone)}");
         }
 
-        public override SchemaResult CheckIfValidData(SchemaContext context, object value)
+        public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
+            using var _ = new DataTypeContextScope(ref context, this.TypeName);
             if (!(value is IEnumerable enumerable))
             {
                 return Fail("Value is not Enumerable", context);
@@ -84,7 +87,7 @@ namespace Schema.Core.Data
             return Fail("Not implemented", context);
         }
 
-        public override SchemaResult<object> ConvertData(SchemaContext context, object value)
+        public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
             return Fail<object>("Not implemented");
         }

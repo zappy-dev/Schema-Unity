@@ -22,11 +22,23 @@ namespace Schema.Core
         /// </summary>
         public bool LogStackTrace { get; set; } = false;
 
-#if SCHEMA_DEBUG
-        public bool LogFailure { get; set; } = true;
-#else
+        /// <summary>
+        /// Determines whether to log failure information. Useful for debugging, but not recommended during production
+        /// </summary>
         public bool LogFailure { get; set; } = false;
+
+        /// <summary>
+        /// Determines whether to log verbose scheme information. Useful for debugging, but not recommended during production
+        /// </summary>
+        public bool LogVerboseScheme { get; set; } = false;
+
+        private SchemaResultSettings()
+        {
+#if SCHEMA_DEBUG
+            LogFailure = true;
+            LogVerboseScheme = true;
 #endif
+        }
     }
     
     public struct SchemaResult
@@ -103,7 +115,7 @@ namespace Schema.Core
         
         public override string ToString()
         {
-            return $"SchemaResponse[status={status}, message={message}]";
+            return $"SchemaResponse[context={context}, status={status}, message={message}]";
         }
 
         #region Static Factory Methods

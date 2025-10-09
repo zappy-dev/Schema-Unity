@@ -13,6 +13,7 @@ namespace Schema.Core.Data
     [Serializable]
     public abstract class DataType : Defaultable, ICloneable
     {
+        #region Constants
         /// <summary>
         /// Built-in text data type.
         /// </summary>
@@ -52,6 +53,10 @@ namespace Schema.Core.Data
         /// </summary>
         public static readonly DataType Default = Text;
 
+        #endregion
+        
+        #region Static Interface
+
         /// <summary>
         /// Array of all built-in data types.
         /// </summary>
@@ -66,9 +71,9 @@ namespace Schema.Core.Data
 
         public static readonly IReadOnlyList<DataType> CoreBuiltInTypes = new [] {
             Text,
+            Boolean,
             Integer,
             Float,
-            Boolean,
             DateTime,
             Guid,
             FilePath_RelativePaths,
@@ -76,12 +81,39 @@ namespace Schema.Core.Data
         };
         // need to separate core data types from dynamically added ones..
         
+        #endregion
 
+        #region Interface
         /// <summary>
         /// Gets the name of the data type.
         /// </summary>
         [JsonIgnore]
         public abstract string TypeName { get; }
+
+        public abstract SchemaResult<string> GetDataMethod(SchemaContext context, AttributeDefinition attribute);
+        
+        [JsonIgnore]
+        public abstract string CSDataType { get; }
+
+        public abstract object Clone();
+
+        /// <summary>
+        /// Checks if the provided value is valid for this data type.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="value">The value to validate.</param>
+        /// <returns>A <see cref="SchemaResult"/> indicating if the value is valid.</returns>
+        public abstract SchemaResult IsValidValue(SchemaContext context, object value);
+
+        /// <summary>
+        /// Converts the provided value to this data type.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="value">The value to convert.</param>
+        /// <returns>A <see cref="SchemaResult{object}"/> representing the conversion result.</returns>
+        public abstract SchemaResult<object> ConvertValue(SchemaContext context, object value);
+
+        #endregion
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DataType"/> class.
@@ -108,8 +140,6 @@ namespace Schema.Core.Data
         {
             return $"DataType: {TypeName}";
         }
-
-        public abstract object Clone();
 
         private bool Equals(DataType other)
         {
@@ -144,6 +174,8 @@ namespace Schema.Core.Data
             return !Equals(left, right);
         }
 
+        #region Utilities
+
         /// <summary>
         /// Converts data from one data type to another, handling built-in and unknown types.
         /// </summary>
@@ -152,7 +184,7 @@ namespace Schema.Core.Data
         /// <param name="fromType">The source data type.</param>
         /// <param name="toType">The target data type.</param>
         /// <returns>A <see cref="SchemaResult{object}"/> representing the conversion result.</returns>
-        public static SchemaResult<object> ConvertData(SchemaContext context, object entryData, DataType fromType,
+        public static SchemaResult<object> ConvertValue(SchemaContext context, object entryData, DataType fromType,
             DataType toType)
         {
             Logger.LogDbgVerbose($"Trying to convert {entryData} to {toType}", "DataConversion");
@@ -176,26 +208,68 @@ namespace Schema.Core.Data
                         successMessage: "Converted empty data to default value", context);
                 }
 
-                return toType.ConvertData(context, data);
+                return toType.ConvertValue(context, data);
             }
 
-            return toType.ConvertData(context, entryData);
+            return toType.ConvertValue(context, entryData);
         }
 
-        /// <summary>
-        /// Checks if the provided value is valid for this data type.
-        /// </summary>
-        /// <param name="context"></param>
-        /// <param name="value">The value to validate.</param>
-        /// <returns>A <see cref="SchemaResult"/> indicating if the value is valid.</returns>
-        public abstract SchemaResult CheckIfValidData(SchemaContext context, object value);
+        public static SchemaResult<DataType> InferDataTypeForValues(SchemaContext context, params object[] entryValues)
+        {
+            var res = SchemaResult<DataType>.New(context);
+            // A high quality candidate is a data type which all entry values are valid values for
+            var highQualityCandidates = new List<DataType>();
+            var potentialDataTypes = new HashSet<DataType>(BuiltInTypes);
+            foreach (var rawValue in entryValues)
+            {
+                var enumerator = potentialDataTypes.GetEnumerator();
+                while (enumerator.MoveNext())
+                {
+                    var testType = enumerator.Current;
+                    // strings are a default representation for values, deprioritize them
+                    bool isHighQualityCandidate = !(testType is TextDataType _);
+                    
+                    // first check if the given value is already valid for a given data type
+                    if (isHighQualityCandidate && testType.IsValidValue(context, rawValue).Try(out var validateErr))
+                    {
+                        highQualityCandidates.Add(testType);
+                        break;
+                    }
 
-        /// <summary>
-        /// Converts the provided value to this data type.
-        /// </summary>
-        /// <param name="context"></param>
-        /// <param name="value">The value to convert.</param>
-        /// <returns>A <see cref="SchemaResult{object}"/> representing the conversion result.</returns>
-        public abstract SchemaResult<object> ConvertData(SchemaContext context, object value);
+                    // second, test converting the data and make sure it is valid.
+                    if (!testType.ConvertValue(context, rawValue).Try(out var convertedData) ||
+                        !testType.IsValidValue(context, convertedData).Passed)
+                    {
+                        potentialDataTypes.Remove(enumerator.Current);
+                    }
+                }
+            }
+
+            if (highQualityCandidates.Count == 0 && potentialDataTypes.Count == 0)
+            {
+                return res.Fail("Could not convert all entries to a known data type");
+            }
+
+            DataType finalDataType;
+            if (highQualityCandidates.Count > 0)
+            {
+                // TODO: Figure out how to handle multiple high-quality candidates..
+                return res.Pass(highQualityCandidates[0]);
+            }
+            
+            if (potentialDataTypes.Count >= 2)
+            {
+                // prefer non-text data type if possible
+                finalDataType = potentialDataTypes.First(dataType => !dataType.Equals(Text));
+            }
+            else
+            {
+                finalDataType = potentialDataTypes.First();
+            }
+
+            return res.Pass(finalDataType);
+        }
+        
+        #endregion
     }
 }

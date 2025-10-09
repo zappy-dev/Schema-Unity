@@ -11,7 +11,7 @@ namespace Schema.Unity.Editor
 {
     public static class EditorStorageUtility
     {
-        public static SchemaResult Export(this IStorageFormat<DataScheme> format, DataScheme scheme, SchemaContext context)
+        public static SchemaResult Export(this ISchemeStorageFormat format, DataScheme scheme, SchemaContext context)
         {
             var extParts = format.Extension.Split('.');
             var lastExt = extParts[extParts.Length - 1];
@@ -30,12 +30,12 @@ namespace Schema.Unity.Editor
             // string saveDirectory = (format is CSharpStorageFormat) ? 
             //     "Packages/dev.czarzappy.schema.unity/Core/Schemes" : 
             //     DefaultContentDirectory;
-            string saveDirectory = (format is CSharpStorageFormat) ? 
+            string saveDirectory = (format is CSharpSchemeStorageFormat) ? 
                 manifestEntry.CSharpExportPath : 
                 Schema.Core.Schema.DefaultContentDirectory;
 
             string outputFilePath;
-            if (format is CSharpStorageFormat cSharpStorageFormat)
+            if (format is CSharpSchemeStorageFormat cSharpStorageFormat)
             {
                 cSharpStorageFormat.ManifestEntry = manifestEntry;
                 exportFileName = exportFileName.Substring(0, 1).ToUpper() +  exportFileName.Substring(1);
@@ -65,7 +65,7 @@ namespace Schema.Unity.Editor
             return SchemaResult.Pass($"Schema '{scheme.SchemeName}' exported to {outputFilePath}");
         }
 
-        public static bool TryImport(this IStorageFormat<DataScheme> format, SchemaContext context, out DataScheme scheme, out string importFilePath)
+        public static bool TryImport(this ISchemeStorageFormat format, SchemaContext context, out DataScheme scheme, out string importFilePath)
         {
             importFilePath = EditorUtility.OpenFilePanel($"Import from {format.Extension.ToUpper()}", Schema.Core.Schema.DefaultContentDirectory, format.Extension);
 

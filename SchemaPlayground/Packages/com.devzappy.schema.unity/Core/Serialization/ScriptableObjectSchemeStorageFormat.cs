@@ -2,7 +2,7 @@
 
 namespace Schema.Core.Serialization
 {
-    public class ScriptableObjectStorageFormat : IStorageFormat<DataScheme>
+    public class ScriptableObjectSchemeStorageFormat : ISchemeStorageFormat
     {
         public string Extension => ".asset";
         public string DisplayName => "Scriptable Object";

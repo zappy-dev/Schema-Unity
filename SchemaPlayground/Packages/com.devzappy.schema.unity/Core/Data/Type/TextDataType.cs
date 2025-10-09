@@ -6,6 +6,8 @@ namespace Schema.Core.Data
     public class TextDataType : DataType
     {
         public override string TypeName => "String"; // TODO: Rename to Text for general interpretability
+        public override SchemaResult<string> GetDataMethod(SchemaContext context, AttributeDefinition attribute) => SchemaResult<string>.Pass($"{nameof(DataEntry)}.{nameof(DataEntry.GetDataAsString)}(\"{attribute.AttributeName}\")");
+        public override string CSDataType => typeof(string).ToString();
         public override object Clone()
         {
             return new TextDataType
@@ -24,13 +26,14 @@ namespace Schema.Core.Data
             
         }
         
-        public override SchemaResult CheckIfValidData(SchemaContext context, object value)
+        public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
+            using var _ = new DataTypeContextScope(ref context, this.TypeName);
             return CheckIf(value is string, errorMessage: $"Value {value} is not text",
                 successMessage: "Value is text", context: context);
         }
 
-        public override SchemaResult<object> ConvertData(SchemaContext context, object value)
+        public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
             // TODO, handle formating for DateTimes explicitly
             var convertedData = value == null ? "" : value.ToString();

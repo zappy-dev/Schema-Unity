@@ -6,6 +6,8 @@ namespace Schema.Core.Data
     public class FloatingPointDataType : DataType
     {
         public override string TypeName => "Float";
+        public override SchemaResult<string> GetDataMethod(SchemaContext context, AttributeDefinition attribute) => SchemaResult<string>.Pass($"{nameof(DataEntry)}.{nameof(DataEntry.GetDataAsFloat)}(\"{attribute.AttributeName}\")");
+        public override string CSDataType => typeof(float).ToString();
         public override object Clone()
         {
             return new FloatingPointDataType
@@ -19,14 +21,15 @@ namespace Schema.Core.Data
             
         }
         
-        public override SchemaResult CheckIfValidData(SchemaContext context, object value)
+        public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
+            using var _ = new DataTypeContextScope(ref context, this.TypeName);
             return CheckIf(value is float || value is double, 
                 errorMessage: "Value is not an floating point number.",
                 successMessage: "Value is an floating point number.", context);
         }
 
-        public override SchemaResult<object> ConvertData(SchemaContext context, object fromData)
+        public override SchemaResult<object> ConvertValue(SchemaContext context, object fromData)
         {
             try
             {
@@ -34,7 +37,7 @@ namespace Schema.Core.Data
                 return Pass<object>(intData,
                     successMessage: $"Value {fromData} is an floating point number.", context: context);
             }
-            catch (FormatException e)
+            catch (Exception e)
             {
                 return Fail<object>($"Failed to convert from {fromData} to {TypeName}, error: {e.Message}", context: context);
             }

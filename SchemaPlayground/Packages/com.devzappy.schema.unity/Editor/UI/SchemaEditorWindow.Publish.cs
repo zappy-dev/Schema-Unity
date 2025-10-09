@@ -67,7 +67,7 @@ namespace Schema.Unity.Editor
             if (!GetStorage(context).Try(out var storage, out var storageError)) return storageError.Cast();
             
             // Publish code
-            var exportRes = storage.CSharpStorageFormat.Export(schemeToPublish, context);
+            var exportRes = storage.CSharpSchemeStorageFormat.Export(schemeToPublish, context);
             if (exportRes.Failed)
             {
                 return exportRes;

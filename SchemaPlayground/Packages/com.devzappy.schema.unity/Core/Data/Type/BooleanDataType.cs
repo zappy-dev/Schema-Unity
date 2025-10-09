@@ -6,6 +6,9 @@ namespace Schema.Core.Data
     public class BooleanDataType : DataType
     {
         public override string TypeName => "Boolean";
+        public override SchemaResult<string> GetDataMethod(SchemaContext context, AttributeDefinition attribute) => SchemaResult<string>.Pass($"{nameof(DataEntry)}.{nameof(DataEntry.GetDataAsBool)}(\"{attribute.AttributeName}\")");
+        public override string CSDataType => typeof(bool).ToString();
+
         public override object Clone()
         {
             return new BooleanDataType
@@ -22,15 +25,17 @@ namespace Schema.Core.Data
         {
         }
 
-        public override SchemaResult CheckIfValidData(SchemaContext context, object value)
+        public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
+            using var _ = new DataTypeContextScope(ref context, this.TypeName);
             return CheckIf(value is bool, 
-                errorMessage: "Value is not a boolean.",
+                errorMessage: $"Value '{value}' is not a boolean.",
                 successMessage: "Value is a boolean.", context);
         }
 
-        public override SchemaResult<object> ConvertData(SchemaContext context, object fromData)
+        public override SchemaResult<object> ConvertValue(SchemaContext context, object fromData)
         {
+            using var _ = new DataTypeContextScope(ref context, this.TypeName);
             try
             {
                 if (fromData is bool b)

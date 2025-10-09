@@ -58,7 +58,7 @@ public class TestDataType
     [Test, TestCaseSource(nameof(ConversionTestCases))]
     public void Test_TryToConvertData(object data, DataType fromType, DataType toType, bool expectSuccessResult, object expectedConvertedResult)
     {
-        var conversion = DataType.ConvertData(Context, data, fromType, toType);
+        var conversion = DataType.ConvertValue(Context, data, fromType, toType);
 
         conversion.AssertCondition(expectSuccessResult, expectedConvertedResult);
     }
@@ -145,9 +145,9 @@ public class TestDataType
     public void Test_BooleanDataType_CheckIfValidData()
     {
         var boolType = new BooleanDataType();
-        Assert.That(boolType.CheckIfValidData(Context, true).Passed, Is.True);
-        Assert.That(boolType.CheckIfValidData(Context, false).Passed, Is.True);
-        Assert.That(boolType.CheckIfValidData(Context, "true").Passed, Is.False);
-        Assert.That(boolType.CheckIfValidData(Context, 1).Passed, Is.False);
+        Assert.That(boolType.IsValidValue(Context, true).Passed, Is.True);
+        Assert.That(boolType.IsValidValue(Context, false).Passed, Is.True);
+        Assert.That(boolType.IsValidValue(Context, "true").Passed, Is.False);
+        Assert.That(boolType.IsValidValue(Context, 1).Passed, Is.False);
     }
 }

@@ -9,17 +9,17 @@ namespace Schema.Core.IO
     {
         private string Context => nameof(Storage);
 
-        public IStorageFormat<DataScheme> JSONStorageFormat;
-        public IStorageFormat<DataScheme> CSVStorageFormat;
-        public IStorageFormat<DataScheme> CSharpStorageFormat;
-        public IStorageFormat<DataScheme> ScriptableObjectStorageFormat;
+        public ISchemeStorageFormat JsonSchemeStorageFormat;
+        public ISchemeStorageFormat CsvSchemeStorageFormat;
+        public ISchemeStorageFormat CSharpSchemeStorageFormat;
+        public ISchemeStorageFormat ScriptableObjectSchemeStorageFormat;
         
-        public IStorageFormat<DataScheme> DefaultSchemaStorageFormat => JSONStorageFormat;
-        public IStorageFormat<DataScheme> DefaultSchemaPublishFormat => JSONStorageFormat;
+        public ISchemeStorageFormat DefaultSchemeStorageFormat => JsonSchemeStorageFormat;
+        public ISchemeStorageFormat DefaultSchemaPublishFormat => JsonSchemeStorageFormat;
 
-        public IStorageFormat<DataScheme> DefaultManifestStorageFormat => JSONStorageFormat;
+        public ISchemeStorageFormat DefaultManifestStorageFormat => JsonSchemeStorageFormat;
 
-        public IEnumerable<IStorageFormat<DataScheme>> AllFormats;
+        public IEnumerable<ISchemeStorageFormat> AllFormats;
 
         public IFileSystem FileSystem { get; private set; }
 
@@ -28,17 +28,17 @@ namespace Schema.Core.IO
             Logger.LogDbgVerbose($"Initializing {fileSystem.GetType().Name}", Context);
             
             FileSystem = fileSystem;
-            JSONStorageFormat = new JsonStorageFormat<DataScheme>(fileSystem);
-            CSVStorageFormat = new CSVStorageFormat(fileSystem);
-            CSharpStorageFormat = new CSharpStorageFormat(fileSystem);
-            ScriptableObjectStorageFormat = new ScriptableObjectStorageFormat();
+            JsonSchemeStorageFormat = new JsonSchemeStorageFormat(fileSystem);
+            CsvSchemeStorageFormat = new CsvSchemeStorageFormat(fileSystem);
+            CSharpSchemeStorageFormat = new CSharpSchemeStorageFormat(fileSystem);
+            ScriptableObjectSchemeStorageFormat = new ScriptableObjectSchemeStorageFormat();
             
             AllFormats = new[]
             {
-                JSONStorageFormat,
-                CSVStorageFormat,
-                CSharpStorageFormat,
-                ScriptableObjectStorageFormat
+                JsonSchemeStorageFormat,
+                CsvSchemeStorageFormat,
+                CSharpSchemeStorageFormat,
+                ScriptableObjectSchemeStorageFormat
             };
         }
     }

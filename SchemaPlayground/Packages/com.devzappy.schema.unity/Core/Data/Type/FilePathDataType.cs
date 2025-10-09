@@ -24,8 +24,9 @@ namespace Schema.Core.Data
         {
         }
         
-        public override SchemaResult CheckIfValidData(SchemaContext context, object value)
+        public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
+            using var _ = new DataTypeContextScope(ref context, this.TypeName);
             if (!(value is string filePath))
             {
                 return Fail("Value is not a file path", context);
@@ -52,7 +53,7 @@ namespace Schema.Core.Data
             return storage.FileSystem.FileExists(context, resolvedPath);
         }
 
-        public override SchemaResult<object> ConvertData(SchemaContext context, object value)
+        public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
             if (!(value is string filePath))
             {

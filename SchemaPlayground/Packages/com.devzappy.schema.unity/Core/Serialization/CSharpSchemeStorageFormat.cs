@@ -8,7 +8,7 @@ using Schema.Core.Schemes;
 
 namespace Schema.Core.Serialization
 {
-    public class CSharpStorageFormat : IStorageFormat<DataScheme>
+    public class CSharpSchemeStorageFormat : ISchemeStorageFormat
     {
         public string Extension => "g.cs";
         public string DisplayName => "CodeGen C#";
@@ -17,19 +17,19 @@ namespace Schema.Core.Serialization
 
         private readonly IFileSystem fileSystem;
 
-        public CSharpStorageFormat(IFileSystem fileSystem)
+        public CSharpSchemeStorageFormat(IFileSystem fileSystem)
         {
             this.fileSystem = fileSystem;
         }
 
         public SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath)
         {
-            throw new System.NotImplementedException($"{nameof(CSharpStorageFormat)}.{nameof(DeserializeFromFile)}");
+            throw new System.NotImplementedException($"{nameof(CSharpSchemeStorageFormat)}.{nameof(DeserializeFromFile)}");
         }
 
         public SchemaResult<DataScheme> Deserialize(SchemaContext context, string content)
         {
-            throw new System.NotImplementedException($"{nameof(CSharpStorageFormat)}.{nameof(Deserialize)}");
+            throw new System.NotImplementedException($"{nameof(CSharpSchemeStorageFormat)}.{nameof(Deserialize)}");
         }
 
         // HACK
@@ -73,6 +73,26 @@ namespace Schema.Core.Serialization
             }
 
             return Pass();
+        }
+
+        public static string SchemeEntryClassIdentifier(string schemeName)
+        {
+            var baseSchemeClassIdentifier = schemeName
+                .Replace(" ", string.Empty) // remove whitespace
+                .ToPascalCase();
+            
+            var entryClassName = $"{baseSchemeClassIdentifier}Entry";
+            return entryClassName;
+        }
+
+        public static string SchemeClassIdentifier(string schemeName)
+        {
+            var baseSchemeClassIdentifier = schemeName
+                .Replace(" ", string.Empty) // remove whitespace
+                .ToPascalCase();
+            
+            var entryClassName = $"{baseSchemeClassIdentifier}Scheme";
+            return entryClassName;
         }
         
         public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme scheme)
@@ -228,23 +248,27 @@ $@"
                 bool codeGenAttributeSetters = scheme.SchemeName == Manifest.MANIFEST_SCHEME_NAME;
                 // TODO: Support more GetData functions for new data types
                 // Codegen?
-                string getDataMethod = "GetDataAsString";
-                string csDataType = "string";
-                switch (attributeDefinition.DataType)
-                {
-                    case BooleanDataType _:
-                        getDataMethod = "GetDataAsBool";
-                        csDataType = "bool";
-                        break;
-                    case IntegerDataType _:
-                        getDataMethod = "GetDataAsInt";
-                        csDataType = "int";
-                        break;
-                    case FloatingPointDataType _:
-                        getDataMethod = "GetDataAsFloat";
-                        csDataType = "float";
-                        break;
-                }
+                // string getDataMethod = "GetDataAsString";
+                // string csDataType = "string";
+                if (!attributeDefinition.DataType.GetDataMethod(context, attributeDefinition)
+                    .Try(out var getDataMethod, out var getDataError)) return getDataError.Cast();
+                
+                string csDataType = attributeDefinition.DataType.CSDataType;
+                // switch (attributeDefinition.DataType)
+                // {
+                //     case BooleanDataType _:
+                //         getDataMethod = "GetDataAsBool";
+                //         csDataType = "bool";
+                //         break;
+                //     case IntegerDataType _:
+                //         getDataMethod = "GetDataAsInt";
+                //         csDataType = "int";
+                //         break;
+                //     case FloatingPointDataType _:
+                //         getDataMethod = "GetDataAsFloat";
+                //         csDataType = "float";
+                //         break;
+                // }
 
                 // Add XML doc comment (use tooltip if available; otherwise provide a sensible default)
                 string propertyDocSummary = !string.IsNullOrWhiteSpace(attributeDefinition.AttributeToolTip)
@@ -265,7 +289,7 @@ $@"
 $@"     
         public {csDataType} {attributePropertyName}
         {{
-            get => DataEntry.{getDataMethod}(""{attributeName}"");
+            get => {getDataMethod};
             set => DataScheme.SetDataOnEntry(DataEntry, ""{attributeName}"", value);
         }}
 ");
@@ -274,7 +298,7 @@ $@"
                 {
                     sb.Append(
 $@"     
-        public {csDataType} {attributePropertyName} => DataEntry.{getDataMethod}(""{attributeName}"");
+        public {csDataType} {attributePropertyName} => {getDataMethod};
 ");
                 }
             }
@@ -290,7 +314,7 @@ $@"
 
         public SchemaResult<string> Serialize(DataScheme scheme)
         {
-            throw new System.NotImplementedException($"{nameof(CSharpStorageFormat)}.{nameof(Serialize)}");
+            throw new System.NotImplementedException($"{nameof(CSharpSchemeStorageFormat)}.{nameof(Serialize)}");
         }
     }
 }

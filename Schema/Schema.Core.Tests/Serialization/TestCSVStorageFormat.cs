@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Text;
 using Moq;
 using Schema.Core.Data;
 using Schema.Core.IO;
@@ -16,14 +17,14 @@ public class TestCSVStorageFormat
         Driver = nameof(TestCSVStorageFormat)
     };
     private Mock<IFileSystem> mockFileSystem;
-    private IStorageFormat<DataScheme> storageFormat;
+    private ISchemeStorageFormat storageFormat;
     private DataScheme testScheme;
 
     [SetUp]
     public void OnTestSetup()
     {
         mockFileSystem = new Mock<IFileSystem>();
-        storageFormat = new CSVStorageFormat(mockFileSystem.Object);
+        storageFormat = new CsvSchemeStorageFormat(mockFileSystem.Object);
 
         testScheme = new DataScheme("Test");
         testScheme.AddAttribute(Context, "StringField", DataType.Text);
@@ -80,13 +81,18 @@ public class TestCSVStorageFormat
 
         var csvContent = storageFormat.Serialize(testScheme).AssertPassed();
         Logger.Log(csvContent);
-        var csvLines = CSVStorageFormat.SplitToRows(csvContent);
+        var csvLines = CsvSchemeStorageFormat.SplitToRows(csvContent);
         mockFileSystem.Setup(fs => fs.ReadAllLines(Context, schemeFilePath))
             .Returns(SchemaResult<string[]>.Pass(csvLines)).Verifiable();
 
         storageFormat.DeserializeFromFile(Context, schemeFilePath).TryAssert(out DataScheme loadedScheme);
         
-        Assert.That(loadedScheme, Is.EqualTo(testScheme));
+        Assert.That(loadedScheme, Is.EqualTo(testScheme), () =>
+        {
+            var diffReport = new StringBuilder();
+            DataScheme.BuildAttributeDiffReport(Context, diffReport, testScheme, loadedScheme);
+            return diffReport.ToString();
+        });
         mockFileSystem.VerifyAll();
         mockFileSystem.VerifyNoOtherCalls();
     }

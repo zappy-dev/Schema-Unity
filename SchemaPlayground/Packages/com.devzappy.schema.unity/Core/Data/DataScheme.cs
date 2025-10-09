@@ -102,7 +102,7 @@ namespace Schema.Core.Data
 #if SCHEMA_DEBUG
             return ToString(true);
 #else
-            return ToString(false);
+            return ToString(SchemaResultSettings.Instance.LogVerboseScheme);
 #endif
         }
 
@@ -122,27 +122,8 @@ namespace Schema.Core.Data
 #endif
             if (verbose)
             {
-                
-                // var handle = GCHandle.Alloc(this, GCHandleType.Pinned);
-                //
-                // try
-                // {
-                //     IntPtr address = handle.AddrOfPinnedObject();
-                // }
-                // finally
-                // {
-                //     handle.Free();                           // ALWAYS free the handle
-                // }
                 stringBuilder.AppendLine();
-                foreach (var attribute in attributes)
-                {
-                    stringBuilder.Append($"{attribute.AttributeName},");
-                }
-                stringBuilder.AppendLine();
-                foreach (var entry in entries)
-                {
-                    stringBuilder.AppendLine($"{entry}");
-                }
+                this.PrintTableView(stringBuilder);
             }
         }
         
