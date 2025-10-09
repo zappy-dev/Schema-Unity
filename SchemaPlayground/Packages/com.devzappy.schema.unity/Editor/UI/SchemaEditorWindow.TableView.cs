@@ -109,10 +109,11 @@ namespace Schema.Unity.Editor
             const float headerHeight = 22f;
             const float spacing = 2f;
             const float minListHeight = 50f; // Minimum height for a list cell
+            const float assetPreviewHeight = 64f; // Height for asset previews (e.g., Texture)
             
             float maxHeight = baseRowHeight;
             
-            // Check each attribute for list data types
+            // Check each attribute for list data types and asset types
             for (int i = 0; i < scheme.AttributeCount; i++)
             {
                 var attribute = scheme.GetAttribute(i).Result;
@@ -133,6 +134,15 @@ namespace Schema.Unity.Editor
                     float listHeight = headerHeight + (itemCount * (itemHeight + spacing)) + spacing * 2;
                     listHeight = Math.Max(listHeight, minListHeight);
                     maxHeight = Math.Max(maxHeight, listHeight);
+                }
+                else if (attribute.DataType is UnityAssetDataType unityAssetDataType)
+                {
+                    // For texture assets and other visual assets, use a taller height to show preview
+                    if (typeof(Texture).IsAssignableFrom(unityAssetDataType.ObjectType) ||
+                        typeof(Sprite).IsAssignableFrom(unityAssetDataType.ObjectType))
+                    {
+                        maxHeight = Math.Max(maxHeight, assetPreviewHeight);
+                    }
                 }
             }
             
@@ -306,6 +316,7 @@ namespace Schema.Unity.Editor
                     }
                 }
 
+                // TODO: Fix this double scrolling window
                 using (var tableScrollView = new EditorGUILayout.ScrollViewScope(tableViewHeaderHorizontalScrollPosition,
                            alwaysShowHorizontal: true,
                            alwaysShowVertical: false))
@@ -1292,7 +1303,7 @@ namespace Schema.Unity.Editor
             var newAsset = EditorGUI.ObjectField(cellRect, asset, assetType, allowSceneObjects: false);
             if (newAsset != asset)
             {
-                if (AssetDatabase.TryGetGUIDAndLocalFileIdentifier(newAsset, out var guid, out long _))
+                if (newAsset != null && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(newAsset, out var guid, out long _))
                 {
                     onValueChanged?.Invoke(guid);
                 }
