@@ -2,15 +2,15 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
+using Schema.Core.Data;
 using Schema.Core.IO;
 using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.Serialization
 {
-    public class JsonStorageFormat<T> : IStorageFormat<T>
+    public class JsonSchemeStorageFormat : ISchemeStorageFormat
     {
         private JsonSerializerSettings settings;
         public string Extension => "json";
@@ -20,7 +20,7 @@ namespace Schema.Core.Serialization
 
         private readonly IFileSystem fileSystem;
 
-        public JsonStorageFormat(IFileSystem fileSystem)
+        public JsonSchemeStorageFormat(IFileSystem fileSystem)
         {
             this.fileSystem = fileSystem;
             settings = new JsonSerializerSettings
@@ -40,35 +40,35 @@ namespace Schema.Core.Serialization
             };
         }
         
-        public SchemaResult<T> DeserializeFromFile(SchemaContext context, string filePath)
+        public SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath)
         {
             var readRes = fileSystem.ReadAllText(context, filePath);
             
             if (!readRes.Try(out string jsonData))
             {
-                return readRes.CastError<T>();
+                return readRes.CastError<DataScheme>();
             }
 
             return Deserialize(context, jsonData);
         }
 
-        public SchemaResult<T> Deserialize(SchemaContext context, string content)
+        public SchemaResult<DataScheme> Deserialize(SchemaContext context, string content)
         {
             // TODO: Handle a non-scheme formatted file, converting into scheme format
             try
             {
-                var data = JsonConvert.DeserializeObject<T>(content, settings);
-                return SchemaResult<T>.Pass(data, "Parsed json data", this);
+                var data = JsonConvert.DeserializeObject<DataScheme>(content, settings);
+                return SchemaResult<DataScheme>.Pass(data, "Parsed json data", this);
             }
             catch (Exception ex)
             {
-                return SchemaResult<T>.Fail($"Error parsing JSON: {ex.Message}", this);
+                return SchemaResult<DataScheme>.Fail($"Error parsing JSON: {ex.Message}", this);
             }
         }
 
-        public SchemaResult SerializeToFile(SchemaContext context, string filePath, T data)
+        public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme data)
         {
-            if (!Serialize(data).Try(out var jsonData))
+            if (!Serialize(context, data).Try(out var jsonData))
             {
                 return Fail(context, "Failed to deserialize JSON");
             }
@@ -77,7 +77,7 @@ namespace Schema.Core.Serialization
             return Pass($"Wrote {data} to file {filePath}", context);
         }
 
-        public SchemaResult<string> Serialize(T data)
+        public SchemaResult<string> Serialize(SchemaContext context, DataScheme data)
         {
             var jsonContent = JsonConvert.SerializeObject(data, Formatting.Indented, settings);
             return SchemaResult<string>.Pass(jsonContent, successMessage: "Serialized json data", this);

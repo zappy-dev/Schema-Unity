@@ -440,110 +440,13 @@ namespace Schema.Unity.Editor
         /// </summary>
         private void BuildDiffReport(SchemaContext context, StringBuilder diffReport, ManifestScheme currentManifest, ManifestScheme templateManifest)
         {
-            var currentAttributes = currentManifest._.GetAttributes().ToDictionary(a => a.AttributeName);
-            var templateAttributes = templateManifest._.GetAttributes().ToDictionary(a => a.AttributeName);
-
             diffReport.AppendLine("Your project is using an out-of-date Manifest version. Would you like to upgrade?");
             diffReport.AppendLine();
-
-            // Removed (exist in current, not in template)
-            var removed = currentAttributes.Keys.Except(templateAttributes.Keys).OrderBy(k => k).ToList();
-            if (removed.Count > 0)
-            {
-                diffReport.AppendLine("Removed attributes:");
-                foreach (var name in removed)
-                {
-                    var a = currentAttributes[name];
-                    diffReport.AppendLine($"\t- {a.AttributeName} ({a.DataType.TypeName})");
-                }
-                diffReport.AppendLine();
-            }
-
-            // Added (exist in template, not in current)
-            var added = templateAttributes.Keys.Except(currentAttributes.Keys).OrderBy(k => k).ToList();
-            if (added.Count > 0)
-            {
-                diffReport.AppendLine("Added attributes:");
-                foreach (var name in added)
-                {
-                    var b = templateAttributes[name];
-                    diffReport.AppendLine($"\t+ {b.AttributeName} ({b.DataType.TypeName})");
-                }
-                diffReport.AppendLine();
-            }
-
-            // Modified (exist in both by name but differ in fields)
-            var common = currentAttributes.Keys.Intersect(templateAttributes.Keys).OrderBy(k => k);
-            var anyModified = false;
-            foreach (var name in common)
-            {
-                var a = currentAttributes[name];
-                var b = templateAttributes[name];
-
-                if (a.Equals(b))
-                {
-                    continue;
-                }
-
-                anyModified = true;
-                diffReport.AppendLine($"Modified attribute: {name}");
-
-                if (!a.DataType.Equals(b.DataType))
-                {
-                    // TODO: More in-depth attribute diff report?
-                    diffReport.AppendLine($"\t{nameof(AttributeDefinition.DataType)}: {a.DataType?.TypeName} -> {b.DataType?.TypeName}");
-                }
-
-                if (a.IsIdentifier != b.IsIdentifier)
-                {
-                    diffReport.AppendLine($"\t{nameof(AttributeDefinition.IsIdentifier)}: {a.IsIdentifier} -> {b.IsIdentifier}");
-                }
-
-                if (a.ShouldPublish != b.ShouldPublish)
-                {
-                    diffReport.AppendLine($"\t{nameof(AttributeDefinition.ShouldPublish)}: {a.ShouldPublish} -> {b.ShouldPublish}");
-                }
-
-                // UI fields (informational)
-                if (a.AttributeToolTip != b.AttributeToolTip)
-                {
-                    diffReport.AppendLine($"\t{nameof(AttributeDefinition.AttributeToolTip)}: '{a.AttributeToolTip}' -> '{b.AttributeToolTip}'");
-                }
-
-                if (a.ColumnWidth != b.ColumnWidth)
-                {
-                    diffReport.AppendLine($"\t{nameof(AttributeDefinition.ColumnWidth)}: {a.ColumnWidth} -> {b.ColumnWidth}");
-                }
-
-                // Default value comparison (best-effort string rep)
-                var aDefault = a.DefaultValue?.ToString();
-                var bDefault = b.DefaultValue?.ToString();
-                if (!string.Equals(aDefault, bDefault, StringComparison.Ordinal))
-                {
-                    diffReport.AppendLine($"\t{nameof(AttributeDefinition.DefaultValue)}: '{aDefault}' -> '{bDefault}'");
-                }
-
-                // Reference data type details if applicable
-                if (a.DataType is ReferenceDataType ar && b.DataType is ReferenceDataType br)
-                {
-                    if (ar.ReferenceSchemeName != br.ReferenceSchemeName)
-                    {
-                        diffReport.AppendLine($"\tReference Scheme: {ar.ReferenceSchemeName} -> {br.ReferenceSchemeName}");
-                    }
-                    if (ar.ReferenceAttributeName != br.ReferenceAttributeName)
-                    {
-                        diffReport.AppendLine($"\tReference Attribute: {ar.ReferenceAttributeName} -> {br.ReferenceAttributeName}");
-                    }
-                    if (ar.SupportsEmptyReferences != br.SupportsEmptyReferences)
-                    {
-                        diffReport.AppendLine($"\tAllow Empty Refs: {ar.SupportsEmptyReferences} -> {br.SupportsEmptyReferences}");
-                    }
-                }
-
-                diffReport.AppendLine();
-            }
-
-            if (!anyModified && removed.Count == 0 && added.Count == 0)
+            
+            var attrDiffDetected = DataScheme.BuildAttributeDiffReport(context, diffReport, currentManifest._, templateManifest._);
+            
+            // Check for manifest self entry differences
+            if (!attrDiffDetected)
             {
                 var currentSelfEntry = currentManifest.GetSelfEntry(context).Result;
                 var templateSelfEntry = templateManifest.GetSelfEntry(context).Result;
@@ -558,7 +461,7 @@ namespace Schema.Unity.Editor
                     var templateEntryData = templateSelfEntry._.ToDictionary();
                     
                     var overlapKeys = currentEntryData.Keys.Intersect(templateEntryData.Keys).OrderBy(k => k).ToList();
-
+            
                     foreach (var overlapKey in overlapKeys)
                     {
                         var currentValue = currentEntryData[overlapKey];
@@ -571,7 +474,7 @@ namespace Schema.Unity.Editor
                     
                     var currentOnlyKeys =  currentEntryData.Keys.Except(overlapKeys).OrderBy(k => k);
                     var templateOnlyKeys =  templateEntryData.Keys.Except(overlapKeys).OrderBy(k => k);
-
+            
                     foreach (var currentOnlyKey in currentOnlyKeys)
                     {
                         diffReport.AppendLine($"- DELETED KEY: {currentOnlyKey}");
@@ -853,7 +756,7 @@ namespace Schema.Unity.Editor
                                 continue;
                             }
 
-                            if (storageFormat is ScriptableObjectStorageFormat so)
+                            if (storageFormat is ScriptableObjectSchemeStorageFormat so)
                             {
                                 foreach (var soType in TypeUtils.GetUserDefinedScriptableObjectTypes())
                                 {
@@ -1045,7 +948,7 @@ namespace Schema.Unity.Editor
                             }
                                                     
                             // finally save new data scheme
-                            string enumSchemeFileName = $"{enumSchemeName}.{storage.DefaultSchemaStorageFormat.Extension}";
+                            string enumSchemeFileName = $"{enumSchemeName}.{storage.DefaultSchemeStorageFormat.Extension}";
                             SubmitAddSchemeRequest(context, enumScheme, importFilePath: enumSchemeFileName).FireAndForget();
                         }
                     }
@@ -1162,7 +1065,7 @@ namespace Schema.Unity.Editor
             }
 
             progress.Progress($"Loading final Data Scheme", 0.9f);
-            string fileName = $"{newSOSchemeName}.{storage.DefaultSchemaStorageFormat.Extension}";
+            string fileName = $"{newSOSchemeName}.{storage.DefaultSchemeStorageFormat.Extension}";
             SubmitAddSchemeRequest(context, dataScheme, importFilePath: fileName).FireAndForget();
             return Pass("Submitted request to add new scheme");
         }

@@ -10,7 +10,7 @@ using static Schema.Core.SchemaResult;
 namespace Schema.Core.Data
 {
     [Serializable]
-    public class DataEntry : IEnumerable<KeyValuePair<string, object>>, IEquatable<DataEntry>
+    public partial class DataEntry : IEnumerable<KeyValuePair<string, object>>, IEquatable<DataEntry>
     {
         public string Context => nameof(DataEntry);
         
@@ -25,6 +25,8 @@ namespace Schema.Core.Data
         {
             this.entryData = entryData;
         }
+        
+        #region Get Data API
 
         // Get and set data for an attribute
         public object GetData(string attributeName)
@@ -140,6 +142,19 @@ namespace Schema.Core.Data
                 return parsedValue;
                 
             return 0f;
+        }
+
+        public DateTime GetDataAsDateTime(string attributeName)
+        {
+            if (!entryData.TryGetValue(attributeName, out var value))
+                return DateTime.MinValue;
+
+            if (value is DateTime dateTimeValue)
+            {
+                return dateTimeValue;
+            }
+            
+            return DateTime.MinValue;
         }
 
         public TEnum GetDataAsEnum<TEnum>(string attributeName) where TEnum : struct, Enum
@@ -309,6 +324,50 @@ namespace Schema.Core.Data
             data = null;
             return false;
         }
+
+        public List<T> GetDataAsList<T>(string attributeName)
+        {
+            if (!entryData.TryGetValue(attributeName, out var value))
+                return new List<T>();
+                
+            if (value == null)
+                return new List<T>();
+                
+            if (value is List<T> list)
+                return list;
+                
+            if (value is T[] array)
+                return new List<T>(array);
+                
+            if (value is IEnumerable<T> enumerable)
+                return new List<T>(enumerable);
+                
+            // Try to convert each element
+            if (value is IEnumerable nonGenericEnumerable)
+            {
+                var result = new List<T>();
+                foreach (var item in nonGenericEnumerable)
+                {
+                    if (item is T typedItem)
+                        result.Add(typedItem);
+                    else
+                    {
+                        try
+                        {
+                            result.Add((T)Convert.ChangeType(item, typeof(T)));
+                        }
+                        catch
+                        {
+                            // Skip items that can't be converted
+                        }
+                    }
+                }
+                return result;
+            }
+                
+            return new List<T>();
+        }
+        #endregion
 
         /// <summary>
         /// Sets the value for an attribute in this entry.

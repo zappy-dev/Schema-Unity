@@ -149,6 +149,24 @@ namespace Schema.Core
                 successMessage: $"Scheme '{schemeName}' is loaded.", context);
         }
 
+        public static SchemaResult<DataScheme> GetOwnerSchemeForAttribute(SchemaContext context, string searchAttr)
+        {
+            var res = SchemaResult<DataScheme>.New(context);
+                      var isInitRes = IsInitialized(context);
+            if (isInitRes.Failed)
+            {
+                return isInitRes.CastError<DataScheme>();
+            }
+            
+            // TODO: What if multiple schemes have an attribute with the same name (i.e. ID)?
+            var ownerScheme = loadedSchemes.Values.FirstOrDefault(scheme =>
+            {
+                return scheme.GetAttribute(attr => attr.AttributeName.Equals(searchAttr)).Try(out _);
+            });
+            
+            return res.CheckIf(ownerScheme != null, ownerScheme, $"No owner scheme found for attribute: {searchAttr}");
+        }
+
         public static SchemaResult<DataScheme> GetOwnerSchemeForAttribute(SchemaContext context, AttributeDefinition searchAttr)
         {
             var res = SchemaResult<DataScheme>.New(context);

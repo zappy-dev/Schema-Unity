@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -93,6 +94,50 @@ namespace Schema.Unity.Editor
         }
         
         private readonly TableLayout _tableLayout = new TableLayout();
+        
+        // Cache for row heights to avoid recalculating every frame
+        private Dictionary<string, Dictionary<int, float>> _rowHeightCache = new Dictionary<string, Dictionary<int, float>>();
+        private string _lastCachedSchemeName = null;
+        
+        /// <summary>
+        /// Calculates the required height for a row based on its content
+        /// </summary>
+        private float CalculateRowHeight(DataEntry entry, DataScheme scheme)
+        {
+            const float baseRowHeight = 20f;
+            const float itemHeight = 20f;
+            const float headerHeight = 22f;
+            const float spacing = 2f;
+            const float minListHeight = 50f; // Minimum height for a list cell
+            
+            float maxHeight = baseRowHeight;
+            
+            // Check each attribute for list data types
+            for (int i = 0; i < scheme.AttributeCount; i++)
+            {
+                var attribute = scheme.GetAttribute(i).Result;
+                if (attribute.DataType is ListDataType)
+                {
+                    var entryValue = entry.GetDataDirect(attribute);
+                    int itemCount = 0;
+                    
+                    if (entryValue != null && entryValue is IEnumerable enumerable && !(entryValue is string))
+                    {
+                        foreach (var _ in enumerable)
+                        {
+                            itemCount++;
+                        }
+                    }
+                    
+                    // Calculate list height: header + (items * itemHeight) + spacing
+                    float listHeight = headerHeight + (itemCount * (itemHeight + spacing)) + spacing * 2;
+                    listHeight = Math.Max(listHeight, minListHeight);
+                    maxHeight = Math.Max(maxHeight, listHeight);
+                }
+            }
+            
+            return maxHeight;
+        }
 
         [NonSerialized] private string selectedSchemeLoadPath = null;
 
@@ -182,12 +227,11 @@ namespace Schema.Unity.Editor
             int attributeCount = scheme.AttributeCount;
             int availableEntryCount = allEntries.Count;
             int totalEntryCount = scheme.EntryCount;
-                
-            // mapping entries to control IDs for focus/navigation management
-            // For virtual scrolling, we only need control IDs for visible entries
-            int visibleEntryCount = _virtualTableView.IsVirtualScrollingActive ? 
-                Math.Min(totalEntryCount, 50) : totalEntryCount; // Limit to reasonable number for virtual scrolling
-            int[] tableCellControlIds = new int[attributeCount * visibleEntryCount];
+            
+            // Declare these at function scope so they're accessible by keyboard navigation code
+            (int start, int end) visibleRange = (0, 0);
+            int visibleEntryCount = 0;
+            int[] tableCellControlIds = Array.Empty<int>();
 
             using (new GUILayout.VerticalScope())
             {
@@ -285,7 +329,7 @@ namespace Schema.Unity.Editor
                         _tableBodyMarker.Begin();
 
                         // Calculate visible range for virtual scrolling
-                        var visibleRange = _virtualTableView.CalculateVisibleRange(
+                        visibleRange = _virtualTableView.CalculateVisibleRange(
                             tableViewBodyVerticalScrollPosition,
                             lastScrollViewRect,
                             allEntries.Count,
@@ -298,31 +342,60 @@ namespace Schema.Unity.Editor
                         {
                             visibleRange = (visibleRange.start, Math.Min(visibleRange.end, allEntries.Count));
                         }
+                        
+                        // mapping entries to control IDs for focus/navigation management
+                        // For virtual scrolling, we only need control IDs for visible entries
+                        // Allocate based on actual visible range to prevent IndexOutOfRangeException
+                        visibleEntryCount = visibleRange.end - visibleRange.start;
+                        tableCellControlIds = new int[attributeCount * visibleEntryCount];
 
                         // Efficient approach: use single spacers for all invisible rows instead of individual spaces
                         // This reduces GUI allocations and improves performance
                         int renderedCount = 0;
 
+                        // Calculate row heights for all entries (needed for proper scrolling)
+                        // Use cache to avoid recalculating every frame
+                        if (_lastCachedSchemeName != scheme.SchemeName || !_rowHeightCache.ContainsKey(scheme.SchemeName) || scheme.IsDirty)
+                        {
+                            _rowHeightCache[scheme.SchemeName] = new Dictionary<int, float>();
+                            for (int i = 0; i < allEntries.Count; i++)
+                            {
+                                _rowHeightCache[scheme.SchemeName][i] = CalculateRowHeight(allEntries[i], scheme);
+                            }
+                            _lastCachedSchemeName = scheme.SchemeName;
+                        }
+                        
+                        var rowHeights = _rowHeightCache[scheme.SchemeName];
+
                         // Top spacer for rows before visible range
                         if (visibleRange.start > 0)
                         {
-                            float topSpacerHeight = visibleRange.start * _tableLayout.RowHeight;
+                            float topSpacerHeight = 0;
+                            for (int i = 0; i < visibleRange.start; i++)
+                            {
+                                topSpacerHeight += rowHeights[i];
+                            }
                             GUILayout.Space(topSpacerHeight);
                         }
 
                         // Render visible rows
                         for (int i = visibleRange.start; i < visibleRange.end; i++)
                         {
-                            var rowRect = GUILayoutUtility.GetRect(0, _tableLayout.RowHeight);
+                            float rowHeight = rowHeights[i];
+                            var rowRect = GUILayoutUtility.GetRect(0, rowHeight);
                             RenderTableRow(renderCtx, rowRect, allEntries.ElementAt(i), i, attributeCount, scheme,
-                                tableCellControlIds, visibleEntryCount, visibleRange.start);
+                                tableCellControlIds, visibleEntryCount, visibleRange.start, rowHeight);
                             renderedCount++;
                         }
 
                         // Bottom spacer for rows after visible range
                         if (visibleRange.end < allEntries.Count)
                         {
-                            float bottomSpacerHeight = (allEntries.Count - visibleRange.end) * _tableLayout.RowHeight;
+                            float bottomSpacerHeight = 0;
+                            for (int i = visibleRange.end; i < allEntries.Count; i++)
+                            {
+                                bottomSpacerHeight += rowHeights[i];
+                            }
                             GUILayout.Space(bottomSpacerHeight);
                         }
 
@@ -475,7 +548,7 @@ namespace Schema.Unity.Editor
                 // I need to publish my manifest seperately from the manifest that is built for a project...
                             
                 // Okay, csharp code gen is part of publishing flow
-                if (storageFormat is CSharpStorageFormat)
+                if (storageFormat is CSharpSchemeStorageFormat)
                 {
                     continue;
                 }
@@ -902,7 +975,7 @@ namespace Schema.Unity.Editor
         /// <summary>
         /// Renders a data cell based on the attribute data type
         /// </summary>
-        private void RenderDataCell(SchemaContext renderCtx, Rect cellRect, DataEntry entry, AttributeDefinition attribute, object entryValue, CellStyle cellStyle, int entryIdx, int attributeIdx, DataScheme scheme, int[] tableCellControlIds, int visibleEntryCount, int visibleRangeStart)
+        private void RenderDataCell(SchemaContext renderCtx, Rect cellRect, DataEntry entry, AttributeDefinition attribute, object entryValue, CellStyle cellStyle, int entryIdx, int attributeIdx, DataScheme scheme, int[] tableCellControlIds, int visibleEntryCount, int visibleRangeStart, int attributeCount)
         {
             var originalColor = GUI.backgroundColor;
             GUI.backgroundColor = cellStyle.BackgroundColor;
@@ -914,7 +987,11 @@ namespace Schema.Unity.Editor
             
             if (localEntryIdx >= 0 && localEntryIdx < visibleEntryCount)
             {
-                tableCellControlIds[localEntryIdx * scheme.AttributeCount + attributeIdx] = GUIUtility.GetControlID(FocusType.Passive);
+                int controlIdIndex = localEntryIdx * attributeCount + attributeIdx;
+                if (controlIdIndex >= 0 && controlIdIndex < tableCellControlIds.Length)
+                {
+                    tableCellControlIds[controlIdIndex] = GUIUtility.GetControlID(FocusType.Passive);
+                }
             }
 
             var updateCtx = new SchemaContext
@@ -973,8 +1050,8 @@ namespace Schema.Unity.Editor
                     RenderGuidCell(cellRect, entryValue is Guid ? (Guid)entryValue : default, cellStyle,
                         value => UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
-                case ListDataType _:
-                    RenderListCell(cellRect, entryValue, cellStyle, value => UpdateEntryValue(updateCtx, entry,  attribute, value, scheme));
+                case ListDataType listDataType:
+                    RenderListCell(renderCtx, cellRect, entryValue, listDataType, cellStyle, value => UpdateEntryValue(updateCtx, entry,  attribute, value, scheme));
                     break;
                 default:
                     RenderUnmappedFieldCell(cellRect, entryValue, cellStyle);
@@ -984,28 +1061,215 @@ namespace Schema.Unity.Editor
             GUI.backgroundColor = originalColor;
         }
 
-        // TODO: Finish implementing lists
-        private void RenderListCell(Rect cellRect, object entryValue, CellStyle cellStyle, Action<object> action)
+        /// <summary>
+        /// Renders a list data type cell with add/remove functionality
+        /// </summary>
+        private void RenderListCell(SchemaContext context, Rect cellRect, object entryValue, ListDataType listDataType, CellStyle cellStyle, Action<object> onValueChanged)
         {
-            // rendering list
-            var elements = new string[] { };
+            // Convert entry value to a list we can work with
+            var listItems = new List<object>();
+            if (entryValue != null && entryValue is IEnumerable enumerable && !(entryValue is string))
+            {
+                foreach (var item in enumerable)
+                {
+                    listItems.Add(item);
+                }
+            }
+
+            const float itemHeight = 20f;
+            const float buttonWidth = 20f;
+            const float spacing = 2f;
+            const float headerHeight = 22f;
             
-            var list = new ReorderableList(elements, typeof(string), true, false,  true, true);
-            list.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Items");
-            list.drawElementCallback = (rect, index, active, focused) =>
-            {
-                rect.y += 2;
-                var el = elements[index];
-                elements[index] = EditorGUI.TextField(rect, $"Element {index}", el);
-            };
-            list.onAddCallback = rl =>
-            {
-            };
-            list.onRemoveCallback = rl =>
-            {
-            };
+            // Draw background
+            var originalColor = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(0.2f, 0.2f, 0.2f, 0.3f);
+            GUI.Box(cellRect, "", EditorStyles.helpBox);
+            GUI.backgroundColor = originalColor;
             
-            list.DoLayoutList();
+            float currentY = cellRect.y + spacing;
+            
+            // Header with count and add button
+            var headerRect = new Rect(cellRect.x + spacing, currentY, cellRect.width - spacing * 2, headerHeight);
+            var addButtonRect = new Rect(headerRect.xMax - buttonWidth, headerRect.y, buttonWidth, headerHeight);
+            var headerLabelRect = new Rect(headerRect.x, headerRect.y, headerRect.width - buttonWidth - spacing, headerHeight);
+            
+            EditorGUI.LabelField(headerLabelRect, $"{listItems.Count} item{(listItems.Count != 1 ? "s" : "")}", EditorStyles.miniLabel);
+            
+            if (GUI.Button(addButtonRect, "+", EditorStyles.miniButton))
+            {
+                // Add a new default item
+                object newItem = GetDefaultValueForElementType(context, listDataType.ElementType);
+                listItems.Add(newItem);
+                onValueChanged?.Invoke(ConvertListToTypedArray(listItems, listDataType.ElementType));
+            }
+            
+            currentY += headerHeight + spacing;
+            
+            // Render each list item
+            for (int i = 0; i < listItems.Count; i++)
+            {
+                var itemRect = new Rect(cellRect.x + spacing, currentY, cellRect.width - spacing * 2, itemHeight);
+                var removeButtonRect = new Rect(itemRect.xMax - buttonWidth, itemRect.y, buttonWidth, itemHeight);
+                var valueRect = new Rect(itemRect.x, itemRect.y, itemRect.width - buttonWidth - spacing, itemHeight);
+                
+                // Render the value field based on element type
+                object newValue = RenderListElementField(context, valueRect, listItems[i], listDataType.ElementType, cellStyle);
+                if (newValue != null && !Equals(newValue, listItems[i]))
+                {
+                    listItems[i] = newValue;
+                    onValueChanged?.Invoke(ConvertListToTypedArray(listItems, listDataType.ElementType));
+                }
+                
+                // Remove button
+                if (GUI.Button(removeButtonRect, "-", EditorStyles.miniButton))
+                {
+                    listItems.RemoveAt(i);
+                    onValueChanged?.Invoke(ConvertListToTypedArray(listItems, listDataType.ElementType));
+                    break; // Exit the loop since we modified the list
+                }
+                
+                currentY += itemHeight + spacing;
+            }
+        }
+        
+        /// <summary>
+        /// Renders a field for a single list element based on its data type
+        /// </summary>
+        private object RenderListElementField(SchemaContext context, Rect rect, object value, DataType elementType, CellStyle cellStyle)
+        {
+            if (elementType == null)
+            {
+                return EditorGUI.TextField(rect, value?.ToString() ?? "", cellStyle.FieldStyle);
+            }
+            
+            switch (elementType)
+            {
+                case IntegerDataType _:
+                    int intValue = value != null ? Convert.ToInt32(value) : 0;
+                    return SchemaGUI.IntField(rect, intValue, cellStyle.FieldStyle);
+                    
+                case FloatingPointDataType _:
+                    float floatValue = value != null ? Convert.ToSingle(value) : 0f;
+                    return SchemaGUI.FloatField(rect, floatValue, cellStyle.FieldStyle);
+                    
+                case BooleanDataType _:
+                    bool boolValue = false;
+                    if (value is bool b)
+                        boolValue = b;
+                    else if (value is string s && bool.TryParse(s, out var parsed))
+                        boolValue = parsed;
+                    else if (value is int i)
+                        boolValue = i != 0;
+                    return EditorGUI.Toggle(rect, boolValue);
+                    
+                case ReferenceDataType refDataType:
+                    var currentValue = value?.ToString() ?? "...";
+                    if (GUI.Button(rect, currentValue, cellStyle.DropdownStyle))
+                    {
+                        var referenceEntryOptions = new GenericMenu();
+                        if (GetScheme(context, refDataType.ReferenceSchemeName).Try(out var refSchema))
+                        {
+                            foreach (var identifierValue in refSchema.GetIdentifierValues())
+                            {
+                                var idValueStr = identifierValue.ToString();
+                                referenceEntryOptions.AddItem(
+                                    new GUIContent(idValueStr),
+                                    on: identifierValue.Equals(currentValue),
+                                    () => { /* Value will be updated on next frame */ });
+                            }
+                        }
+                        referenceEntryOptions.ShowAsContext();
+                    }
+                    return value; // Reference values need special handling
+                    
+                case GuidDataType _:
+                    Guid guidValue = value is Guid g ? g : Guid.Empty;
+                    return EditorGUI.TextField(rect, guidValue.ToString(), cellStyle.FieldStyle);
+                    
+                case DateTimeDataType _:
+                    DateTime dateValue = value is DateTime dt ? dt : DateTime.Now;
+                    string dateStr = dateValue.ToString("yyyy-MM-dd HH:mm:ss");
+                    string newDateStr = EditorGUI.TextField(rect, dateStr, cellStyle.FieldStyle);
+                    if (newDateStr != dateStr && DateTime.TryParse(newDateStr, out DateTime parsedDate))
+                    {
+                        return parsedDate;
+                    }
+                    return dateValue;
+                    
+                case TextDataType _:
+                case FilePathDataType _:
+                case FolderDataType _:
+                default:
+                    return EditorGUI.TextField(rect, value?.ToString() ?? "", cellStyle.FieldStyle);
+            }
+        }
+        
+        /// <summary>
+        /// Gets the default value for a given element type
+        /// </summary>
+        private object GetDefaultValueForElementType(SchemaContext context, DataType elementType)
+        {
+            if (elementType == null)
+                return "";
+            
+            switch (elementType)
+            {
+                case IntegerDataType _:
+                    return 0;
+                case FloatingPointDataType _:
+                    return 0f;
+                case BooleanDataType _:
+                    return false;
+                case GuidDataType _:
+                    return Guid.NewGuid();
+                case DateTimeDataType _:
+                    return DateTime.Now;
+                case ReferenceDataType refDataType:
+                    // Try to get the first identifier value from the referenced scheme
+                    if (GetScheme(context, refDataType.ReferenceSchemeName).Try(out var refSchema))
+                    {
+                        var identifiers = refSchema.GetIdentifierValues().ToArray();
+                        if (identifiers.Length > 0)
+                            return identifiers[0];
+                    }
+                    return "";
+                case TextDataType _:
+                case FilePathDataType _:
+                case FolderDataType _:
+                default:
+                    return "";
+            }
+        }
+        
+        /// <summary>
+        /// Converts a generic list to a typed array based on element type
+        /// </summary>
+        private object ConvertListToTypedArray(List<object> list, DataType elementType)
+        {
+            if (elementType == null)
+                return list.ToArray();
+            
+            switch (elementType)
+            {
+                case IntegerDataType _:
+                    return list.Select(o => Convert.ToInt32(o)).ToArray();
+                case FloatingPointDataType _:
+                    return list.Select(o => Convert.ToSingle(o)).ToArray();
+                case BooleanDataType _:
+                    return list.Select(o => o is bool b ? b : Convert.ToBoolean(o)).ToArray();
+                case GuidDataType _:
+                    return list.Select(o => o is Guid g ? g : Guid.Parse(o.ToString())).ToArray();
+                case DateTimeDataType _:
+                    return list.Select(o => o is DateTime dt ? dt : DateTime.Parse(o.ToString())).ToArray();
+                case ReferenceDataType _:
+                case TextDataType _:
+                case FilePathDataType _:
+                case FolderDataType _:
+                    return list.Select(o => o?.ToString() ?? "").ToArray();
+                default:
+                    return list.ToArray();
+            }
         }
 
         private void RenderGuidCell(Rect cellRect, Guid entryValue, CellStyle cellStyle, Action<object> action)
@@ -1261,7 +1525,7 @@ namespace Schema.Unity.Editor
         /// <summary>
         /// Renders a single table row using rect-based rendering
         /// </summary>
-        private void RenderTableRow(SchemaContext renderCtx, Rect rowRect, DataEntry entry, int entryIdx, int attributeCount, DataScheme scheme, int[] tableCellControlIds, int visibleEntryCount, int visibleRangeStart)
+        private void RenderTableRow(SchemaContext renderCtx, Rect rowRect, DataEntry entry, int entryIdx, int attributeCount, DataScheme scheme, int[] tableCellControlIds, int visibleEntryCount, int visibleRangeStart, float rowHeight)
         {
             var cellStyle = GetRowCellStyle(entryIdx);
             
@@ -1272,7 +1536,7 @@ namespace Schema.Unity.Editor
             float currentX = rowRect.x;
             
             // Render row number cell
-            var rowNumberRect = new Rect(currentX, rowRect.y, _tableLayout.SettingsWidth, _tableLayout.RowHeight);
+            var rowNumberRect = new Rect(currentX, rowRect.y, _tableLayout.SettingsWidth, rowHeight);
             RenderRowNumberCell(rowNumberRect, entryIdx + 1, cellStyle, entryIdx, scheme.EntryCount, scheme, entry);
             currentX += _tableLayout.SettingsWidth;
             
@@ -1280,12 +1544,12 @@ namespace Schema.Unity.Editor
             for (int attributeIdx = 0; attributeIdx < attributeCount; attributeIdx++)
             {
                 var attribute = scheme.GetAttribute(attributeIdx).Result;
-                var cellRect = new Rect(currentX, rowRect.y, attribute.ColumnWidth, _tableLayout.RowHeight);
+                var cellRect = new Rect(currentX, rowRect.y, attribute.ColumnWidth, rowHeight);
                 var entryValue = GetEntryValue(scheme, entry, attribute);
                 
                 using (_dataCellMarker.Auto()) 
                 {
-                    RenderDataCell(renderCtx, cellRect, entry, attribute, entryValue, cellStyle, entryIdx, attributeIdx, scheme, tableCellControlIds, visibleEntryCount, visibleRangeStart);
+                    RenderDataCell(renderCtx, cellRect, entry, attribute, entryValue, cellStyle, entryIdx, attributeIdx, scheme, tableCellControlIds, visibleEntryCount, visibleRangeStart, attributeCount);
                 }
                 
                 currentX += attribute.ColumnWidth;
@@ -1316,7 +1580,7 @@ namespace Schema.Unity.Editor
             {
                 using (_dataConvertMarker.Auto())
                 {
-                    if (DataType.ConvertData(ctx, entryValue, DataType.Default, attribute.DataType).Try(out var convertedValue))
+                    if (DataType.ConvertValue(ctx, entryValue, DataType.Default, attribute.DataType).Try(out var convertedValue))
                     {
                         entryValue = convertedValue;
                         entry.SetData(ctx, attribute.AttributeName, entryValue);

@@ -265,7 +265,7 @@ namespace Schema.Core
             progress?.Report(resolvedPath);
                 
             // TODO support async loading
-            if (!_storage.DefaultSchemaStorageFormat.DeserializeFromFile(context, resolvedPath)
+            if (!_storage.DefaultSchemeStorageFormat.DeserializeFromFile(context, resolvedPath)
                     .Try(out var loadedSchema, out var loadErr))
             {
                 return res.Fail($"Failed to load scheme from file: {resolvedPath}, reason: {loadErr.Message}");
@@ -573,7 +573,7 @@ namespace Schema.Core
                 }
                 
                 Logger.LogDbgVerbose($"Saving {scheme} to file {resolvedPath} (from path {savePath})", "Storage");
-                result = _storage.DefaultSchemaStorageFormat.SerializeToFile(context, resolvedPath, scheme);
+                result = _storage.DefaultSchemeStorageFormat.SerializeToFile(context, resolvedPath, scheme);
             }
 
             if (scheme.IsManifest || alsoSaveManifest)

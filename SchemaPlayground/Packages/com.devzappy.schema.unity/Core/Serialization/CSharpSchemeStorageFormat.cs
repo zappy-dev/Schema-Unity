@@ -8,7 +8,7 @@ using Schema.Core.Schemes;
 
 namespace Schema.Core.Serialization
 {
-    public class CSharpStorageFormat : IStorageFormat<DataScheme>
+    public class CSharpSchemeStorageFormat : ISchemeStorageFormat
     {
         public string Extension => "g.cs";
         public string DisplayName => "CodeGen C#";
@@ -17,19 +17,19 @@ namespace Schema.Core.Serialization
 
         private readonly IFileSystem fileSystem;
 
-        public CSharpStorageFormat(IFileSystem fileSystem)
+        public CSharpSchemeStorageFormat(IFileSystem fileSystem)
         {
             this.fileSystem = fileSystem;
         }
 
         public SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath)
         {
-            throw new System.NotImplementedException($"{nameof(CSharpStorageFormat)}.{nameof(DeserializeFromFile)}");
+            throw new System.NotImplementedException($"{nameof(CSharpSchemeStorageFormat)}.{nameof(DeserializeFromFile)}");
         }
 
         public SchemaResult<DataScheme> Deserialize(SchemaContext context, string content)
         {
-            throw new System.NotImplementedException($"{nameof(CSharpStorageFormat)}.{nameof(Deserialize)}");
+            throw new System.NotImplementedException($"{nameof(CSharpSchemeStorageFormat)}.{nameof(Deserialize)}");
         }
 
         // HACK
@@ -74,17 +74,46 @@ namespace Schema.Core.Serialization
 
             return Pass();
         }
+
+        public static string SchemeEntryClassIdentifier(string schemeName)
+        {
+            var baseSchemeClassIdentifier = schemeName
+                .Replace(" ", string.Empty) // remove whitespace
+                .ToPascalCase();
+            
+            var entryClassName = $"{baseSchemeClassIdentifier}Entry";
+            return entryClassName;
+        }
+
+        public static string SchemeClassIdentifier(string schemeName)
+        {
+            var baseSchemeClassIdentifier = schemeName
+                .Replace(" ", string.Empty) // remove whitespace
+                .ToPascalCase();
+            
+            var entryClassName = $"{baseSchemeClassIdentifier}Scheme";
+            return entryClassName;
+        }
         
         public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme scheme)
         {
+            if (!Serialize(context, scheme).Try(out var code, out var codeErr)) return codeErr.Cast();
+            
+            fileSystem.WriteAllText(context, filePath, code);
+            return Pass($"Wrote {scheme} to file: {filePath}", context);
+        }
+
+        public SchemaResult<string> Serialize(SchemaContext context, DataScheme scheme)
+        {
             using var _ = new SchemeContextScope(ref context, scheme);
+            var res = SchemaResult<string>.New(context);
             var baseSchemeClassIdentifier = scheme.SchemeName
                 .Replace(" ", string.Empty) // remove whitespace
                 .ToPascalCase();
 
             if (!IsValidIdentifierName(context, baseSchemeClassIdentifier).Try(out var err))
             {
-                return Fail(context, $"Cannot generate identifier for base class name '{baseSchemeClassIdentifier}', reason: {err.Message}");
+                return res.Fail($"Cannot generate identifier for base class name '{baseSchemeClassIdentifier}', reason: {err.Message}");
             }
             var schemeClassName = $"{baseSchemeClassIdentifier}Scheme";
             var entryClassName = $"{baseSchemeClassIdentifier}Entry";
@@ -147,7 +176,7 @@ $@"
                         .ToUpper();
                     if (!IsValidIdentifierName(context, sanitizedId).Try(out var idErr))
                     {
-                        return Fail(context, $"Cannot generate identifier for '{sanitizedId}', reason: {idErr.Message}");
+                        return res.Fail($"Cannot generate identifier for '{sanitizedId}', reason: {idErr.Message}");
                     }
 
                     string idValueCode = string.Empty;
@@ -161,7 +190,7 @@ $@"
                             idValueCode = identifierValue.ToString();
                             break;
                         default:
-                            return Fail(context, $"No code mapping for identifier data type: {idAttr}");
+                            return res.Fail($"No code mapping for identifier data type: {idAttr}");
                     }
                     
                     sb.Append(
@@ -199,7 +228,7 @@ $@"
         
         public {schemeClassName}(DataScheme dataScheme) : base(dataScheme) {{}}
         
-        protected override {entryClassName} EntryFactory(DataScheme dataScheme, DataEntry dataEntry) {{
+        protected override {entryClassName} EntryFactory({nameof(DataScheme)} dataScheme, {nameof(DataEntry)} dataEntry) {{
             return new {entryClassName}(dataScheme, dataEntry);
         }}
     }}
@@ -209,7 +238,7 @@ $@"
         /// <summary>
         /// Represents a single entry (row) in the '{scheme.SchemeName}' data scheme.
         /// </summary>
-        public {entryClassName}(DataScheme dataScheme, DataEntry entry) : base(dataScheme, entry) {{}}
+        public {entryClassName}({nameof(DataScheme)} dataScheme, {nameof(DataEntry)} entry) : base(dataScheme, entry) {{}}
 ");
             foreach (var attributeDefinition in scheme.GetAttributes()
                          .Where(a => a.ShouldPublish))
@@ -221,30 +250,19 @@ $@"
 
                 if (!IsValidIdentifierName(context, attributePropertyName).Try(out var idErr))
                 {
-                    return Fail(context, $"Cannot generate identifier for attribute '{attributePropertyName}', reason: {idErr.Message}");
+                    return res.Fail($"Cannot generate identifier for attribute '{attributePropertyName}', reason: {idErr.Message}");
                 }
                 var attributeName = attributeDefinition.AttributeName;
 
                 bool codeGenAttributeSetters = scheme.SchemeName == Manifest.MANIFEST_SCHEME_NAME;
                 // TODO: Support more GetData functions for new data types
                 // Codegen?
-                string getDataMethod = "GetDataAsString";
-                string csDataType = "string";
-                switch (attributeDefinition.DataType)
-                {
-                    case BooleanDataType _:
-                        getDataMethod = "GetDataAsBool";
-                        csDataType = "bool";
-                        break;
-                    case IntegerDataType _:
-                        getDataMethod = "GetDataAsInt";
-                        csDataType = "int";
-                        break;
-                    case FloatingPointDataType _:
-                        getDataMethod = "GetDataAsFloat";
-                        csDataType = "float";
-                        break;
-                }
+                // string getDataMethod = "GetDataAsString";
+                // string csDataType = "string";
+                if (!attributeDefinition.DataType.GetDataMethod(context, attributeDefinition)
+                    .Try(out var getDataMethod, out var getDataError)) return getDataError.CastError<string>();
+                
+                string csDataType = attributeDefinition.DataType.CSDataType;
 
                 // Add XML doc comment (use tooltip if available; otherwise provide a sensible default)
                 string propertyDocSummary = !string.IsNullOrWhiteSpace(attributeDefinition.AttributeToolTip)
@@ -265,8 +283,8 @@ $@"
 $@"     
         public {csDataType} {attributePropertyName}
         {{
-            get => DataEntry.{getDataMethod}(""{attributeName}"");
-            set => DataScheme.SetDataOnEntry(DataEntry, ""{attributeName}"", value);
+            get => {getDataMethod};
+            set => {nameof(EntryWrapper.DataScheme)}.SetDataOnEntry({nameof(EntryWrapper.DataEntry)}, ""{attributeName}"", value);
         }}
 ");
                 }
@@ -274,7 +292,7 @@ $@"
                 {
                     sb.Append(
 $@"     
-        public {csDataType} {attributePropertyName} => DataEntry.{getDataMethod}(""{attributeName}"");
+        public {csDataType} {attributePropertyName} => {getDataMethod};
 ");
                 }
             }
@@ -284,13 +302,7 @@ $@"
     }}
 {namespaceFooterCode}
 ");
-            fileSystem.WriteAllText(context, filePath, sb.ToString());
-            return Pass($"Wrote {scheme} to file: {filePath}", context);
-        }
-
-        public SchemaResult<string> Serialize(DataScheme scheme)
-        {
-            throw new System.NotImplementedException($"{nameof(CSharpStorageFormat)}.{nameof(Serialize)}");
+            return res.Pass(sb.ToString());
         }
     }
 }

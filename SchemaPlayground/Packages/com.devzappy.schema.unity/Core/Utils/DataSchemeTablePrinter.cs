@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Schema.Core.Data;
@@ -6,13 +7,15 @@ namespace Schema.Core
 {
     public static class DataSchemeTablePrinter
     {
-        public static StringBuilder PrintTableView(this DataScheme scheme)
+        public static void PrintTableView(this DataScheme scheme, StringBuilder tableSB)
         {
             const string ID_SUFFIX = " - ID";
             var maxWidth = new Dictionary<string, int>();
             foreach (var attribute in scheme.GetAttributes())
             {
-                maxWidth[attribute.AttributeName] = attribute.AttributeName.Length + (attribute.IsIdentifier ? ID_SUFFIX.Length : 0);
+                var maxColumnHeaderLength =
+                    Math.Max(attribute.AttributeName.Length, attribute.DataType.TypeName.Length);
+                maxWidth[attribute.AttributeName] = maxColumnHeaderLength + (attribute.IsIdentifier ? ID_SUFFIX.Length : 0);
             }
             
             // pad entries
@@ -29,8 +32,6 @@ namespace Schema.Core
                     maxWidth[attribute.AttributeName] = newMaxWidth;
                 }
             }
-            
-            var tableSB = new StringBuilder();
 
             // table header, top
             int numAttrs = scheme.AttributeCount;
@@ -101,7 +102,12 @@ namespace Schema.Core
             
             // footer
             PrintTableRow('└', '┘', '┴', '─');
+        }
 
+        public static StringBuilder PrintTableView(this DataScheme scheme)
+        {
+           var tableSB = new StringBuilder();
+           scheme.PrintTableView(tableSB);
             return tableSB;
         }
     }

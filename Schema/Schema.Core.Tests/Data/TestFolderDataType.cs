@@ -31,8 +31,8 @@ public class TestFolderDataType
 		var folderType = new FolderDataType(allowEmptyPath: true, useRelativePaths: true,
 			basePath: "/Users/zappy/src/Schema-Unity/SchemaPlayground/Content");
 
-		folderType.CheckIfValidData(Context, absoluteDir).AssertFailed();
-		folderType.ConvertData(Context, absoluteDir).TryAssert(out var result);
+		folderType.IsValidValue(Context, absoluteDir).AssertFailed();
+		folderType.ConvertValue(Context, absoluteDir).TryAssert(out var result);
 
 		Assert.That(result, Is.EqualTo("Configs"));
 	}
@@ -46,7 +46,7 @@ public class TestFolderDataType
 		var folderType = new FolderDataType(allowEmptyPath: true, useRelativePaths: true,
 			basePath: "/abs/path/Content");
 
-		folderType.CheckIfValidData(Context, absoluteDir).AssertFailed();
+		folderType.IsValidValue(Context, absoluteDir).AssertFailed();
 	}
 
 	[Test]
@@ -55,8 +55,8 @@ public class TestFolderDataType
 		var folderType = new FolderDataType(allowEmptyPath: true, useRelativePaths: true,
 			basePath: "/base");
 
-		folderType.CheckIfValidData(Context, string.Empty).AssertPassed();
-		folderType.ConvertData(Context, string.Empty).AssertPassed();
+		folderType.IsValidValue(Context, string.Empty).AssertPassed();
+		folderType.ConvertValue(Context, string.Empty).AssertPassed();
 	}
 
 	[Test]
@@ -70,7 +70,7 @@ public class TestFolderDataType
 		var folderType = new FolderDataType(allowEmptyPath: false, useRelativePaths: true,
 			basePath: basePath);
 
-		folderType.ConvertData(Context, relDir).AssertFailed<object>();
+		folderType.ConvertValue(Context, relDir).AssertFailed<object>();
 	}
 
 	[Test]
@@ -84,7 +84,7 @@ public class TestFolderDataType
 		var folderType = new FolderDataType(allowEmptyPath: false, useRelativePaths: true,
 			basePath: basePath);
 
-		folderType.ConvertData(Context, relDir).TryAssert(out var result);
+		folderType.ConvertValue(Context, relDir).TryAssert(out var result);
 		Assert.That(result, Is.EqualTo(relDir));
 	}
 
@@ -92,7 +92,7 @@ public class TestFolderDataType
 	public void CheckIfValidData_Fails_For_NonString()
 	{
 		var folderType = new FolderDataType();
-		folderType.CheckIfValidData(Context, 123).AssertFailed();
+		folderType.IsValidValue(Context, 123).AssertFailed();
 	}
 }
 

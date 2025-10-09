@@ -24,6 +24,8 @@ namespace Schema.Core.Data
         
         [JsonIgnore]
         public string BasePath => basePath;
+        public override SchemaResult<string> GetDataMethod(SchemaContext context, AttributeDefinition attribute) => SchemaResult<string>.Pass($"{nameof(DataEntry)}.{nameof(DataEntry.GetDataAsString)}(\"{attribute.AttributeName}\")");
+        public override string CSDataType => typeof(string).ToString();
 
         #endregion
         

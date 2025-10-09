@@ -75,7 +75,7 @@ namespace Schema.Unity.Editor
             if (!GetStorage(context).Try(out var storage, out var storageErr)) return storageErr.Cast();
                             
             // Create a relative path for the new schema file
-            string fileName = $"{newSchemeName}.{storage.DefaultSchemaStorageFormat.Extension}";
+            string fileName = $"{newSchemeName}.{storage.DefaultSchemeStorageFormat.Extension}";
             string relativePath = $"{DefaultContentDirectory}/{fileName}";
             // string relativePath = fileName; // Default to just the filename (relative to Content folder)
                             

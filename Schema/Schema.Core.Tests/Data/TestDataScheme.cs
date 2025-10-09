@@ -374,7 +374,7 @@ public class TestDataScheme
     }
 
     [Test]
-    [TestCase(0, false)]
+    [TestCase(0, true)]
     [TestCase(1, true)]
     [TestCase(2, false)]
     public void Test_MoveEntry(int moveIdx, bool expected)

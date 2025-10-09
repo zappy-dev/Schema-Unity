@@ -9,7 +9,7 @@ using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.Serialization
 {
-    public class CSVStorageFormat : IStorageFormat<DataScheme>
+    public class CsvSchemeStorageFormat : ISchemeStorageFormat
     {
         public string Extension => "csv";
         public string DisplayName => "CSV";
@@ -18,7 +18,7 @@ namespace Schema.Core.Serialization
 
         private readonly IFileSystem fileSystem;
 
-        public CSVStorageFormat(IFileSystem fileSystem)
+        public CsvSchemeStorageFormat(IFileSystem fileSystem)
         {
             this.fileSystem = fileSystem;
         }
@@ -95,43 +95,11 @@ namespace Schema.Core.Serialization
             // determine the best data type for a column
             for (var attrIdx = 0; attrIdx < attrCount; attrIdx++)
             {
-                var attrCtx = new SchemaContext
-                {
-                    Scheme = importedScheme,
-                    AttributeName = attributes[attrIdx].AttributeName,
-                };
-                
-                var potentialDataTypes = new HashSet<DataType>(DataType.BuiltInTypes);
-                foreach (var dataEntry in rawDataEntries)
-                {
-                    var rawData = dataEntry[attrIdx];
-                    var enumerator = potentialDataTypes.GetEnumerator();
-                    while (enumerator.MoveNext())
-                    {
-                        var testType = enumerator.Current;
-                        if (!testType.ConvertData(attrCtx, rawData).Try(out var convertedData) ||
-                            !testType.CheckIfValidData(attrCtx, convertedData).Passed)
-                        {
-                            potentialDataTypes.Remove(enumerator.Current);
-                        }
-                    }
-                }
+                using var _ = new AttributeContextScope(ref context, attributes[attrIdx].AttributeName);
 
-                if (potentialDataTypes.Count == 0)
-                {
-                    return SchemaResult<DataScheme>.Fail($"Could not convert all entries for colunn {attrIdx} to a known data type", context: this);
-                }
-
-                DataType finalDataType;
-                if (potentialDataTypes.Count >= 2)
-                {
-                    // prefer non-text data type if possible
-                    finalDataType = potentialDataTypes.First(dataType => !dataType.Equals(DataType.Text));
-                }
-                else
-                {
-                    finalDataType = potentialDataTypes.First();
-                }
+                var columnValues = rawDataEntries.Select(dataEntry => dataEntry[attrIdx]).ToArray();
+                if (!DataType.InferDataTypeForValues(context, columnValues)
+                        .Try(out var finalDataType, out var inferError)) return inferError.CastError<DataScheme>();
 
                 attributes[attrIdx].DataType = finalDataType;
             }
@@ -163,7 +131,7 @@ namespace Schema.Core.Serialization
                     var dataType = attributes[attrIdx].DataType;
                     var attributeName = attributes[attrIdx].AttributeName;
 
-                    if (!dataType.ConvertData(attrCtx, rawData).Try(out var convertedData))
+                    if (!dataType.ConvertValue(attrCtx, rawData).Try(out var convertedData))
                     {
                         return SchemaResult<DataScheme>.Fail($"Could not convert entry {rawDataEntry} to type {dataType}", context: this);
                     }
@@ -194,7 +162,7 @@ namespace Schema.Core.Serialization
                 return Fail(context, $"Scheme cannot be null");
             }
 
-            if (!Serialize(scheme).Try(out var csvContent))
+            if (!Serialize(context, scheme).Try(out var csvContent))
             {
                 return Fail(context, "Failed to deserialize scheme");
             }
@@ -205,7 +173,7 @@ namespace Schema.Core.Serialization
             return Pass($"Wrote {scheme} to file: {filePath}");
         }
 
-        public SchemaResult<string> Serialize(DataScheme scheme)
+        public SchemaResult<string> Serialize(SchemaContext context, DataScheme scheme)
         {
             StringBuilder csvContent = new StringBuilder();
 

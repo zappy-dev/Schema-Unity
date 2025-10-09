@@ -5,6 +5,8 @@ namespace Schema.Core.Data
     public class GuidDataType : DataType
     {
         public override string TypeName => "Guid";
+        public override SchemaResult<string> GetDataMethod(SchemaContext context, AttributeDefinition attribute) => SchemaResult<string>.Pass($"{nameof(DataEntry)}.{nameof(DataEntry.GetDataAsGuid)}(\"{attribute.AttributeName}\")");
+        public override string CSDataType => typeof(Guid).ToString();
         public override object Clone()
         {
             return new GuidDataType
@@ -13,12 +15,13 @@ namespace Schema.Core.Data
             };
         }
 
-        public override SchemaResult CheckIfValidData(SchemaContext context, object value)
+        public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
+            using var _ = new DataTypeContextScope(ref context, this.TypeName);
             return CheckIf(value is Guid, "Value is not a Guid", "Value is a Guid", context);
         }
 
-        public override SchemaResult<object> ConvertData(SchemaContext context, object value)
+        public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
             if (value == null)
             {

@@ -159,16 +159,16 @@ public class TestSchema
 
         if (mockRead)
         {
-            var serialized = _storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed();
+            var serialized = _storage.DefaultManifestStorageFormat.Serialize(Context, scheme).AssertPassed();
             _mockFileSystem.Setup(m => m.ReadAllText(Context, relPath))
                 .Returns(SchemaResult<string>.Pass(serialized)).Verifiable();
             _mockFileSystem.Setup(m => m.ReadAllText(Context, absPath))
                 .Returns(SchemaResult<string>.Pass(serialized)).Verifiable();
         }
-
+        
         if (mockWrite)
         {
-            var serialized = _storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed(null);
+            var serialized = _storage.DefaultManifestStorageFormat.Serialize(Context, scheme).AssertPassed(null);
             _mockFileSystem.Setup(m => m.DirectoryExists(Context, It.IsAny<string>())).Returns(true).Verifiable();
             _mockFileSystem.Setup(m => m.WriteAllText(Context, relPath, serialized)).Verifiable();
             _mockFileSystem.Setup(m => m.WriteAllText(Context, absPath, serialized)).Verifiable();
@@ -363,7 +363,7 @@ public class TestSchema
         
         // Arrange
         var scheme = new DataScheme("Dirty");
-        _mockFileSystem.Setup(fs => fs.WriteAllText(Context, It.IsAny<string>(), _storage.DefaultManifestStorageFormat.Serialize(scheme).AssertPassed(null))).Verifiable();
+        _mockFileSystem.Setup(fs => fs.WriteAllText(Context, It.IsAny<string>(), _storage.DefaultManifestStorageFormat.Serialize(Context, scheme).AssertPassed(null))).Verifiable();
         
         Schema.LoadDataScheme(Context, scheme, true, importFilePath: "Dirty.json");
         scheme.SetDirty(Context, true);
