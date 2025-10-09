@@ -158,16 +158,15 @@ namespace Schema.Core.Data
 
             if (value is string str)
             {
-                if (ElementType is TextDataType textType)
+                if (ElementType is TextDataType)
                 {
-                    return Fail<object>($"Cannot convert string '{str}' to List<{ElementType}>", context);
+                    // User convenience: automatically convert a single string to a list containing that string
+                    return Pass<object>(new string[] { str }, $"Converted single string to List<string>", context);
                 }
                 else
                 {
-                    return Pass<object>(new List<string>
-                    {
-                        str,
-                    });
+                    // Cannot convert string to list of non-string types (e.g., List<int>)...yet?
+                    return Fail<object>($"Cannot convert string '{str}' to {TypeName}", context);
                 }
             }
 

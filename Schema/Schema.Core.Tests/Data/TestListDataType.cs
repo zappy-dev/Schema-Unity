@@ -251,6 +251,20 @@ public class TestListDataType
     }
 
     [Test]
+    public void ConvertValue_SingleStringToStringList_ConvertsToArray()
+    {
+        // User convenience feature: automatically wrap a single string in a list
+        var listType = new ListDataType(DataType.Text, Context);
+        var result = listType.ConvertValue(Context, "single value");
+        
+        Assert.That(result.Passed, Is.True);
+        Assert.That(result.Result, Is.TypeOf<string[]>());
+        var array = (string[])result.Result;
+        Assert.That(array.Length, Is.EqualTo(1));
+        Assert.That(array[0], Is.EqualTo("single value"));
+    }
+
+    [Test]
     public void ConvertValue_NonEnumerableValue_ReturnsFalse()
     {
         var listType = new ListDataType(DataType.Integer, Context);
