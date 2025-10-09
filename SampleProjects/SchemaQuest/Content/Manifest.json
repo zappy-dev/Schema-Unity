@@ -1,0 +1,129 @@
+{
+  "SchemeName": "Manifest",
+  "Attributes": [
+    {
+      "AttributeName": "SchemeName",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "GetDataMethod": "GetDataAsString",
+        "CSDataType": "System.String",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "The name of the scheme",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "FilePath",
+      "DataType": {
+        "$type": "Schema.Core.Data.FilePathDataType, Schema.Core",
+        "AllowEmptyPath": true,
+        "UseRelativePaths": true,
+        "BasePath": null,
+        "GetDataMethod": "GetDataAsString",
+        "CSDataType": "System.String",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Relative path to the staging file from this scheme",
+      "ColumnWidth": 300,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "PublishTarget",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "GetDataMethod": "GetDataAsString",
+        "CSDataType": "System.String",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": false,
+      "AttributeToolTip": "Type of output format to use for publishing this data scheme",
+      "ColumnWidth": 150,
+      "DefaultValue": "DEFAULT"
+    },
+    {
+      "AttributeName": "CSharpExportPath",
+      "DataType": {
+        "$type": "Schema.Core.Data.FolderDataType, Schema.Core",
+        "AllowEmptyPath": true,
+        "UseRelativePaths": true,
+        "BasePath": null,
+        "GetDataMethod": "GetDataAsString",
+        "CSDataType": "System.String",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": false,
+      "AttributeToolTip": "Destination folder for generated C# code for this scheme",
+      "ColumnWidth": 300,
+      "DefaultValue": "Assets\\Scripts\\Schemes"
+    },
+    {
+      "AttributeName": "CSharpNamespace",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "GetDataMethod": "GetDataAsString",
+        "CSDataType": "System.String",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": false,
+      "AttributeToolTip": "Namespace for generated C# code for this scheme",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "CSharpGenerateIds",
+      "DataType": {
+        "$type": "Schema.Core.Data.BooleanDataType, Schema.Core",
+        "GetDataMethod": "GetDataAsBool",
+        "CSDataType": "System.Boolean",
+        "DefaultValue": false
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": false,
+      "AttributeToolTip": "Determines whether to generate Identifiers in emitted C#. It is generally useful to allow identifiers code to get generated, but optional to disable.",
+      "ColumnWidth": 150,
+      "DefaultValue": true
+    }
+  ],
+  "Entries": [
+    {
+      "SchemeName": "Manifest",
+      "FilePath": "Content\\Manifest.json",
+      "PublishTarget": "DEFAULT",
+      "CSharpExportPath": "Assets\\Scripts\\Schemes",
+      "CSharpNamespace": "",
+      "CSharpGenerateIds": false
+    },
+    {
+      "SchemeName": "Quests",
+      "PublishTarget": "DEFAULT",
+      "FilePath": "Content/Quests.json",
+      "CSharpExportPath": "Assets\\Scripts\\Schemes",
+      "CSharpNamespace": "",
+      "CSharpGenerateIds": true
+    },
+    {
+      "SchemeName": "NPC",
+      "PublishTarget": "DEFAULT",
+      "FilePath": "Content/NPC.json",
+      "CSharpExportPath": "Assets\\Scripts\\Schemes",
+      "CSharpNamespace": "",
+      "CSharpGenerateIds": true
+    },
+    {
+      "SchemeName": "Dialogue",
+      "PublishTarget": "DEFAULT",
+      "FilePath": "Content/Dialogue.json",
+      "CSharpExportPath": "Assets\\Scripts\\Schemes",
+      "CSharpNamespace": "",
+      "CSharpGenerateIds": true
+    }
+  ]
+}

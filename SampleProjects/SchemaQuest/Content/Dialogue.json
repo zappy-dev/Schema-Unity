@@ -1,0 +1,24 @@
+{
+  "SchemeName": "Dialogue",
+  "Attributes": [
+    {
+      "AttributeName": "ID",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "GetDataMethod": "GetDataAsString",
+        "CSDataType": "System.String",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    }
+  ],
+  "Entries": [
+    {
+      "ID": ""
+    }
+  ]
+}

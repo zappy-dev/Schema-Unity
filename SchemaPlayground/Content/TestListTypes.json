@@ -1,0 +1,160 @@
+{
+  "SchemeName": "TestListTypes",
+  "Attributes": [
+    {
+      "AttributeName": "ID",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "StringList",
+      "DataType": {
+        "$type": "Schema.Core.Data.ListDataType, Schema.Core",
+        "ElementType": {
+          "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+          "DefaultValue": ""
+        },
+        "DefaultValue": {
+          "$type": "System.String[], mscorlib",
+          "$values": []
+        }
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Test list of strings",
+      "ColumnWidth": 200,
+      "DefaultValue": {
+        "$type": "System.String[], mscorlib",
+        "$values": []
+      }
+    },
+    {
+      "AttributeName": "IntList",
+      "DataType": {
+        "$type": "Schema.Core.Data.ListDataType, Schema.Core",
+        "ElementType": {
+          "$type": "Schema.Core.Data.IntegerDataType, Schema.Core",
+          "DefaultValue": 0
+        },
+        "DefaultValue": {
+          "$type": "System.Int32[], mscorlib",
+          "$values": []
+        }
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Test list of integers",
+      "ColumnWidth": 200,
+      "DefaultValue": {
+        "$type": "System.Int32[], mscorlib",
+        "$values": []
+      }
+    },
+    {
+      "AttributeName": "FloatList",
+      "DataType": {
+        "$type": "Schema.Core.Data.ListDataType, Schema.Core",
+        "ElementType": {
+          "$type": "Schema.Core.Data.FloatingPointDataType, Schema.Core",
+          "DefaultValue": 0.0
+        },
+        "DefaultValue": {
+          "$type": "System.Single[], mscorlib",
+          "$values": []
+        }
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Test list of floats",
+      "ColumnWidth": 200,
+      "DefaultValue": {
+        "$type": "System.Single[], mscorlib",
+        "$values": []
+      }
+    },
+    {
+      "AttributeName": "BoolList",
+      "DataType": {
+        "$type": "Schema.Core.Data.ListDataType, Schema.Core",
+        "ElementType": {
+          "$type": "Schema.Core.Data.BooleanDataType, Schema.Core",
+          "DefaultValue": false
+        },
+        "DefaultValue": {
+          "$type": "System.Boolean[], mscorlib",
+          "$values": []
+        }
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Test list of booleans",
+      "ColumnWidth": 200,
+      "DefaultValue": {
+        "$type": "System.Boolean[], mscorlib",
+        "$values": []
+      }
+    }
+  ],
+  "Entries": [
+    {
+      "ID": "Test1",
+      "StringList": [
+        "Apple",
+        "Banana",
+        "Cherry"
+      ],
+      "IntList": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "FloatList": [
+        1.5,
+        2.5,
+        3.5
+      ],
+      "BoolList": [
+        true,
+        false,
+        true
+      ]
+    },
+    {
+      "ID": "Test2",
+      "StringList": [
+        "Red",
+        "Green"
+      ],
+      "IntList": [
+        10,
+        20
+      ],
+      "FloatList": [
+        0.1,
+        0.2,
+        0.3,
+        0.4
+      ],
+      "BoolList": [
+        false,
+        false
+      ]
+    },
+    {
+      "ID": "EmptyLists",
+      "StringList": [],
+      "IntList": [],
+      "FloatList": [],
+      "BoolList": []
+    }
+  ]
+}

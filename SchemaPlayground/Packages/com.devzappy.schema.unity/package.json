@@ -1,6 +1,6 @@
 {
     "name": "com.devzappy.schema.unity",
-    "version": "0.1.5",
+    "version": "0.2.0",
     "displayName": "Schema Unity",
     "description": "A Unity package for integrating the Schema config system",
     "unity": "2020.3",
@@ -9,6 +9,9 @@
       "email": "me@devzappy.com",
       "url": "https://www.devzappy.com/schema"
     },
+    "changelogUrl": "https://github.com/zappy-dev/Schema-Unity/compare/v0.1.0...v0.2.0",
+    "documentationUrl": "https://github.com/zappy-dev/Schema-Unity/blob/main/docs/Quickstart.md",
+    "licensesUrl": "https://github.com/zappy-dev/Schema-Unity/blob/main/LICENSE",
     "dependencies": {
         "com.unity.nuget.newtonsoft-json": "3.2.1",
         "com.unity.editorcoroutines": "1.0.1"

@@ -1,0 +1,28 @@
+{
+  "SchemeName": "Tags",
+  "Attributes": [
+    {
+      "AttributeName": "ID",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    }
+  ],
+  "Entries": [
+    {
+      "ID": "BOOP"
+    },
+    {
+      "ID": "Foo"
+    },
+    {
+      "ID": "Bar"
+    }
+  ]
+}
