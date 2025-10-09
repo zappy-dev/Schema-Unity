@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <ExcludeByFile>
+            <!-- Exclude all auto-generated schema files -->
+            **/*.g.cs
+          </ExcludeByFile>
+          <ExcludeByAttribute>
+            <!-- Exclude compiler-generated code -->
+            CompilerGenerated,GeneratedCode,ExcludeFromCodeCoverage
+          </ExcludeByAttribute>
+          <Exclude>
+            <!-- Exclude specific schema wrapper classes -->
+            [*]Schema.Core.Schemes.TooltipsScheme,
+            [*]Schema.Core.Schemes.TooltipsEntry,
+            [*]Schema.Core.Schemes.LocalizationScheme,
+            [*]Schema.Core.Schemes.LocalizationEntry,
+            [*]Schema.Core.Schemes.TODOsScheme,
+            [*]Schema.Core.Schemes.TODOsEntry
+          </Exclude>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
+
