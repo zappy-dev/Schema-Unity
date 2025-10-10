@@ -60,14 +60,14 @@ namespace Schema.Core.Serialization
                 {
                     if (!(char.IsLetter(id[i]) || id[i] == '_'))
                     {
-                        return Fail(ctx, "First character must be a letter or an underscore (_) for a valid identifier");
+                        return Fail(ctx, $"Invalid identifier '{id}', reason: First character must be a letter or an underscore (_) for a valid identifier. Either update the identifier or disable ID Code Generation in the Manifest entry.");
                     }
                 }
                 else
                 {
                     if (!(char.IsLetterOrDigit(id[i]) ||  id[i] == '_'))
                     {
-                        return Fail(ctx, "Character must be a letter or an underscore (_) for a valid identifier");
+                        return Fail(ctx, $"Invalid identifier '{id}', reason: Character must be a letter or an underscore (_) for a valid identifier. Either update the identifier or disable ID Code Generation in the Manifest entry.");
                     }
                 }
             }

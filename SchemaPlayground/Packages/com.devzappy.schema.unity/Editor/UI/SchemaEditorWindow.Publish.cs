@@ -258,6 +258,7 @@ namespace Schema.Unity.Editor
 
             var bulkRes =  BulkResult(
                 entries: schemeNames,
+                haltOnError: true, // Avoid publishing bad code if a Scheme fails to publish
                 operation: (schemeName) =>
                 {
                     progressScope.Progress($"Publishing Scheme '{schemeName}' ({progress} / {total})",
@@ -273,34 +274,14 @@ namespace Schema.Unity.Editor
         
         private SchemaResult PublishAllSchemes(SchemaContext context)
         {
-            if (!GetAllSchemes(context).Try(out var allSchemes, out var error)) return error.Cast();
+            // get all loaded schemes and publish in topological order.
+            if (!DataScheme.TopologicalSortByReferences(context, LoadedSchemes.Values)
+                .Try(out var schemesToPublish, out var sortErr))
+            {
+                return sortErr.Cast();
+            }
             
-            return BulkPublishSchemes(context, allSchemes.ToList());
-            // using var progressScope = new ProgressScope("Schema - Publish All");
-            // // TODO: need a way of generating an aggregate schema result
-            // bool success = true;
-            // int progress = 1;
-            // int total = AllSchemes.Count();
-            //
-            // return BulkResult(
-            //     entries: AllSchemes,
-            //     operation: (schemeName) =>
-            //     {
-            //         progressScope.Progress($"Publishing Scheme '{schemeName}' ({progress} / {total})",
-            //             progress * 1.0f / total);
-            //         progress++;
-            //         return PublishScheme(context, schemeName);
-            //     },
-            //     errorMessage: "Failed to publish all schemes. Check console logs for more details.");
-            // foreach (var schemeName in AllSchemes)
-            // {
-            //     progressScope.Progress($"Publishing Scheme '{schemeName}' ({progress} / {total})", progress * 1.0f / total);
-            //     progress++;
-            //     var result = PublishScheme(schemeName, context);
-            //     success &= result.Passed;
-            // }
-            //
-            // return CheckIf(success, "Failed to publish all schemes. Check console logs for more details.");
+            return BulkPublishSchemes(context, schemesToPublish.Select(s => s.SchemeName).ToList());
         }
     }
 }

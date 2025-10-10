@@ -57,6 +57,7 @@ namespace Schema.Core
         public static SchemaResult BulkResult<T>(IEnumerable<T> entries, 
             Func<T, SchemaResult> operation, 
             string errorMessage = "Failed Bulk Operation",
+            bool haltOnError = false,
             SchemaContext context = default)
         {
             bool success = true;
@@ -67,6 +68,10 @@ namespace Schema.Core
                 if (res.Failed)
                 {
                     Logger.LogError(res.Message, res.Context);
+                    if (haltOnError)
+                    {
+                        break;
+                    }
                 }
             }
 

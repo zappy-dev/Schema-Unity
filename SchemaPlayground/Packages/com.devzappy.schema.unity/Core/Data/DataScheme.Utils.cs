@@ -158,7 +158,6 @@ namespace Schema.Core.Data
             while (schemesToProcess.Count > 0)
             {
                 var current = schemesToProcess[index];
-                Logger.Log($"Processing {current.SchemeName} ({index}) ({result.Count} / {totalSchemesToProcess})");
 
                 if (current.GetReferenceAttributes()
                     .Select(refAttr => refAttr.DataType as ReferenceDataType)
