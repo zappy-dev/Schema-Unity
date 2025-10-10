@@ -24,16 +24,30 @@
       "AttributeToolTip": "Move speed of the entity",
       "ColumnWidth": 150,
       "DefaultValue": 0.0
+    },
+    {
+      "AttributeName": "Sprite",
+      "DataType": {
+        "$type": "Schema.Core.Data.GuidDataType, Schema.Core",
+        "DefaultValue": "00000000-0000-0000-0000-000000000000"
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": null,
+      "ColumnWidth": 150,
+      "DefaultValue": "00000000-0000-0000-0000-000000000000"
     }
   ],
   "Entries": [
     {
       "ID": "Player",
-      "MoveSpeed": 1.0
+      "MoveSpeed": 10.0,
+      "Sprite": "4ba042bd-f841-30f4-98f9-52d0551c6911"
     },
     {
       "ID": "Enemy",
-      "MoveSpeed": 0.5
+      "MoveSpeed": 0.5,
+      "Sprite": "00000000-0000-0000-f000-000000000000"
     }
   ]
 }

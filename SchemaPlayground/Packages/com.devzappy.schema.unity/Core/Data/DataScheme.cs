@@ -56,8 +56,9 @@ namespace Schema.Core.Data
             get => isDirty;
         }
 
-        public void SetDirty(SchemaContext context, bool isDirty) 
+        public void SetDirty(SchemaContext context, bool isDirty)
         {
+            using var _ = new SchemeContextScope(ref context, this);
             Logger.LogDbgVerbose($"IsDirty=>{isDirty}", context);
             this.isDirty = isDirty;
         }
@@ -350,7 +351,7 @@ namespace Schema.Core.Data
         /// <param name="context"></param>
         /// <returns>A SchemaResult indicating success or failure.</returns>
         public SchemaResult SetDataOnEntry(DataEntry entry, string attributeName, object value,
-            bool allowIdentifierUpdate = false, SchemaContext context = default)
+            bool allowIdentifierUpdate = false, SchemaContext context = default, bool shouldDirtyScheme = true)
         {
             var attrResult = GetAttribute(attributeName);
             if (!attrResult.Try(out var attr))
@@ -365,14 +366,17 @@ namespace Schema.Core.Data
             // special case, don't mutate a file path to a platform-specific format if it is effectively the same.
             if (attr.DataType is FSDataType && 
                 value is string valueStr && 
-                prevValue is string prevValueStr &&
+                prevValue != null && prevValue is string prevValueStr &&
                 PathUtility.SanitizePath(valueStr) == PathUtility.SanitizePath(prevValueStr))
             {
                 return SchemaResult.Pass("Value already set", context);
             }
 
             Logger.LogDbgVerbose($"SetDataOnEntry, entry: {entry}, {attributeName}=>{value}", context: context);
-            SetDirty(context, true);
+            if (shouldDirtyScheme)
+            {
+                SetDirty(context, true);
+            }
             return entry.SetData(context, attributeName, value);
         }
     }

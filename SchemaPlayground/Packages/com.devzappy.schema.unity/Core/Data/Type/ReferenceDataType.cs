@@ -35,7 +35,7 @@ namespace Schema.Core.Data
             DefaultValue = string.Empty;
         }
 
-        public ReferenceDataType(string schemeName, string identifierAttribute) : base(null)
+        public ReferenceDataType(string schemeName, string identifierAttribute, bool validateSchemeLoaded = true) : base(null)
         {
             ReferenceSchemeName = schemeName;
             ReferenceAttributeName = identifierAttribute;
@@ -47,7 +47,7 @@ namespace Schema.Core.Data
             };
             
             // Set an initial default value
-            if (Schema.GetScheme(ctx, ReferenceSchemeName).Try(out var refScheme))
+            if (validateSchemeLoaded && Schema.GetScheme(ctx, ReferenceSchemeName).Try(out var refScheme))
             {
                 var values = refScheme.GetIdentifierValues().Select(v => v?.ToString() ?? "").ToList();
                 DefaultValue = values.Count > 0 ? values[0] : "";
@@ -58,7 +58,7 @@ namespace Schema.Core.Data
 
         public override string ToString()
         {
-            return $"ReferenceDataType: {ReferenceSchemeName}, Attribute: {ReferenceAttributeName}";
+            return $"ReferenceDataType[Scheme: '{ReferenceSchemeName}', Attribute: '{ReferenceAttributeName}']";
         }
 
         public override object Clone()

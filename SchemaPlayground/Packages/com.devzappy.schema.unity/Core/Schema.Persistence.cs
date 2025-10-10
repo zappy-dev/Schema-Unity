@@ -188,8 +188,8 @@ namespace Schema.Core
                     loadedSchemes.Add(loadedScheme);
                 }
                 
-                // TODO: topological sort so schemes are loaded in reference order
-                var schemeLoadOrder = loadedSchemes.OrderBy(scheme => scheme.GetReferenceAttributes().Count() );
+                if (!DataScheme.TopologicalSortByReferences(context, loadedSchemes).Try(out var schemeLoadOrder, out var sortErr)) 
+                    return sortErr.CastError<ManifestLoadStatus>();
 
                 progress?.Report((0.1f, "Loading..."));
                 foreach (var scheme in schemeLoadOrder)
@@ -286,6 +286,7 @@ namespace Schema.Core
         /// <returns></returns>
         public static SchemaResult LoadDataScheme(SchemaContext context, DataScheme scheme, bool overwriteExisting, bool registerManifestEntry = true, string importFilePath = null)
         {
+            using var schemeScope = new SchemeContextScope(ref context, scheme);
             string schemeName = scheme.SchemeName;
             
             // input validation
@@ -338,14 +339,14 @@ namespace Schema.Core
                     if (entryData.Failed)
                     {
                         // Don't have the data for this attribute, set to default value
-                        scheme.SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue(), context: context);
+                        scheme.SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue(), context: context, shouldDirtyScheme: true);
                     }
                     else
                     {
                         // Prompt users that there's an issue, maybe cause a failure in downstream publishing, but allow for editor fixes
                         
                         var fieldData = entryData.Result;
-                        var validateData = attribute.CheckIfValidData(context, fieldData);
+                        var validateData = attribute.IsValidValue(context, fieldData);
                         if (validateData.Failed) // Try to force the manifest to be loaded
                         {
                             //for manifest, handle partial load failures, if a manifest entry refers to a file that doesn't exist
@@ -362,7 +363,7 @@ namespace Schema.Core
                                 continue;
                             }
                             
-                            var conversion = attribute.ConvertData(context, fieldData);
+                            var conversion = attribute.ConvertValue(context, fieldData);
                             if (conversion.Failed)
                             {
                                 // TODO: What should the user flow be here? Auto-convert? Prompt for user feedback?
@@ -379,7 +380,7 @@ namespace Schema.Core
                                 // }
                             }
 
-                            var updateData = scheme.SetDataOnEntry(entry, attribute.AttributeName, conversion.Result, allowIdentifierUpdate: true, context: context);
+                            var updateData = scheme.SetDataOnEntry(entry, attribute.AttributeName, conversion.Result, allowIdentifierUpdate: true, context: context, shouldDirtyScheme: false);
                             if (updateData.Failed)
                             {
                                 return Fail(context, updateData.Message);

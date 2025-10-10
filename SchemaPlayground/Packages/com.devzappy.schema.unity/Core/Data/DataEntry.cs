@@ -72,7 +72,7 @@ namespace Schema.Core.Data
         public string GetDataAsString(string attributeName)
         {
             // TODO: Should this default to the default value for the attribute?
-            return entryData.TryGetValue(attributeName, out var value) ? value.ToString() : string.Empty;
+            return entryData.TryGetValue(attributeName, out var value) ? value == null ? string.Empty : value.ToString() : string.Empty;
         }
 
         public int GetDataAsInt(string attributeName)

@@ -10,6 +10,9 @@ public class Player2DController : MonoBehaviour
     [SerializeField]
     private EntitiesEntry playerEntry;
     
+    [SerializeField]
+    private SpriteRenderer spriteRenderer;
+    
     // Start is called before the first frame update
     void Start()
     {
@@ -38,6 +41,7 @@ public class Player2DController : MonoBehaviour
 
         Debug.Log($"Using player entry: {player}");
         playerEntry = player;
+        spriteRenderer.sprite = playerEntry.Sprite;
     }
 
     // Update is called once per frame

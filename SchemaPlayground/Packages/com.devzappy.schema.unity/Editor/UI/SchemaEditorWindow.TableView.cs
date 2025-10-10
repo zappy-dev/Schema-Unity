@@ -1290,12 +1290,10 @@ namespace Schema.Unity.Editor
             EditorGUI.TextField(cellRect, entryValue.ToString(), cellStyle.FieldStyle);
         }
 
-        private void RenderAssetCell(UnityAssetDataType assetDataType, Rect cellRect, Guid entryValue, CellStyle cellStyle, Action<string> onValueChanged)
+        private void RenderAssetCell(UnityAssetDataType assetDataType, Rect cellRect, Guid entryValue, CellStyle cellStyle, Action<Guid> onValueChanged)
         {
-            // var assetPath = AssetDatabase.GUIDToAssetPath(entryValue.ToString().Replace("-", string.Empty));
-            // var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
             Type assetType = assetDataType.ObjectType;
-            if (AssetUtils.TryLoadAssetFromGUID(entryValue, out var asset))
+            if (AssetUtils.TryLoadAssetFromGUID(entryValue, assetType, out var asset))
             {
                 assetType = asset.GetType();
             }
@@ -1303,13 +1301,17 @@ namespace Schema.Unity.Editor
             var newAsset = EditorGUI.ObjectField(cellRect, asset, assetType, allowSceneObjects: false);
             if (newAsset != asset)
             {
-                if (newAsset != null && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(newAsset, out var guid, out long _))
+                var assetPath = AssetDatabase.GetAssetPath(newAsset);
+                var assetGuid = AssetDatabase.AssetPathToGUID(assetPath);
+                if (newAsset != null &&
+                    Guid.TryParse(assetGuid, out Guid guidValue))
                 {
-                    onValueChanged?.Invoke(guid);
+                    onValueChanged?.Invoke(guidValue);
                 }
                 else
                 {
-                    onValueChanged?.Invoke(null);
+                    var defaultValue = (Guid) DataType.Guid.CloneDefaultValue();
+                    onValueChanged?.Invoke(defaultValue);
                 }
             }
         }
@@ -1584,10 +1586,13 @@ namespace Schema.Unity.Editor
                 var defaultValue = attribute.CloneDefaultValue();
                 if (defaultValue != null)
                 {
-                    entry.SetData(ctx, attribute.AttributeName, entryValue);
+                    if (entry.SetData(ctx, attribute.AttributeName, defaultValue).Try(out var defaultErr))
+                    {
+                        entryValue = defaultErr;
+                    }
                 }
             }
-            else if (attribute.CheckIfValidData(ctx, entryValue).Failed)
+            else if (attribute.IsValidValue(ctx, entryValue).Failed)
             {
                 using (_dataConvertMarker.Auto())
                 {

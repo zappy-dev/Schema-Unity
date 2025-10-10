@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using Schema.Core;
 using Schema.Core.Data;
+using Schema.Core.Ext;
 using Schema.Core.Schemes;
 using Schema.Runtime;
+using Schema.Runtime.Type;
 using UnityEditor;
 using static Schema.Core.Logging.Logger;
 using static Schema.Core.Schema;
@@ -73,6 +75,39 @@ namespace Schema.Unity.Editor
                 return exportRes;
             }
             
+            // Publish asset links
+
+            foreach (var entry in schemeToPublish.AllEntries)
+            {
+                foreach (var attribute in schemeToPublish.GetAttributes())
+                {
+                    // find attributes that map to unity assets
+                    if (!(attribute.DataType is UnityAssetDataType unityAssetDataType))
+                    {
+                        continue;
+                    }
+
+                    var assetGuid = entry.GetDataAsGuid(attribute.AttributeName).ToAssetGuid();
+
+                    // No asset to link
+                    if (string.IsNullOrEmpty(assetGuid))
+                    {
+                        continue;
+                    }
+
+                    var assetPath = AssetDatabase.GUIDToAssetPath(assetGuid);
+                    var asset = AssetDatabase.LoadAssetAtPath(assetPath, unityAssetDataType.ObjectType);
+
+                    var assetLink = new AssetLink(assetGuid, assetPath, asset);
+                    var assetLinker = UnityAssetLinker.Instance;
+                    if (assetLinker == null)
+                    {
+                        assetLinker = UnityAssetLinker.CreateAsset();
+                    }
+                    assetLinker.AddAssetLink(assetLink);
+                }
+            }
+            
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             return Pass("Published assets");
@@ -136,9 +171,10 @@ namespace Schema.Unity.Editor
         /// <returns></returns>
         private SchemaResult PublishEntryToScriptableObject(SchemaContext context, DataScheme schemeToPublish, DataEntry entry, AttributeDefinition idAttr)
         {
+            throw new NotImplementedException("Publishing Scriptable Objects is not implemented");
             var assetGuid = entry.GetDataAsGuid(idAttr.AttributeName);
 
-            if (!AssetUtils.TryLoadAssetFromGUID(assetGuid, out var currentAsset))
+            if (!AssetUtils.TryLoadAssetFromGUID(assetGuid, null, out var currentAsset))
             {
                 return Fail(context,$"Not asset found with guid: {assetGuid}");
             }
@@ -187,7 +223,7 @@ namespace Schema.Unity.Editor
                                 }
 
                                 var refGuid = refEntry.GetDataAsGuid(refDataType.ReferenceAttributeName);
-                                if (AssetUtils.TryLoadAssetFromGUID(refGuid, out var refAsset))
+                                if (AssetUtils.TryLoadAssetFromGUID(refGuid, null, out var refAsset))
                                 {
                                     mappedValue = refAsset;
                                 }

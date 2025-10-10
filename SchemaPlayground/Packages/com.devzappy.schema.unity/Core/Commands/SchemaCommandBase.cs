@@ -80,6 +80,7 @@ namespace Schema.Core.Commands
                 stopwatch.Stop();
                 Logger.LogDbgError($"Command failed: {Description} - {ex.Message} ({stopwatch.ElapsedMilliseconds}ms)",
                     this);
+                Logger.LogDbgError(ex.StackTrace);
                 return CommandResult.Fail($"Command '{Description}' failed: {ex.Message}", ex,
                     stopwatch.Elapsed);
             }

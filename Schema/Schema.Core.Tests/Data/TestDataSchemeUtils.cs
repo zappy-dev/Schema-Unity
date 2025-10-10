@@ -2,6 +2,7 @@ using System.Text;
 using Moq;
 using Schema.Core.Data;
 using Schema.Core.IO;
+using Schema.Core.Logging;
 using Schema.Core.Tests.Ext;
 
 namespace Schema.Core.Tests.Data;
@@ -460,6 +461,40 @@ public class TestDataSchemeUtils
         Assert.That(hasDiff, Is.True);
         var report = diffReport.ToString();
         Assert.That(report, Does.Contain("AttributeToolTip: '' -> 'New Tooltip'"));
+    }
+
+    [Test]
+    public void Test_TopologicalSort_Succeeds_OrderableSchemes()
+    {
+        // arrange
+        var schemeA = new DataScheme("schemeA");
+        var schemeAID = schemeA.AddAttribute(Context, "ID", DataType.Text, isIdentifier: true).AssertPassed();
+        
+        var schemeB = new DataScheme("schemeB");
+        var schemeBID = schemeB.AddAttribute(Context, "ID", DataType.Text, isIdentifier: true).AssertPassed();
+        var schemeC = new DataScheme("schemeC");
+        var schemeD = new DataScheme("schemeD");
+        
+        // add references
+        // self reference
+        schemeA.AddAttribute(Context, "Field1", new ReferenceDataType(schemeA.SchemeName, schemeAID.AttributeName, validateSchemeLoaded: false)).AssertPassed();
+        
+        // external reference
+        schemeB.AddAttribute(Context, "Field1", new ReferenceDataType(schemeA.SchemeName, schemeAID.AttributeName, validateSchemeLoaded: false)).AssertPassed();
+        schemeC.AddAttribute(Context, "Field1", new ReferenceDataType(schemeA.SchemeName, schemeAID.AttributeName, validateSchemeLoaded: false)).AssertPassed();
+        schemeC.AddAttribute(Context, "Field2", new ReferenceDataType(schemeB.SchemeName, schemeBID.AttributeName, validateSchemeLoaded: false)).AssertPassed();
+        
+        var list = new List<DataScheme> { schemeA, schemeB, schemeC, schemeD };
+
+        var topologicalSort = DataScheme.TopologicalSortByReferences(Context, list).AssertPassed();
+        
+        Assert.That(topologicalSort, Is.Not.Null);
+        Assert.That(topologicalSort.Count, Is.EqualTo(list.Count));
+
+        foreach (var scheme in topologicalSort)
+        {
+            TestContext.WriteLine(scheme.ToString());
+        }
     }
 }
 

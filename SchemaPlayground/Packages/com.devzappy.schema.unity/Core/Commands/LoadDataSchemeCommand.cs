@@ -178,11 +178,11 @@ namespace Schema.Core.Commands
                     {
                         // Validate and potentially convert data
                         var fieldData = entryData.Result;
-                        var validateResult = attribute.CheckIfValidData(Context, fieldData);
+                        var validateResult = attribute.IsValidValue(Context, fieldData);
                         
                         if (validateResult.Failed && !scheme.IsManifest)
                         {
-                            var conversionResult = attribute.ConvertData(Context, fieldData);
+                            var conversionResult = attribute.ConvertValue(Context, fieldData);
                             if (conversionResult.Failed)
                             {
                                 // Allow file path types to load even if file doesn't exist
@@ -269,7 +269,7 @@ namespace Schema.Core.Commands
                         filePathAttr.DataType is FilePathDataType)
                     {
                         // Let the FilePathDataType handle the path conversion
-                        var convertResult = filePathAttr.ConvertData(Context, importFilePath);
+                        var convertResult = filePathAttr.ConvertValue(Context, importFilePath);
                         if (convertResult.Try(out var convertedPath))
                         {
                             manifestEntry.FilePath = convertedPath as string;

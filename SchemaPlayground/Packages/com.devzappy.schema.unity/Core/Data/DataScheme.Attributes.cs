@@ -179,15 +179,7 @@ namespace Schema.Core.Data
                     referencingAttributesUpdated++;
                 }
 
-                // Update all data entries as well
-                int entriesUpdated = 0;
-                foreach (var entry in otherScheme.entries)
-                {
-                    entry.MigrateData(context, prevAttributeName, newAttributeName);
-                    entriesUpdated++;
-                }
-
-                if (referencingAttributesUpdated > 0 && entriesUpdated > 0)
+                if (referencingAttributesUpdated > 0)
                 {
                     otherScheme.SetDirty(context, true);
                 }

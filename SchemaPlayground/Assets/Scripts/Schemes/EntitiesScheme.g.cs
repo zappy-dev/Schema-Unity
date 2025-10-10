@@ -6,6 +6,7 @@
 using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Schemes;
+using Schema.Runtime;
 using static Schema.Core.Schema;
 
 namespace ExampleProject.Schemes 
@@ -74,13 +75,19 @@ namespace ExampleProject.Schemes
         /// Gets the value of 'ID'.
         /// </summary>
      
-        public string ID => DataEntry.GetDataAsString("ID");
+        public System.String ID => DataEntry.GetDataAsString("ID");
      
         /// <summary>
         /// Move speed of the entity
         /// </summary>
      
-        public float MoveSpeed => DataEntry.GetDataAsFloat("MoveSpeed");
+        public System.Single MoveSpeed => DataEntry.GetDataAsFloat("MoveSpeed");
+     
+        /// <summary>
+        /// Gets the value of 'Sprite'.
+        /// </summary>
+     
+        public UnityEngine.Sprite Sprite => DataEntry.GetDataAsObject<UnityEngine.Sprite>("Sprite").Result;
  
     }
 }

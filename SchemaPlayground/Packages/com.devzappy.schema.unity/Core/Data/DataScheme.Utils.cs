@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Schema.Core.Logging;
 
 namespace Schema.Core.Data
 {
@@ -118,6 +120,77 @@ namespace Schema.Core.Data
 
             return anyModified || removed.Any() || added.Any();
         }
-        
+
+        /// <summary>
+        /// Sort the given set of Data Schemes in topological order (first schemes should have no references on future schemes, later schemes can depend on earlier schemes but not schemes after them)
+        /// </summary>
+        /// <param name="schemes">Schemes to sort</param>
+        /// <returns></returns>
+        public static SchemaResult<IEnumerable<DataScheme>> TopologicalSortByReferences(SchemaContext context, IEnumerable<DataScheme> schemes)
+        {
+            var res = SchemaResult<IEnumerable<DataScheme>>.New(context);
+            var schemesToProcess = schemes.ToList();
+            int totalSchemesToProcess = schemesToProcess.Count;
+
+            // First pass, process schemes invalid schemes, schemes with no references
+            var result = new List<DataScheme>();
+            for (int i = schemesToProcess.Count - 1; i >= 0; i--)
+            {
+                var current = schemesToProcess[i];
+                if (current == null)
+                {
+                    schemesToProcess.RemoveAt(i);
+                    continue;
+                }
+
+                // Immediately add schemes with no reference attributes
+                if (!current.GetReferenceAttributes().Any())
+                {
+                    result.Add(current);
+                    schemesToProcess.RemoveAt(i);
+                }
+            }
+            
+            // second pass, process schemes with references
+            // check if all referenced schemes exist earlier in results
+            int index = 0;
+            int lastIterationSize = schemesToProcess.Count;
+            while (schemesToProcess.Count > 0)
+            {
+                var current = schemesToProcess[index];
+                Logger.Log($"Processing {current.SchemeName} ({index}) ({result.Count} / {totalSchemesToProcess})");
+
+                if (current.GetReferenceAttributes()
+                    .Select(refAttr => refAttr.DataType as ReferenceDataType)
+                    .All(refDataType =>
+                    {
+                        var resultsContainsRef = result.Select(s => s.SchemeName).Contains(refDataType.ReferenceSchemeName);
+                        var isSelfRef = refDataType.ReferenceSchemeName == current.SchemeName;
+                        return isSelfRef || resultsContainsRef;
+                    }))
+                {
+                    result.Add(current);
+                    schemesToProcess.RemoveAt(index);
+                }
+
+                if (schemesToProcess.Count > 0)
+                {
+                    index = (index + 1) % schemesToProcess.Count;
+                    if (index == 0)
+                    {
+                        if (lastIterationSize == schemesToProcess.Count)
+                        {
+                            var schemeReport = string.Join(",", schemesToProcess.Select(s => s.SchemeName));
+                            res.Fail($"Unable to topological sort the following schemes, check for cyclical dependencies: {schemeReport}");
+                            // No schemes were moved, meaning there is a cyclical dependency
+                            break;
+                        }
+                        lastIterationSize = schemesToProcess.Count;
+                    }
+                }
+            }
+
+            return res.Pass(result);
+        }
     }
 }

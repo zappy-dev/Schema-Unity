@@ -247,8 +247,59 @@ namespace Schema.Unity.Editor
         
         #region UI Command Handling
 
-        private void OnSelectScheme(string schemeName, SchemaContext context)
+        private bool OnSelectScheme(string schemeName, SchemaContext context)
         {
+            // Check if any schemes have unsaved changes (excluding the manifest)
+            if (!string.IsNullOrEmpty(SelectedSchemeName) && SelectedSchemeName != schemeName)
+            {
+                var dirtySchemes = GetSchemes(context)
+                    .Where(s => s.IsDirty && !s.IsManifest)
+                    .ToList();
+
+                if (dirtySchemes.Any())
+                {
+                    // Build a message listing all dirty schemes
+                    var messageBuilder = new StringBuilder();
+                    messageBuilder.AppendLine("The following schemes have unsaved changes:");
+                    messageBuilder.AppendLine();
+                    foreach (var dirtyScheme in dirtySchemes)
+                    {
+                        messageBuilder.AppendLine($"  • {dirtyScheme.SchemeName}");
+                    }
+                    messageBuilder.AppendLine();
+                    messageBuilder.Append("Do you want to save all changes?");
+
+                    int choice = EditorUtility.DisplayDialogComplex(
+                        "Unsaved Changes",
+                        messageBuilder.ToString(),
+                        "Save All",
+                        "Cancel",
+                        "Don't Save");
+
+                    if (choice == 0) // Save All
+                    {
+                        // Save all dirty schemes
+                        foreach (var dirtyScheme in dirtySchemes)
+                        {
+                            var saveResult = SaveDataScheme(context, dirtyScheme, alsoSaveManifest: false);
+                            if (saveResult.Failed)
+                            {
+                                EditorUtility.DisplayDialog(
+                                    "Save Failed",
+                                    $"Failed to save scheme '{dirtyScheme.SchemeName}': {saveResult.Message}",
+                                    "OK");
+                                return false; // Don't switch schemes if any save failed
+                            }
+                        }
+                    }
+                    else if (choice == 1) // Cancel
+                    {
+                        return false; // Don't switch schemes
+                    }
+                    // choice == 2 means "Don't Save", so we continue without saving
+                }
+            }
+
             // Unfocus any selected control fields when selecting a new scheme
             ReleaseControlFocus();
 
@@ -258,7 +309,7 @@ namespace Schema.Unity.Editor
                 var prevSelectedIndex = Array.IndexOf(schemeNames, schemeName);
                 if (prevSelectedIndex == -1)
                 {
-                    return;
+                    return false;
                 }
                 selectedSchemaIndex = prevSelectedIndex;
             }
@@ -270,6 +321,8 @@ namespace Schema.Unity.Editor
             
             // Clear virtual scrolling cache when switching schemes
             _virtualTableView?.ClearCache();
+            
+            return true;
         }
 
         private SchemaResult OnLoadManifest(SchemaContext context)
@@ -807,6 +860,7 @@ namespace Schema.Unity.Editor
 
                     using (var schemeChange = new EditorGUI.ChangeCheckScope())
                     {
+                        int previousIndex = selectedSchemaIndex;
                         selectedSchemaIndex = GUILayout.SelectionGrid(selectedSchemaIndex, schemeNames.Select(s =>
                         {
 #if SCHEMA_DEBUG
@@ -828,7 +882,13 @@ namespace Schema.Unity.Editor
                         if (schemeChange.changed)
                         {
                             var nextSelectedSchema = schemeNames[selectedSchemaIndex];
-                            OnSelectScheme(nextSelectedSchema.SchemeName, ctx);
+                            bool switchSucceeded = OnSelectScheme(nextSelectedSchema.SchemeName, ctx);
+                            
+                            // If the switch was canceled, restore the previous selection
+                            if (!switchSucceeded)
+                            {
+                                selectedSchemaIndex = previousIndex;
+                            }
                         }
                     }
                 }

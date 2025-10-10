@@ -1,5 +1,6 @@
 ﻿using Schema.Core;
 using Schema.Core.Data;
+using Schema.Core.Schemes;
 using UnityEditor;
 using UnityEngine;
 using Logger = Schema.Core.Logging.Logger;
@@ -13,7 +14,9 @@ namespace Schema.Runtime.Type
 
         public override SchemaResult<string> GetDataMethod(SchemaContext context, AttributeDefinition attribute)
         {
-            return SchemaResult<string>.Fail($"Method {nameof(GetDataMethod)} not implemented on {nameof(UnityAssetDataType)}", context);
+            // Target API
+            // public UnityEngine.Texture Sprite => DataEntry.GetDataAsObject<UnityEngine.Texture>("Sprite");
+            return SchemaResult<string>.Pass($"{nameof(EntryWrapper.DataEntry)}.GetDataAsObject<{ObjectType}>(\"{attribute.AttributeName}\").Result");
         }
         
         public override string CSDataType => ObjectType.ToString();
@@ -33,6 +36,7 @@ namespace Schema.Runtime.Type
             Logger.LogVerbose("Initializing Unity Asset DataTypes");
             AddPluginType(new UnityAssetDataType(typeof(GameObject)));
             AddPluginType(new UnityAssetDataType(typeof(Texture)));
+            AddPluginType(new UnityAssetDataType(typeof(Sprite)));
         }
     }
 }

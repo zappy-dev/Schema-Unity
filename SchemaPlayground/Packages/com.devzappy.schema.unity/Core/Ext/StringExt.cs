@@ -40,5 +40,20 @@ namespace Schema.Core.Ext
 
             return char.ToLowerInvariant(pascal[0]) + pascal.Substring(1);
         }
+
+        public static string[] SplitByLineEndings(this string input)
+        {
+            return input.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        }
+
+        /// <summary>
+        /// Forces line endings to Windows-style line ending
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        public static string ReplaceLineEndings(this string input)
+        {
+            return input.Replace("\r\n", "\n");
+        }
     }
 }

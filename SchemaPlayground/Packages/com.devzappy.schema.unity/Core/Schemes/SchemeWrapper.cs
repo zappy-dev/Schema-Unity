@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Schema.Core.CodeGen;
 using Schema.Core.Data;
 
 namespace Schema.Core.Schemes
@@ -11,7 +12,7 @@ namespace Schema.Core.Schemes
     public abstract class SchemeWrapper<TEntry> where TEntry : EntryWrapper
     {
         private protected readonly DataScheme DataScheme;
-        
+
         /// <summary>
         /// Underlying data scheme
         /// </summary>
@@ -44,12 +45,7 @@ namespace Schema.Core.Schemes
         /// <param name="schemeName">The scheme name.</param>
         public static SchemaResult<DataScheme> GetScheme(string schemeName)
         {
-            var ctx = new SchemaContext
-            {
-                Driver = "Codegen_Wrapper",
-            };
-            
-            return Schema.GetScheme(ctx, schemeName);
+            return Schema.GetScheme(CodeGenUtils.Context, schemeName);
         }
         
         /// <summary>
