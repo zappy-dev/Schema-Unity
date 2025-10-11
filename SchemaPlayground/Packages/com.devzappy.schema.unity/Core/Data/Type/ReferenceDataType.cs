@@ -218,6 +218,7 @@ namespace Schema.Core.Data
 
         private SchemaResult<DataScheme> GetReferencedScheme(SchemaContext context)
         {
+            using var _ = new DataTypeContextScope(ref context, this);
             // Try normal API first (requires initialization)
             var refScheme = Schema.GetScheme(context, ReferenceSchemeName);
             if (refScheme.Passed)

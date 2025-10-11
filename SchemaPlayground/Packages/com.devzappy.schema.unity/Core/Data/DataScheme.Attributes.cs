@@ -205,6 +205,7 @@ namespace Schema.Core.Data
 
         public SchemaResult<AttributeDefinition> GetAttributeByName(string attributeName, SchemaContext context = default)
         {
+            using var _ = new SchemeContextScope(ref context, this);
             var attribute = attributes.FirstOrDefault(a => a.AttributeName.Equals(attributeName));
             
             return CheckIf(attribute != null, attribute, 

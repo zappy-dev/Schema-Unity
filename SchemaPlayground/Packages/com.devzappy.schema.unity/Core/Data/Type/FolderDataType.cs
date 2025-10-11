@@ -56,6 +56,7 @@ namespace Schema.Core.Data
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
+            using var _ = new DataTypeContextScope(ref context, this);
             if (!(value is string filePath))
             {
                 return Fail<object>($"Value '{value}' is not a file path", context: context);

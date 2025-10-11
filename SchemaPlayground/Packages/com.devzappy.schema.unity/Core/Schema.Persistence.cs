@@ -85,12 +85,16 @@ namespace Schema.Core
                 return loadResult.CastError<ManifestLoadStatus>();
             }
 
+            manifestImportPath = manifestLoadPath;
             var loadManifestRes = LoadManifest(context, manifestDataScheme, progress);
 
+            // WARNING
+            // Time lost debugging this code: 10 hours
+            Logger.Log($"Load Manifest from file: {manifestLoadPath}, status: {loadManifestRes}", context);
             if (loadManifestRes.Passed)
             {
-                // Update manifest import path to support Edit-mode validation
-                manifestImportPath = manifestLoadPath;
+                // TODO: If this fails, revert back to previous manifest import path?
+                // Manifest import path is really load-bearing and fragile..
             }
             
             return loadManifestRes;
@@ -251,10 +255,14 @@ namespace Schema.Core
             // Resolve relative path if needed
             // TODO: Unify logic to FS Data Type
             string resolvedPath = schemeFilePath;
+            Logger.Log("resolvedPath: " + resolvedPath);
+            Logger.Log("ManifestImportPath: " + ManifestImportPath);
+            Logger.Log("Is Absolute: " + PathUtility.IsAbsolutePath(schemeFilePath));
             if (!PathUtility.IsAbsolutePath(schemeFilePath) && !string.IsNullOrEmpty(ManifestImportPath))
             {
                 resolvedPath = PathUtility.MakeAbsolutePath(schemeFilePath, ProjectPath);
             }
+            Logger.Log("resolvedPath2: " + resolvedPath);
 
             var fileExistRes = _storage.FileSystem.FileExists(context, resolvedPath);
             if (fileExistRes.Failed)
