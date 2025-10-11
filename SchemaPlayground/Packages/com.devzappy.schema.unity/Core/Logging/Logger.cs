@@ -30,13 +30,14 @@ namespace Schema.Core.Logging
         private static string FormatMessage(string message, LogLevel msgSeverity, object context = null)
         {
             var sb = new StringBuilder();
-            sb.Append("[Schema]");
+            sb.Append("[Schema] ");
+            sb.Append(message);
             if (context != null)
             {
-                sb.Append("[Context=").Append(context).Append("] ");
+                sb.AppendLine();
+                sb.AppendLine("Context:");
+                sb.Append(context);
             }
-
-            sb.Append(message);
 
             if (_logger.LogLevel == LogLevel.VERBOSE && msgSeverity >= LogLevel.WARN)
             {

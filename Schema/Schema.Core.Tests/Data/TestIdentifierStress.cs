@@ -97,15 +97,12 @@ public class TestIdentifierStress
         var scheme = new DataScheme("NPCs");
         var idAttr = new AttributeDefinition(scheme, "Name", DataType.Text, isIdentifier: true);
         scheme.AddAttribute(Context, idAttr).AssertPassed();
-        scheme.AddEntry(Context, new DataEntry { { "Name", "Alice", Context } });
-        scheme.AddEntry(Context, new DataEntry { { "Name", "Bob", Context } });
+        scheme.AddEntry(Context, new DataEntry { { "Name", "Alice", Context } }).AssertPassed();
+        scheme.AddEntry(Context, new DataEntry { { "Name", "Bob", Context } }).AssertPassed();
         scheme.Load(Context).AssertPassed();
 
         // Act: Try to rename Alice to Bob (collision)
-        var result = Schema.UpdateIdentifierValue(Context, scheme.SchemeName, "Name", "Alice", "Bob");
-
-        // Assert
-        result.AssertFailed();
+        Schema.UpdateIdentifierValue(Context, scheme.SchemeName, "Name", "Alice", "Bob").AssertFailed();
     }
 
     [Test]
@@ -307,11 +304,8 @@ public class TestIdentifierStress
         sourceScheme.DeleteAttribute(Context, idAttr).AssertPassed();
 
         // Act: Try to create a reference to the now-missing identifier
-        sourceScheme.GetIdentifierAttribute().TryAssert(out var identifierAttr);
-        var refTypeResult = identifierAttr?.CreateReferenceType(Context);
-
-        // Assert: Should fail because there's no identifier attribute
-        Assert.IsNull(identifierAttr);
+        sourceScheme.GetIdentifierAttribute().AssertFailed();
+        idAttr.CreateReferenceType(Context).AssertFailed();
     }
 
     #endregion

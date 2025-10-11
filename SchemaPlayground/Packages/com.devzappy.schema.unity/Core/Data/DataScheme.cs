@@ -177,7 +177,20 @@ namespace Schema.Core.Data
         
         #region Value Operations
         
+        /// <summary>
+        /// Get all unique identifier values, de-duplicated
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<object> GetIdentifierValues()
+        {
+            return GetRawIdentifierValues().Distinct();;
+        }
+        
+        /// <summary>
+        /// Get all unique identifier values, not de-duplicated
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerable<object> GetRawIdentifierValues()
         {
             var identifierAttrRes = GetIdentifierAttribute();
             if (identifierAttrRes.Failed)
@@ -185,7 +198,7 @@ namespace Schema.Core.Data
                 return Enumerable.Empty<object>();
             }
 
-            return GetValuesForAttribute(identifierAttrRes.Result).Distinct();;
+            return GetValuesForAttribute(identifierAttrRes.Result);
         }
 
         public IEnumerable<object> GetValuesForAttribute(string attributeName)
@@ -344,14 +357,15 @@ namespace Schema.Core.Data
         /// <summary>
         /// Sets data on a DataEntry, enforcing identifier immutability unless explicitly allowed.
         /// </summary>
+        /// <param name="context"></param>
         /// <param name="entry">The DataEntry to update.</param>
         /// <param name="attributeName">The attribute name to update.</param>
         /// <param name="value">The value to set.</param>
         /// <param name="allowIdentifierUpdate">If true, allows updating identifier values (should only be true for centralized update method).</param>
-        /// <param name="context"></param>
+        /// <param name="shouldDirtyScheme"></param>
         /// <returns>A SchemaResult indicating success or failure.</returns>
-        public SchemaResult SetDataOnEntry(DataEntry entry, string attributeName, object value,
-            bool allowIdentifierUpdate = false, SchemaContext context = default, bool shouldDirtyScheme = true)
+        public SchemaResult SetDataOnEntry(SchemaContext context, DataEntry entry, string attributeName, object value,
+            bool allowIdentifierUpdate = false, bool shouldDirtyScheme = true)
         {
             var attrResult = GetAttribute(attributeName);
             if (!attrResult.Try(out var attr))

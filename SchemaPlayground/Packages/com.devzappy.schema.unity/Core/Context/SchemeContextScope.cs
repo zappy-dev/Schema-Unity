@@ -3,16 +3,19 @@ using Schema.Core.Data;
 
 namespace Schema.Core
 {
-    public class SchemeContextScope : ContextScope
+    public class SchemeContextScope : IContextScope
     {
-        public SchemeContextScope(ref SchemaContext context, DataScheme scheme) : base(ref context) 
+        public SchemaContext Context { get; set; }
+        public SchemeContextScope(ref SchemaContext context, DataScheme scheme)
         {
+            Context = context;
             context.Scheme = scheme;
         }
         
-        public override void Dispose()
+        public void Dispose()
         {
             Context.Scheme = null;
+            Context = null;
         }
     }
 }

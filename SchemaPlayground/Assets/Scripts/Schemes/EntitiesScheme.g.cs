@@ -4,6 +4,7 @@
 // </auto-generated>
 
 using Schema.Core;
+using Schema.Core.CodeGen;
 using Schema.Core.Data;
 using Schema.Core.Schemes;
 using Schema.Runtime;

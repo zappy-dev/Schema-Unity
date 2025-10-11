@@ -19,7 +19,7 @@ namespace Schema.Core.Data
 
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             return CheckIf(value is DateTime, 
                 errorMessage: "Value is not a DateTime",
                 successMessage: "Value is a DateTime", context);
@@ -28,7 +28,7 @@ namespace Schema.Core.Data
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             var data = value as string;
             
             bool result = System.DateTime.TryParse(data, out var date);

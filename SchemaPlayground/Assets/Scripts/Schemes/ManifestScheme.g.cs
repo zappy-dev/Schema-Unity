@@ -4,6 +4,7 @@
 // </auto-generated>
 
 using Schema.Core;
+using Schema.Core.CodeGen;
 using Schema.Core.Data;
 using Schema.Core.Schemes;
 using Schema.Runtime;
@@ -65,7 +66,7 @@ namespace ExampleProject.Schemes
         public System.String SchemeName
         {
             get => DataEntry.GetDataAsString("SchemeName");
-            set => DataScheme.SetDataOnEntry(DataEntry, "SchemeName", value);
+            set => DataScheme.SetDataOnEntry(CodeGenUtils.Context, DataEntry, "SchemeName", value);
         }
      
         /// <summary>
@@ -75,7 +76,7 @@ namespace ExampleProject.Schemes
         public System.String FilePath
         {
             get => DataEntry.GetDataAsString("FilePath");
-            set => DataScheme.SetDataOnEntry(DataEntry, "FilePath", value);
+            set => DataScheme.SetDataOnEntry(CodeGenUtils.Context, DataEntry, "FilePath", value);
         }
  
     }

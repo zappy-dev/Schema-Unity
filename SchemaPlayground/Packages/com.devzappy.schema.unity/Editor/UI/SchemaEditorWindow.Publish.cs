@@ -38,6 +38,11 @@ namespace Schema.Unity.Editor
                 return Fail(context, $"Invalid publish target for scheme to publish, scheme: {schemeName}, found target: {manifestEntry.PublishTarget}, " +
                             $"expected a valid type from {nameof(ManifestScheme.PublishTarget)}.");
             }
+
+            if (!IsValidScheme(context, schemeToPublish).Try(out var validationErr))
+            {
+                return validationErr;
+            }
             
             // publishing data
             bool isSuccess = true;
@@ -169,6 +174,7 @@ namespace Schema.Unity.Editor
         /// <param name="entry"></param>
         /// <param name="idAttr"></param>
         /// <returns></returns>
+        #pragma warning disable CS0162
         private SchemaResult PublishEntryToScriptableObject(SchemaContext context, DataScheme schemeToPublish, DataEntry entry, AttributeDefinition idAttr)
         {
             throw new NotImplementedException("Publishing Scriptable Objects is not implemented");
@@ -247,6 +253,7 @@ namespace Schema.Unity.Editor
 
             return Pass($"Saving changes to asset: {currentAsset}");
         }
+        #pragma warning restore CS0162
 
 
         private SchemaResult BulkPublishSchemes(SchemaContext context, IReadOnlyList<string> schemeNames)

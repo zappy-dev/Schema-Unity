@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Schema.Core;
@@ -14,14 +13,12 @@ using Schema.Runtime.Type;
 using Schema.Unity.Editor.Ext;
 using Unity.Profiling;
 using UnityEditor;
-using UnityEditorInternal;
 using UnityEngine;
 using static Schema.Core.Schema;
 using static Schema.Core.Logging.Logger;
 using static Schema.Unity.Editor.LayoutUtils;
 using static Schema.Unity.Editor.SchemaLayout;
 using Logger = Schema.Core.Logging.Logger;
-using Object = UnityEngine.Object;
 
 namespace Schema.Unity.Editor
 {
@@ -154,6 +151,29 @@ namespace Schema.Unity.Editor
         #endregion
 
         private List<DataEntry> allEntries;
+        private TableCell lastFocusedCell;
+        private Table table;
+        private object lastEntryValue;
+
+        private event Action<TableCell, TableCell> OnTableFocusChanged;
+        
+        public (int globalEntryIdx, int globalAttributeIdx) GetGlobalPosition(TableCell tableCell)
+        {
+            var cellIdx = table.IndexOf(tableCell);
+            (int localEntryIdx, int localAttributeIdx) = table.GetPosition(tableCell);
+            int globalEntryIdx = localEntryIdx;
+            int globalAttributeIdx = localAttributeIdx;
+            
+            // For virtual scrolling, we need to convert local index back to global index
+            if (_virtualTableView.IsVirtualScrollingActive && cellIdx != -1)
+            {
+                globalEntryIdx = _virtualTableView.VisibleRange.start + localEntryIdx;
+                globalAttributeIdx = localAttributeIdx;
+            }
+
+            return (globalEntryIdx, globalAttributeIdx);
+        }
+
         private void RefreshTableEntriesForSelectedScheme()
         {
             var refreshCtx = new SchemaContext
@@ -161,8 +181,7 @@ namespace Schema.Unity.Editor
                 Driver = "Editor_Refresh_Table_Entries"
             };
             
-            if (string.IsNullOrEmpty(selectedSchemeName) ||
-                !GetScheme(refreshCtx, selectedSchemeName).Try(out var scheme))
+            if (!GetSelectedScheme(refreshCtx).Try(out var scheme))
             {
                 allEntries = Enumerable.Empty<DataEntry>().ToList();
                 return;
@@ -241,7 +260,8 @@ namespace Schema.Unity.Editor
             // Declare these at function scope so they're accessible by keyboard navigation code
             (int start, int end) visibleRange = (0, 0);
             int visibleEntryCount = 0;
-            int[] tableCellControlIds = Array.Empty<int>();
+            table.Reset();
+            var ev = Event.current;
 
             using (new GUILayout.VerticalScope())
             {
@@ -358,7 +378,7 @@ namespace Schema.Unity.Editor
                         // For virtual scrolling, we only need control IDs for visible entries
                         // Allocate based on actual visible range to prevent IndexOutOfRangeException
                         visibleEntryCount = visibleRange.end - visibleRange.start;
-                        tableCellControlIds = new int[attributeCount * visibleEntryCount];
+                        table.Initialize(attributeCount, visibleEntryCount);
 
                         // Efficient approach: use single spacers for all invisible rows instead of individual spaces
                         // This reduces GUI allocations and improves performance
@@ -394,8 +414,7 @@ namespace Schema.Unity.Editor
                         {
                             float rowHeight = rowHeights[i];
                             var rowRect = GUILayoutUtility.GetRect(0, rowHeight);
-                            RenderTableRow(renderCtx, rowRect, allEntries.ElementAt(i), i, attributeCount, scheme,
-                                tableCellControlIds, visibleEntryCount, visibleRange.start, rowHeight);
+                            RenderTableRow(renderCtx, rowRect, allEntries.ElementAt(i), i, attributeCount, scheme, visibleEntryCount, visibleRange.start, rowHeight);
                             renderedCount++;
                         }
 
@@ -431,25 +450,41 @@ namespace Schema.Unity.Editor
                     if (AddButton("Create New Entry", expandWidth: true, height: 50f))
                     {
                         // TODO: Convert to command
-                        scheme.CreateNewEmptyEntry(new SchemaContext
+                        LatestResponse = scheme.CreateNewEmptyEntry(new SchemaContext
                         {
                             Scheme = scheme,
                             Driver = "User_Create_Entry",
-                        });
+                        }).Cast();
+                        
                         LogDbgVerbose($"Added entry to '{scheme.SchemeName}'.");
                         OnSelectedSchemeChanged?.Invoke();
                     }
                 }
             }
             
+            var focusedTableCell = new TableCell(GUIUtility.keyboardControl - 1);
+            var focusedIndex = table.IndexOf(focusedTableCell);
+            if (ev.type == EventType.Layout)
+            {
+                if (!Equals(focusedTableCell, lastFocusedCell))
+                {
+                    var sendLastFocusedCell = lastFocusedCell;
+                    lastFocusedCell = focusedTableCell;
+                    OnTableFocusChanged?.Invoke(sendLastFocusedCell, focusedTableCell);
+                }
+
+                if (GetEntryDataForTableCell(renderCtx, focusedTableCell).Try(out var entryData))
+                {
+                    var (entry, attribute) = entryData;
+                    // lastEntryValue = entry.GetData(attribute);
+                }
+            }
+            
             // handle arrow key navigation of table
-            var ev = Event.current;
             // Sometimes this receives multiple events but one doesn't contain a keycode?
             if (ev.type == EventType.KeyUp && ev.keyCode != KeyCode.None)
             {
                 // IDK why this is off-by-one
-                int focusedIndex = Array.IndexOf(tableCellControlIds, GUIUtility.keyboardControl + 1);
-                
                 // For virtual scrolling, we need to convert local index back to global index
                 if (_virtualTableView.IsVirtualScrollingActive && focusedIndex != -1)
                 {
@@ -513,9 +548,9 @@ namespace Schema.Unity.Editor
                             {
                                 int localEntryIdx = globalEntryIdx - _virtualTableView.VisibleRange.start;
                                 int localIndex = localEntryIdx * attributeCount + globalAttributeIdx;
-                                if (localIndex >= 0 && localIndex < tableCellControlIds.Length)
+                                if (localIndex >= 0 && localIndex < table.NumCells)
                                 {
-                                    GUIUtility.keyboardControl = tableCellControlIds[localIndex] - 1;
+                                    GUIUtility.keyboardControl = table[localIndex].ToKeyboardControlID();
                                     ev.Use();
                                 }
                             }
@@ -530,12 +565,164 @@ namespace Schema.Unity.Editor
                         else
                         {
                             // IDK why this is off-by-one
-                            GUIUtility.keyboardControl = tableCellControlIds[nextFocusedIndex] - 1;
+                            GUIUtility.keyboardControl = table[nextFocusedIndex].ToKeyboardControlID();
                             ev.Use(); // make sure to consume event if we used it
                         }
                     }
                 }
             }
+        }
+
+        internal struct Table
+        {
+            private TableCell[] tableCells;
+            private int numColumns;
+            private int numRows;
+            public int NumColumns => numColumns;
+            public int NumRows => numRows;
+            public int NumCells => tableCells.Length;
+
+            public void Reset()
+            {
+                tableCells = Array.Empty<TableCell>();
+            }
+
+            public void Initialize(int attributeCount, int visibleEntryCount)
+            {
+                numColumns = attributeCount;
+                numRows = visibleEntryCount;
+                tableCells = new TableCell[numColumns * numRows];
+            }
+
+            public int IndexOf(TableCell tableCell)
+            {
+                return Array.IndexOf(tableCells, tableCell);
+            }
+
+            public (int rowIdx, int colIdx) GetPosition(TableCell tableCell)
+            {
+                var cellIdx = IndexOf(tableCell);
+                int rowIdx = cellIdx / numColumns;
+                int colIdx = cellIdx % numColumns;
+                
+                return (rowIdx, colIdx);
+            }
+
+            public TableCell this[int cellIdx]
+            {
+                get => tableCells[cellIdx];
+                set => tableCells[cellIdx] = value;
+            }
+        }
+
+        internal struct TableCell : IEquatable<TableCell>
+        {
+            public readonly int ControlId;
+            public TableCell(int controlID)
+            {
+                ControlId = controlID;
+            }
+
+            public bool IsSet => ControlId != -1;
+
+            public int ToKeyboardControlID()
+            {
+                return ControlId;
+            }
+
+            public bool Equals(TableCell other)
+            {
+                return ControlId == other.ControlId;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is TableCell other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return ControlId;
+            }
+
+            public override string ToString()
+            {
+                return $"TableCell(controlID={ControlId})";
+            }
+        }
+
+        private void TableCellFocusChanged(TableCell lastFocusedCell, TableCell nextFocusedCell)
+        {
+            Logger.LogDbgVerbose($"{lastFocusedCell} - {nextFocusedCell}, {Event.current}, last value: {lastEntryValue}");
+            var ctx = new SchemaContext
+            {
+                Driver = "Editor_TableView_CellFocusChanged"
+            };
+            
+            DetectIDValueModificationError(ctx, lastFocusedCell);
+            
+            // update lastEntryValue to prep for next focus.
+            if (!GetEntryDataForTableCell(ctx, nextFocusedCell).Try(out var nextEntryData)) return;
+            var (nextEntry, nextAttribute) = nextEntryData;
+            lastEntryValue = nextEntry.GetDataDirect(nextAttribute);
+        }
+
+        private bool DetectIDValueModificationError(SchemaContext ctx, TableCell lastFocusedCell)
+        {
+            // Show a warning popup notifying the user why their value may not have changed.
+            if (!GetEntryDataForTableCell(ctx, lastFocusedCell).Try(out var entryData)) return false;
+            var (entry, attribute) = entryData;
+
+            // warning for when an identifier value was set to an already existing value
+            if (!attribute.IsIdentifier) return false;
+
+            // check if the last set value is different than the current value
+            if (!entry.GetData(attribute).Try(out var currentEntryValue)) return false;
+            if (currentEntryValue == lastEntryValue) return false;
+
+            if (!GetSelectedScheme(ctx).Try(out var scheme)) return false;
+
+            var idValues = scheme.GetIdentifierValues();
+            if (idValues.Contains(lastEntryValue))
+            {
+                EditorUtility.DisplayDialog("Schema - ID Value Error", $"ID values must be unique.\n" +
+                                                                       $"Value '{lastEntryValue}' already exists in {scheme.SchemeName}.{attribute.AttributeName}\n" +
+                                                                       $"\n" +
+                                                                       $"Value will reset to previous value '{currentEntryValue}'", "Proceed");
+                return true;
+            }
+
+            return false;
+        }
+
+        public SchemaResult<DataScheme> GetSelectedScheme(SchemaContext ctx)
+        {
+            var res = SchemaResult<DataScheme>.New(ctx);
+            if (string.IsNullOrEmpty(selectedSchemeName) ||
+                !GetScheme(ctx, selectedSchemeName).Try(out var scheme))
+            {
+                return res.Fail("No selected scheme");
+            }
+
+            return res.Pass(scheme);
+        }
+
+        private SchemaResult<(DataEntry, AttributeDefinition)> GetEntryDataForTableCell(SchemaContext ctx, TableCell tableCell)
+        {
+            var res = SchemaResult<(DataEntry, AttributeDefinition)>.New(ctx);
+            
+            (int globalEntryIdx, int globalAttributeIdx) = GetGlobalPosition(tableCell);
+
+            if (!GetSelectedScheme(ctx).Try(out var scheme, out var schemeErr)) 
+                return schemeErr.CastError(res);
+
+            if (!scheme.GetEntrySafe(ctx, globalEntryIdx).Try(out var entry, out var entryErr))
+                return entryErr.CastError(res);
+            
+            if (!scheme.GetAttribute(globalAttributeIdx, ctx).Try(out var attribute, out var attrErr)) 
+                return attrErr.CastError(res);
+            
+            return res.Pass((entry, attribute));
         }
 
         private SchemaResult RenderExportOptions(DataScheme scheme)
@@ -986,7 +1173,7 @@ namespace Schema.Unity.Editor
         /// <summary>
         /// Renders a data cell based on the attribute data type
         /// </summary>
-        private void RenderDataCell(SchemaContext renderCtx, Rect cellRect, DataEntry entry, AttributeDefinition attribute, object entryValue, CellStyle cellStyle, int entryIdx, int attributeIdx, DataScheme scheme, int[] tableCellControlIds, int visibleEntryCount, int visibleRangeStart, int attributeCount)
+        private void RenderDataCell(SchemaContext renderCtx, Rect cellRect, DataEntry entry, AttributeDefinition attribute, object entryValue, CellStyle cellStyle, int entryIdx, int attributeIdx, DataScheme scheme, int visibleEntryCount, int visibleRangeStart, int attributeCount)
         {
             var originalColor = GUI.backgroundColor;
             GUI.backgroundColor = cellStyle.BackgroundColor;
@@ -999,9 +1186,9 @@ namespace Schema.Unity.Editor
             if (localEntryIdx >= 0 && localEntryIdx < visibleEntryCount)
             {
                 int controlIdIndex = localEntryIdx * attributeCount + attributeIdx;
-                if (controlIdIndex >= 0 && controlIdIndex < tableCellControlIds.Length)
+                if (controlIdIndex >= 0 && controlIdIndex < table.NumCells)
                 {
-                    tableCellControlIds[controlIdIndex] = GUIUtility.GetControlID(FocusType.Passive);
+                    table[controlIdIndex] = new TableCell(GUIUtility.GetControlID(FocusType.Passive));
                 }
             }
 
@@ -1010,7 +1197,7 @@ namespace Schema.Unity.Editor
                 Driver = "User_Update_Entry_Value",
                 Scheme = scheme,
             };
-            
+
             // Render based on data type
             switch (attribute.DataType)
             {
@@ -1465,7 +1652,7 @@ namespace Schema.Unity.Editor
                 var ctx = new SchemaContext
                 {
                     Driver = "User_Focus_Object_Reference",
-                    DataType = refDataType.TypeName
+                    DataType = refDataType
                 };
                 FocusOnEntry(ctx, refDataType.ReferenceSchemeName, 
                     refDataType.ReferenceAttributeName, 
@@ -1500,6 +1687,8 @@ namespace Schema.Unity.Editor
         /// </summary>
         private void UpdateEntryValue(SchemaContext context, DataEntry entry, AttributeDefinition attribute, object newValue, DataScheme scheme)
         {
+            using var contextScope = new AttributeContextScope(ref context, attribute.AttributeName);
+            lastEntryValue = newValue;
             var attributeName = attribute.AttributeName;
             
             if (attribute.IsIdentifier)
@@ -1514,15 +1703,9 @@ namespace Schema.Unity.Editor
                 {
                     return;
                 }
-                
-                if (scheme.GetIdentifierValues().Any(otherAttributeName => Equals(otherAttributeName, newValue)))
-                {
-                    EditorUtility.DisplayDialog("Schema", $"Attribute '{attribute.AttributeName}' with value '{newValue}' already exists.", "OK");
-                    return;
-                }
 
                 var oldValue = entry.GetData(attributeName);
-                Logger.LogDbgVerbose($"{scheme}, {entry}, old Value: {oldValue} for attribute: {attributeName}");
+                Logger.LogDbgVerbose($"{entry}, old Value: {oldValue}", context);
                 var idRes = UpdateIdentifierValue(context, scheme.SchemeName, attributeName, oldValue, newValue);
                 if (idRes.Failed)
                 {
@@ -1538,7 +1721,7 @@ namespace Schema.Unity.Editor
         /// <summary>
         /// Renders a single table row using rect-based rendering
         /// </summary>
-        private void RenderTableRow(SchemaContext renderCtx, Rect rowRect, DataEntry entry, int entryIdx, int attributeCount, DataScheme scheme, int[] tableCellControlIds, int visibleEntryCount, int visibleRangeStart, float rowHeight)
+        private void RenderTableRow(SchemaContext renderCtx, Rect rowRect, DataEntry entry, int entryIdx, int attributeCount, DataScheme scheme, int visibleEntryCount, int visibleRangeStart, float rowHeight)
         {
             var cellStyle = GetRowCellStyle(entryIdx);
             
@@ -1562,7 +1745,7 @@ namespace Schema.Unity.Editor
                 
                 using (_dataCellMarker.Auto()) 
                 {
-                    RenderDataCell(renderCtx, cellRect, entry, attribute, entryValue, cellStyle, entryIdx, attributeIdx, scheme, tableCellControlIds, visibleEntryCount, visibleRangeStart, attributeCount);
+                    RenderDataCell(renderCtx, cellRect, entry, attribute, entryValue, cellStyle, entryIdx, attributeIdx, scheme, visibleEntryCount, visibleRangeStart, attributeCount);
                 }
                 
                 currentX += attribute.ColumnWidth;

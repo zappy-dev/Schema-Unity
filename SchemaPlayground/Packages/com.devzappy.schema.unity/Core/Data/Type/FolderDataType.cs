@@ -26,7 +26,7 @@ namespace Schema.Core.Data
         
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             if (!(value is string filePath))
             {
                 return Fail("Value is not a file path", context);

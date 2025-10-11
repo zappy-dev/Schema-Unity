@@ -409,19 +409,20 @@ namespace Schema.Core.Data
             int numEntriesToPrint = numAttributesToPrint == -1 ? entryData.Count : numAttributesToPrint;
             foreach (var kvp in entryData.Take(numEntriesToPrint))
             {
-                sb.Append("(");
-                sb.Append(kvp.Key).Append(": ");
+                sb.Append("{");
+                sb.Append(kvp.Key).Append(": \'");
                 if (kvp.Value != null)
                 {
                     sb.Append(kvp.Value);
-                    sb.Append(':');
+                    sb.Append("\' (t:");
                     sb.Append(kvp.Value.GetType().Name);
+                    sb.Append(")");
                 }
                 else
                 {
                     sb.Append("(not set)");
                 }
-                sb.Append(")");
+                sb.Append("}");
                 
                 if (entryIndex != numEntriesToPrint - 1)
                 {

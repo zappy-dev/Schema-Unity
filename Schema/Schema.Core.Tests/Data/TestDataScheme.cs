@@ -283,7 +283,7 @@ public class TestDataScheme
             testScheme.AddAttribute(Context, attributeName, DataType.Text, defaultValue: defaultValue);
         }
         
-        var entry = testScheme.CreateNewEmptyEntry(Context);
+        var entry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
         foreach (var attributeName in attributeNames)
         {
             Assert.That(entry.GetDataAsString(attributeName), Is.EqualTo(defaultValue));
@@ -317,8 +317,8 @@ public class TestDataScheme
     [Test]
     public void Test_SwapEntries()
     {
-        var firstEntry = testScheme.CreateNewEmptyEntry(Context);
-        var secondEntry = testScheme.CreateNewEmptyEntry(Context);
+        var firstEntry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
+        var secondEntry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
 
         var swapRes = testScheme.SwapEntries(Context, 0, 1);
         swapRes.AssertPassed();
@@ -330,8 +330,8 @@ public class TestDataScheme
     [Test]
     public void Test_MoveUpEntry_BadMove()
     {
-        var firstEntry = testScheme.CreateNewEmptyEntry(Context);
-        var secondEntry = testScheme.CreateNewEmptyEntry(Context);
+        var firstEntry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
+        var secondEntry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
         
         var moveRes = testScheme.MoveUpEntry(Context, firstEntry);
         moveRes.AssertFailed();
@@ -340,10 +340,10 @@ public class TestDataScheme
     [Test]
     public void Test_MoveUpEntry_GoodMove()
     {
-        var firstEntry = testScheme.CreateNewEmptyEntry(Context);
+        var firstEntry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
         
         // make sure second entrty does not match first in equality check
-        var secondEntry = testScheme.CreateNewEmptyEntry(Context);
+        var secondEntry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
         secondEntry.SetData(Context, "Foo", "Bar");
         
         var moveRes = testScheme.MoveUpEntry(Context, secondEntry);
@@ -353,10 +353,10 @@ public class TestDataScheme
     [Test]
     public void Test_MoveDownEntry_BadMove()
     {
-        var firstEntry = testScheme.CreateNewEmptyEntry(Context);
+        var firstEntry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
         
         // amke sure element is different
-        var secondEntry = testScheme.CreateNewEmptyEntry(Context);
+        var secondEntry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
         secondEntry.SetData(Context, "foo", "bar");
         
         var moveRes = testScheme.MoveDownEntry(Context, secondEntry);
@@ -366,8 +366,8 @@ public class TestDataScheme
     [Test]
     public void Test_MoveDownEntry_GoodMove()
     {
-        var firstEntry = testScheme.CreateNewEmptyEntry(Context);
-        var secondEntry = testScheme.CreateNewEmptyEntry(Context);
+        var firstEntry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
+        var secondEntry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
         
         var moveRes = testScheme.MoveDownEntry(Context, firstEntry);
         moveRes.AssertPassed();
@@ -379,8 +379,8 @@ public class TestDataScheme
     [TestCase(2, false)]
     public void Test_MoveEntry(int moveIdx, bool expected)
     {
-        var firstEntry = testScheme.CreateNewEmptyEntry(Context);
-        var secondEntry = testScheme.CreateNewEmptyEntry(Context);
+        var firstEntry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
+        var secondEntry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
 
         var res = testScheme.MoveEntry(Context, firstEntry, moveIdx);
         Assert.That(res.Passed, Is.EqualTo(expected));

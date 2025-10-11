@@ -1,8 +1,8 @@
 namespace Schema.Core.CodeGen
 {
-    internal static class CodeGenUtils
+    public static class CodeGenUtils
     {
-        internal static readonly SchemaContext Context = new SchemaContext
+        public static readonly SchemaContext Context = new SchemaContext
         {
             Driver = "Codegen_Wrapper",
         };

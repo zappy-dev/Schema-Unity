@@ -139,6 +139,8 @@ namespace Schema.Unity.Editor
 
                 selectedSchemeLoadPath = null;
             };
+
+            OnTableFocusChanged += TableCellFocusChanged;
         }
 
         private void OnDisable()
@@ -710,6 +712,7 @@ namespace Schema.Unity.Editor
 
             EditorGUILayout.TextField("Current Event", Event.current.ToString());
             EditorGUILayout.Vector2Field("Mouse Pos", Event.current.mousePosition);
+            EditorGUILayout.TextField("Last Entry Value", lastEntryValue?.ToString());
 #endif
 
             // Do not render more until we have valid manifest loaded

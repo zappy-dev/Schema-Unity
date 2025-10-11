@@ -55,7 +55,6 @@ namespace Schema.Core.Data
             {
                 throw new InvalidOperationException();// try to prevent Json serialization using this path
             }
-            using var _ = new DataTypeContextScope(ref context, $"List of {elementType.TypeName}");
             
             switch (elementType)
             {
@@ -96,7 +95,7 @@ namespace Schema.Core.Data
 
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             
             if (value == null)
             {
@@ -138,7 +137,7 @@ namespace Schema.Core.Data
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             
             if (value == null)
             {

@@ -64,7 +64,7 @@ namespace Schema.Core.Schemes
         public string SchemeName
         {
             get => DataEntry.GetDataAsString("SchemeName");
-            set => DataScheme.SetDataOnEntry(DataEntry, "SchemeName", value);
+            set => DataScheme.SetDataOnEntry(CodeGen.CodeGenUtils.Context, DataEntry, "SchemeName", value);
         }
      
         /// <summary>
@@ -74,7 +74,7 @@ namespace Schema.Core.Schemes
         public string FilePath
         {
             get => DataEntry.GetDataAsString("FilePath");
-            set => DataScheme.SetDataOnEntry(DataEntry, "FilePath", value);
+            set => DataScheme.SetDataOnEntry(CodeGen.CodeGenUtils.Context, DataEntry, "FilePath", value);
         }
      
         /// <summary>
@@ -84,7 +84,7 @@ namespace Schema.Core.Schemes
         public string PublishTarget
         {
             get => DataEntry.GetDataAsString("PublishTarget");
-            set => DataScheme.SetDataOnEntry(DataEntry, "PublishTarget", value);
+            set => DataScheme.SetDataOnEntry(CodeGen.CodeGenUtils.Context, DataEntry, "PublishTarget", value);
         }
      
         /// <summary>
@@ -94,7 +94,7 @@ namespace Schema.Core.Schemes
         public string CSharpExportPath
         {
             get => DataEntry.GetDataAsString("CSharpExportPath");
-            set => DataScheme.SetDataOnEntry(DataEntry, "CSharpExportPath", value);
+            set => DataScheme.SetDataOnEntry(CodeGen.CodeGenUtils.Context, DataEntry, "CSharpExportPath", value);
         }
      
         /// <summary>
@@ -104,7 +104,7 @@ namespace Schema.Core.Schemes
         public string CSharpNamespace
         {
             get => DataEntry.GetDataAsString("CSharpNamespace");
-            set => DataScheme.SetDataOnEntry(DataEntry, "CSharpNamespace", value);
+            set => DataScheme.SetDataOnEntry(CodeGen.CodeGenUtils.Context, DataEntry, "CSharpNamespace", value);
         }
      
         /// <summary>
@@ -114,7 +114,7 @@ namespace Schema.Core.Schemes
         public bool CSharpGenerateIds
         {
             get => DataEntry.GetDataAsBool("CSharpGenerateIds");
-            set => DataScheme.SetDataOnEntry(DataEntry, "CSharpGenerateIds", value);
+            set => DataScheme.SetDataOnEntry(CodeGen.CodeGenUtils.Context, DataEntry, "CSharpGenerateIds", value);
         }
  
     }

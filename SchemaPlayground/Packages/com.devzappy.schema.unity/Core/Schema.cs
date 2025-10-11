@@ -220,8 +220,13 @@ namespace Schema.Core
             var entry = targetScheme.AllEntries.FirstOrDefault(e => Equals(e.GetData(identifierAttribute), oldValue));
             if (entry == null)
                 return Fail(context, $"Entry with {identifierAttribute} == '{oldValue}' not found in scheme '{targetScheme}'.");
+
+            if (targetScheme.AllEntries.Any(e => Equals(e.GetData(identifierAttribute), newValue)))
+            {
+                return Fail(context, $"Entry with {identifierAttribute} == '{newValue}' already exists.'");
+            }
             
-            var idUpdateResult = targetScheme.SetDataOnEntry(entry, identifierAttribute, newValue, allowIdentifierUpdate: true, context: context);
+            var idUpdateResult = targetScheme.SetDataOnEntry(context: context, entry: entry, attributeName: identifierAttribute, value: newValue, allowIdentifierUpdate: true);
             if (idUpdateResult.Failed)
                 return idUpdateResult;
             int totalUpdated = 0;

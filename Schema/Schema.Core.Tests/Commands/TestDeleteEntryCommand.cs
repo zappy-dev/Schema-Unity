@@ -26,9 +26,9 @@ namespace Schema.Core.Tests.Commands
             _scheme.AddAttribute(Context, "Name", DataType.Text).AssertPassed();
             _scheme.AddAttribute(Context, "Value", DataType.Integer).AssertPassed();
             
-            _entry = _scheme.CreateNewEmptyEntry(Context);
-            _scheme.SetDataOnEntry(_entry, "Name", "TestEntry").AssertPassed();
-            _scheme.SetDataOnEntry(_entry, "Value", 42).AssertPassed();
+            _entry = _scheme.CreateNewEmptyEntry(Context).AssertPassed();
+            _scheme.SetDataOnEntry(context: Context, entry: _entry, attributeName: "Name", value: "TestEntry").AssertPassed();
+            _scheme.SetDataOnEntry(context: Context, entry: _entry, attributeName: "Value", value: 42).AssertPassed();
             
             _mockFileSystem = new Mock<IFileSystem>();
             Schema.SetStorage(new Storage(_mockFileSystem.Object));
@@ -87,8 +87,8 @@ namespace Schema.Core.Tests.Commands
         public async Task UndoAsync_AfterSuccessfulDelete_RestoresEntry()
         {
             // Arrange - add a second entry so the first entry is not the last
-            var entry2 = _scheme.CreateNewEmptyEntry(Context);
-            _scheme.SetDataOnEntry(entry2, "Name", "Entry2").AssertPassed();
+            var entry2 = _scheme.CreateNewEmptyEntry(Context).AssertPassed();
+            _scheme.SetDataOnEntry(Context, entry2, "Name", "Entry2").AssertPassed();
             
             var command = new DeleteEntryCommand(Context, _scheme, _entry);
             var initialCount = _scheme.EntryCount;
@@ -140,8 +140,8 @@ namespace Schema.Core.Tests.Commands
         public async Task CommandHistory_ExecuteUndoRedo_WorkCorrectly()
         {
             // Arrange - add a second entry to avoid the MoveEntry bug
-            var entry2 = _scheme.CreateNewEmptyEntry(Context);
-            _scheme.SetDataOnEntry(entry2, "Name", "Entry2").AssertPassed();
+            var entry2 = _scheme.CreateNewEmptyEntry(Context).AssertPassed();
+            _scheme.SetDataOnEntry(context: Context, entry: entry2, attributeName: "Name", value: "Entry2").AssertPassed();
             
             var history = new CommandProcessor();
             var command = new DeleteEntryCommand(Context, _scheme, _entry);
@@ -237,13 +237,13 @@ namespace Schema.Core.Tests.Commands
         public async Task ExecuteAsync_MultipleEntries_DeletesCorrectOne()
         {
             // Arrange
-            var entry2 = _scheme.CreateNewEmptyEntry(Context);
-            _scheme.SetDataOnEntry(entry2, "Name", "Entry2").AssertPassed();
-            _scheme.SetDataOnEntry(entry2, "Value", 100).AssertPassed();
+            var entry2 = _scheme.CreateNewEmptyEntry(Context).AssertPassed();
+            _scheme.SetDataOnEntry(Context, entry2, "Name", "Entry2").AssertPassed();
+            _scheme.SetDataOnEntry(Context, entry2, "Value", 100).AssertPassed();
 
-            var entry3 = _scheme.CreateNewEmptyEntry(Context);
-            _scheme.SetDataOnEntry(entry3, "Name", "Entry3").AssertPassed();
-            _scheme.SetDataOnEntry(entry3, "Value", 200).AssertPassed();
+            var entry3 = _scheme.CreateNewEmptyEntry(Context).AssertPassed();
+            _scheme.SetDataOnEntry(Context, entry3, "Name", "Entry3").AssertPassed();
+            _scheme.SetDataOnEntry(Context, entry3, "Value", 200).AssertPassed();
 
             var initialCount = _scheme.EntryCount;
             var command = new DeleteEntryCommand(Context, _scheme, entry2);
@@ -263,11 +263,11 @@ namespace Schema.Core.Tests.Commands
         public async Task UndoAsync_MultipleEntries_RestoresAtCorrectIndex()
         {
             // Arrange
-            var entry2 = _scheme.CreateNewEmptyEntry(Context);
-            _scheme.SetDataOnEntry(entry2, "Name", "Entry2").AssertPassed();
+            var entry2 = _scheme.CreateNewEmptyEntry(Context).AssertPassed();
+            _scheme.SetDataOnEntry(Context, entry2, "Name", "Entry2").AssertPassed();
 
-            var entry3 = _scheme.CreateNewEmptyEntry(Context);
-            _scheme.SetDataOnEntry(entry3, "Name", "Entry3").AssertPassed();
+            var entry3 = _scheme.CreateNewEmptyEntry(Context).AssertPassed();
+            _scheme.SetDataOnEntry(Context, entry3, "Name", "Entry3").AssertPassed();
 
             var entry2Index = _scheme.GetEntryIndex(entry2);
             var command = new DeleteEntryCommand(Context, _scheme, entry2);
@@ -298,8 +298,8 @@ namespace Schema.Core.Tests.Commands
         public async Task ExecuteAsync_DeleteFirstEntry_WorksCorrectly()
         {
             // Arrange
-            var entry2 = _scheme.CreateNewEmptyEntry(Context);
-            _scheme.SetDataOnEntry(entry2, "Name", "Entry2").AssertPassed();
+            var entry2 = _scheme.CreateNewEmptyEntry(Context).AssertPassed();
+            _scheme.SetDataOnEntry(Context, entry2, "Name", "Entry2").AssertPassed();
 
             var firstEntryIndex = _scheme.GetEntryIndex(_entry);
             Assert.That(firstEntryIndex, Is.EqualTo(0));
@@ -319,8 +319,8 @@ namespace Schema.Core.Tests.Commands
         public async Task UndoAsync_DeleteFirstEntry_RestoresAtFirstPosition()
         {
             // Arrange
-            var entry2 = _scheme.CreateNewEmptyEntry(Context);
-            _scheme.SetDataOnEntry(entry2, "Name", "Entry2").AssertPassed();
+            var entry2 = _scheme.CreateNewEmptyEntry(Context).AssertPassed();
+            _scheme.SetDataOnEntry(Context, entry2, "Name", "Entry2").AssertPassed();
 
             var command = new DeleteEntryCommand(Context, _scheme, _entry);
             await command.ExecuteAsync(CancellationToken.None);
@@ -337,8 +337,8 @@ namespace Schema.Core.Tests.Commands
         public async Task ExecuteAsync_DeleteLastEntry_WorksCorrectly()
         {
             // Arrange
-            var entry2 = _scheme.CreateNewEmptyEntry(Context);
-            _scheme.SetDataOnEntry(entry2, "Name", "Entry2").AssertPassed();
+            var entry2 = _scheme.CreateNewEmptyEntry(Context).AssertPassed();
+            _scheme.SetDataOnEntry(Context, entry2, "Name", "Entry2").AssertPassed();
 
             var lastIndex = _scheme.GetEntryIndex(entry2);
             var command = new DeleteEntryCommand(Context, _scheme, entry2);
@@ -355,8 +355,8 @@ namespace Schema.Core.Tests.Commands
         public async Task UndoAsync_DeleteLastEntry_RestoresAtLastPosition()
         {
             // Arrange
-            var entry2 = _scheme.CreateNewEmptyEntry(Context);
-            _scheme.SetDataOnEntry(entry2, "Name", "Entry2").AssertPassed();
+            var entry2 = _scheme.CreateNewEmptyEntry(Context).AssertPassed();
+            _scheme.SetDataOnEntry(Context, entry2, "Name", "Entry2").AssertPassed();
 
             var lastIndex = _scheme.GetEntryIndex(entry2);
             var command = new DeleteEntryCommand(Context, _scheme, entry2);

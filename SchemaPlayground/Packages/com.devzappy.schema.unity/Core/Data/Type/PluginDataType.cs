@@ -28,13 +28,13 @@ namespace Schema.Core.Data
 
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             return Fail("Unable to validate value as Plugin Data Type", context);
         }
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             return SchemaResult<object>.Fail("Unable to convert value to Plugin Data Type", context);
         }
     }

@@ -22,7 +22,7 @@ namespace Schema.Core.Data
 
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             bool isGuid = value is Guid;
             return CheckIf(isGuid, $"Value '{value}' is not a Guid", "Value is a Guid", context);
         }

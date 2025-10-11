@@ -1,16 +1,21 @@
+using Schema.Core.Data;
+
 namespace Schema.Core
 {
-    public class DataTypeContextScope : ContextScope
+    public class DataTypeContextScope : IContextScope
     {
-        public DataTypeContextScope(ref SchemaContext context, string dataType) : base(ref context)
+        public SchemaContext Context { get; set; }
+        public DataTypeContextScope(ref SchemaContext context, DataType dataType)
         {
+            Context = context;
             Context.DataType = dataType;
         }
 
 
-        public override void Dispose()
+        public void Dispose()
         {
-            Context.DataType = string.Empty;
+            Context.DataType = null;
+            Context = null;
         }
     }
 }

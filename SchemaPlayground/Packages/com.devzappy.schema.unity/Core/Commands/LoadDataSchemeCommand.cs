@@ -172,7 +172,7 @@ namespace Schema.Core.Commands
                     if (entryData.Failed)
                     {
                         // Set default value
-                        scheme.SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue(), context: Context);
+                        scheme.SetDataOnEntry(context: Context, entry: entry, attributeName: attribute.AttributeName, value: attribute.CloneDefaultValue());
                     }
                     else
                     {
@@ -195,7 +195,7 @@ namespace Schema.Core.Commands
                             }
                             else
                             {
-                                scheme.SetDataOnEntry(entry, attribute.AttributeName, conversionResult.Result, context: Context);
+                                scheme.SetDataOnEntry(context: Context, entry: entry, attributeName: attribute.AttributeName, value: conversionResult.Result);
                             }
                         }
                     }

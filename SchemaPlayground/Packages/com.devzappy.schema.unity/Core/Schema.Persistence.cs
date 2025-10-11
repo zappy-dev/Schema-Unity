@@ -305,6 +305,7 @@ namespace Schema.Core
             // process all incoming entry data and make sure it is in a valid formats 
             foreach (var entry in scheme.AllEntries)
             {
+                using var entryScope = new EntryContextScope(ref context, entry);
                 var attributesToRemove = new List<string>();
                 // prune unknown attributes
                 using var entryEnumerator = entry.GetEnumerator();
@@ -331,60 +332,65 @@ namespace Schema.Core
                     }
                 }
                 
+                // WARNING
+                // Number of hours spent on this code: 10
                 foreach (var attribute in schemeAttributes)
                 {
+                    using var attrScope =  new AttributeContextScope(ref context, attribute);
                     attribute._scheme = scheme;
                     
                     var entryData = entry.GetData(attribute);
                     if (entryData.Failed)
                     {
                         // Don't have the data for this attribute, set to default value
-                        scheme.SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue(), context: context, shouldDirtyScheme: true);
+                        scheme.SetDataOnEntry(context: context, entry: entry, attributeName: attribute.AttributeName, value: attribute.CloneDefaultValue(), shouldDirtyScheme: true);
+                        continue;
                     }
-                    else
+                    
+                    // Prompt users that there's an issue, maybe cause a failure in downstream publishing, but allow for editor fixes
+                    var fieldData = entryData.Result;
+                    var validateData = attribute.IsValidValue(context, fieldData);
+                    if (validateData.Failed) // Try to force the manifest to be loaded
                     {
-                        // Prompt users that there's an issue, maybe cause a failure in downstream publishing, but allow for editor fixes
-                        
-                        var fieldData = entryData.Result;
-                        var validateData = attribute.IsValidValue(context, fieldData);
-                        if (validateData.Failed) // Try to force the manifest to be loaded
+                        //for manifest, handle partial load failures, if a manifest entry refers to a file that doesn't exist
+                        Logger.LogDbgWarning($"Entry {entry} failed attribute validate {attribute} in scheme: {scheme}");
+                        if (scheme.IsManifest && (attribute.DataType is FilePathDataType || attribute.DataType is FolderDataType))
                         {
-                            //for manifest, handle partial load failures, if a manifest entry refers to a file that doesn't exist
-                            Logger.LogDbgWarning($"Entry {entry} failed attribute validate {attribute} in scheme: {scheme}");
-                            if (scheme.IsManifest && (attribute.DataType is FilePathDataType || attribute.DataType is FolderDataType))
-                            {
-                                Logger.LogDbgWarning($"Error validating Manifest data for attribute: {attribute}, {fieldData}, error: {validateData.Message}");
-                                continue;
-                            }
+                            Logger.LogDbgWarning($"Error validating Manifest data for attribute: {attribute}, {fieldData}, error: {validateData.Message}");
+                            continue;
+                        }
 
-                            if (attribute.DataType is PluginDataType)
-                            {
-                                Logger.LogDbgWarning($"Attempting to load a scheme with unknown type: {attribute.DataType.TypeName}");
-                                continue;
-                            }
+                        if (attribute.DataType is PluginDataType)
+                        {
+                            Logger.LogDbgWarning($"Attempting to load a scheme with unknown type: {attribute.DataType.TypeName}");
+                            continue;
+                        }
                             
-                            var conversion = attribute.ConvertValue(context, fieldData);
-                            if (conversion.Failed)
-                            {
-                                // TODO: What should the user flow be here? Auto-convert? Prompt for user feedback?
-                                // tried to convert the data, failed
+                        var conversion = attribute.ConvertValue(context, fieldData);
+                        if (conversion.Failed)
+                        {
+                            // TODO: What should the user flow be here? Auto-convert? Prompt for user feedback?
+                            // tried to convert the data, failed
                                 
-                                // Allow file path data types to load in, even if the file doesn't exist.
-                                // TODO: Runtime warn users when a filepath doesn't exist
-                                // var allowFailedConversion = attribute.DataType == DataType.FilePath ||
-                                //                             attribute.DataType is ReferenceDataType;
-                                //
-                                // if (!allowFailedConversion)
-                                // {
-                                    return Fail(context, errorMessage: $"{scheme}.{attribute}: {conversion.Message}");
-                                // }
-                            }
+                            // Allow file path data types to load in, even if the file doesn't exist.
+                            // TODO: Runtime warn users when a filepath doesn't exist
+                            // var allowFailedConversion = attribute.DataType == DataType.FilePath ||
+                            //                             attribute.DataType is ReferenceDataType;
+                            //
+                            // if (!allowFailedConversion)
+                            // {
+                            // return Fail(context, errorMessage: $"{scheme}.{attribute}: {conversion.Message}");
+                            // }
+                            
+                            // Let's try continuing with the failure.
+                            Logger.LogError(conversion.Message, conversion.Context);
+                            continue;
+                        }
 
-                            var updateData = scheme.SetDataOnEntry(entry, attribute.AttributeName, conversion.Result, allowIdentifierUpdate: true, context: context, shouldDirtyScheme: false);
-                            if (updateData.Failed)
-                            {
-                                return Fail(context, updateData.Message);
-                            }
+                        var updateData = scheme.SetDataOnEntry(context: context, entry: entry, attributeName: attribute.AttributeName, value: conversion.Result, allowIdentifierUpdate: true, shouldDirtyScheme: false);
+                        if (updateData.Failed)
+                        {
+                            return Fail(context, updateData.Message);
                         }
                     }
                 }

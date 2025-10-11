@@ -27,7 +27,7 @@ namespace Schema.Core.Data
 
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             return CheckIf(value is bool, 
                 errorMessage: $"Value '{value}' is not a boolean.",
                 successMessage: "Value is a boolean.", context);
@@ -35,7 +35,7 @@ namespace Schema.Core.Data
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object fromData)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             try
             {
                 if (fromData is bool b)

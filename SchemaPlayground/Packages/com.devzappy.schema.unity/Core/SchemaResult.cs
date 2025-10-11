@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using Schema.Core.Data;
 using Schema.Core.Logging;
 
 namespace Schema.Core
@@ -83,8 +84,8 @@ namespace Schema.Core
 
         private string message;
         public string Message => message;
-        private object context;
-        public object Context => context;
+        private string context;
+        public string Context => context;
         public bool Passed => status == RequestStatus.Passed;
         public bool Failed => status == RequestStatus.Failed;
 
@@ -92,14 +93,14 @@ namespace Schema.Core
         {
             this.status = status;
             this.message = string.IsNullOrEmpty(message) ? MESSAGE_NOT_SET : message;
-            this.context = context;;
+            this.context = context?.ToString(); // TODO: this is probably performance intensive to do for every result...
 
             // TODO: Maybe create a preference for whether schema results automatically create a log?
             // TODO: Handle logging when creating an empty result
 // #if SCHEMA_DEBUG
              if (SchemaResultSettings.Instance.LogFailure && status == RequestStatus.Failed)
              {
-                 OnSchemaResultFailed(message, context);
+                 OnSchemaResultFailed(message, this.context);
              }
 // #endif
         }
@@ -107,7 +108,13 @@ namespace Schema.Core
         internal static void OnSchemaResultFailed(string message, object context)
         {
             var logMsgSb = new StringBuilder();
-            logMsgSb.Append($"[Context={context}] {message}");
+            logMsgSb.Append($"{message}");
+            if (context != null)
+            {
+                logMsgSb.AppendLine();
+                logMsgSb.AppendLine("Context:");
+                logMsgSb.AppendLine(context.ToString());
+            }
 
             if (SchemaResultSettings.Instance.LogStackTrace)
             {
@@ -232,11 +239,6 @@ namespace Schema.Core
             return Passed;
         }
 
-        public SchemaResult<TOut> CastError<TOut>()
-        {
-            return SchemaResult<TOut>.Fail(Message, Context);
-        }
-
         public SchemaResult<TResult> Pass(TResult result, string successMessage = "")
         {
             return Pass(result, successMessage, context: context);
@@ -250,11 +252,6 @@ namespace Schema.Core
         public SchemaResult<TResult> Fail(string errorMessage)
         {
             return Fail(errorMessage, Context);
-        }
-
-        public SchemaResult Cast()
-        {
-            return new SchemaResult(status, message, context);
         }
 
         #region Static Factory Methods
@@ -274,6 +271,25 @@ namespace Schema.Core
         public static SchemaResult<TResult> CheckIf(bool conditional, TResult result, string errorMessage, string successMessage = "", object context = null)
         {
             return conditional ? Pass(result: result, successMessage: successMessage, context: context) : Fail(errorMessage: errorMessage, context: context);
+        }
+
+        #endregion
+
+        #region Cast Methods
+        
+        public SchemaResult Cast()
+        {
+            return new SchemaResult(status, message, context);
+        }
+
+        public SchemaResult<TOut> CastError<TOut>()
+        {
+            return SchemaResult<TOut>.Fail(Message, Context);
+        }
+
+        public SchemaResult<TOut> CastError<TOut>(SchemaResult<TOut> res)
+        {
+            return SchemaResult<TOut>.Fail(Message, context);
         }
 
         #endregion
