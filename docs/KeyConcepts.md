@@ -14,6 +14,7 @@ A table-like definition with a unique `SchemeName`, a set of `Attributes` (colum
 ### Attribute
 A column definition with a `DataType`, optional identifier flag, and `ShouldPublish`. Common types include:
 - Text, Number, Boolean
+- Color (hex color codes like #FF0000 or #FF0000AA)
 - FilePath, Folder
 - Custom types can be added in code
 

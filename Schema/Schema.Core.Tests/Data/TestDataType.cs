@@ -111,6 +111,15 @@ public class TestDataType
             yield return new TestCaseData(1, DataType.Integer, DataType.Boolean, true, true);
             yield return new TestCaseData(0, DataType.Integer, DataType.Boolean, true, false);
             yield return new TestCaseData(2, DataType.Integer, DataType.Boolean, true, true);
+            
+            // Color conversions
+            yield return new TestCaseData("#FF0000", DataType.Text, DataType.Color, true, "#FF0000");
+            yield return new TestCaseData("#00FF00", DataType.Text, DataType.Color, true, "#00FF00");
+            yield return new TestCaseData("#0000FF", DataType.Text, DataType.Color, true, "#0000FF");
+            yield return new TestCaseData("FF0000", DataType.Text, DataType.Color, true, "#FF0000");
+            yield return new TestCaseData("", DataType.Text, DataType.Color, true, "#000000");
+            yield return new TestCaseData("invalid", DataType.Text, DataType.Color, false, null);
+            yield return new TestCaseData("#GGGGGG", DataType.Text, DataType.Color, false, null);
         }
     }
 
@@ -138,6 +147,9 @@ public class TestDataType
             yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema1", "Attribute2"), false);
             yield return new TestCaseData(DataType.Boolean, new BooleanDataType(), true);
             yield return new TestCaseData(DataType.Boolean, DataType.Text, false);
+            yield return new TestCaseData(DataType.Color, new ColorDataType(), true);
+            yield return new TestCaseData(DataType.Color, new ColorDataType("#FF0000"), true);
+            yield return new TestCaseData(DataType.Color, DataType.Text, false);
         }
     }
 
