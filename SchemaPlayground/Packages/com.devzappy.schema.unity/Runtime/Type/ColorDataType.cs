@@ -1,10 +1,10 @@
-using System;
 using System.Text.RegularExpressions;
 using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Schemes;
+using UnityEditor;
 using UnityEngine;
-using static Schema.Core.SchemaResult;
+using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Runtime.Type
 {
@@ -43,28 +43,10 @@ namespace Schema.Runtime.Type
         {
             using var _ = new DataTypeContextScope(ref context, this);
             
-            if (value == null)
-            {
-                return CheckIf(false, 
-                    errorMessage: "Color value cannot be null",
-                    successMessage: "Color value is valid", context);
-            }
-            
-            string hexString = value.ToString();
-            
-            if (string.IsNullOrWhiteSpace(hexString))
-            {
-                return CheckIf(false, 
-                    errorMessage: "Color value cannot be empty or whitespace",
-                    successMessage: "Color value is valid", context);
-            }
-            
-            // Use Unity's ColorUtility for validation
-            bool isValidHex = ColorUtility.TryParseHtmlString(hexString, out _);
-            
-            return CheckIf(isValidHex, 
-                errorMessage: $"Value '{hexString}' is not a valid hex color format. Expected #RRGGBB or #RRGGBBAA",
-                successMessage: $"Value '{hexString}' is a valid hex color", context);
+            // Note: value is only considered valid, if it is of the Color type.
+            return CheckIf(value is Color, 
+                errorMessage: "Value is not a valid color.",
+                successMessage: "Value is a valid color", context);
         }
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
@@ -98,15 +80,8 @@ namespace Schema.Runtime.Type
                 return Fail<object>($"Failed to convert '{value}' to {TypeName}. Invalid hex color format. Expected #RRGGBB or #RRGGBBAA", context: context);
             }
             
-            // Return the normalized hex string (Unity's ColorUtility normalizes it)
-            string normalizedHex = ColorUtility.ToHtmlStringRGBA(color);
-            if (normalizedHex.Length == 6) // If no alpha, don't include it
-            {
-                normalizedHex = normalizedHex.Substring(0, 6);
-            }
-            
-            return Pass<object>(result: "#" + normalizedHex,
-                successMessage: $"Converted '{value}' to hex color '#{normalizedHex}'", context);
+            return Pass<object>(result: color,
+                successMessage: $"Converted value to hex color", context);
         }
         
         /// <summary>
@@ -193,7 +168,7 @@ namespace Schema.Runtime.Type
             }
         }
         
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        [InitializeOnLoadMethod]
         static void Initialize()
         {
             Logger.LogVerbose("Initializing Color DataType");

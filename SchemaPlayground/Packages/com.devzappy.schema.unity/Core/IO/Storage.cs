@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Schema.Core.Data;
 using Schema.Core.Logging;
 using Schema.Core.Serialization;
 
@@ -9,7 +8,7 @@ namespace Schema.Core.IO
     {
         private string Context => nameof(Storage);
 
-        public ISchemeStorageFormat JsonSchemeStorageFormat;
+        public JsonSchemeStorageFormat JsonSchemeStorageFormat;
         public ISchemeStorageFormat CsvSchemeStorageFormat;
         public ISchemeStorageFormat CSharpSchemeStorageFormat;
         public ISchemeStorageFormat ScriptableObjectSchemeStorageFormat;

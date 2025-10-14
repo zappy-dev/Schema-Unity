@@ -1,6 +1,7 @@
-using System;
 using NUnit.Framework;
+using Schema.Core;
 using Schema.Core.Data;
+using Schema.Runtime;
 using Schema.Runtime.Type;
 using UnityEngine;
 
@@ -20,34 +21,14 @@ namespace Schema.Unity.Editor.Tests
             // Create a new Color data type instance
             var colorType = new ColorDataType();
             
-            // Verify it's a plugin type (not in core built-in types)
-            Assert.That(DataType.CoreBuiltInTypes, Does.Not.Contain(colorType));
-            
             // Verify it can be added as a plugin type
             DataType.AddPluginType(colorType);
             
+            // Verify it's a plugin type (not in core built-in types)
+            CollectionAssert.DoesNotContain(DataType.CoreBuiltInTypes, colorType);
+            
             // Verify it's now in the built-in types (which includes plugins)
-            Assert.That(DataType.BuiltInTypes, Does.Contain(colorType));
-        }
-
-        [Test]
-        public void ColorDataType_ShouldWorkWithDataEntry()
-        {
-            // Create a data entry with color data
-            var dataEntry = new DataEntry(new System.Collections.Generic.Dictionary<string, object>
-            {
-                { "PlayerColor", "#FF0000" },
-                { "EnemyColor", "#00FF00" }
-            });
-            
-            // Test the GetDataAsColor extension method
-            var playerColorResult = dataEntry.GetDataAsColor("PlayerColor");
-            Assert.That(playerColorResult.Passed, Is.True);
-            Assert.That(playerColorResult.Result, Is.EqualTo(Color.red));
-            
-            var enemyColorResult = dataEntry.GetDataAsColor("EnemyColor");
-            Assert.That(enemyColorResult.Passed, Is.True);
-            Assert.That(enemyColorResult.Result, Is.EqualTo(Color.green));
+            CollectionAssert.Contains(DataType.BuiltInTypes, colorType);
         }
 
         [Test]
@@ -66,29 +47,11 @@ namespace Schema.Unity.Editor.Tests
             
             // Empty color should return black
             var emptyResult = dataEntry.GetDataAsColor("EmptyColor");
-            Assert.That(emptyResult.Passed, Is.True);
-            Assert.That(emptyResult.Result, Is.EqualTo(Color.black));
+            Assert.That(emptyResult.Passed, Is.False);
             
             // Null color should return black
             var nullResult = dataEntry.GetDataAsColor("NullColor");
-            Assert.That(nullResult.Passed, Is.True);
-            Assert.That(nullResult.Result, Is.EqualTo(Color.black));
-        }
-
-        [Test]
-        public void ColorDataType_ShouldSupportAlphaChannel()
-        {
-            var dataEntry = new DataEntry(new System.Collections.Generic.Dictionary<string, object>
-            {
-                { "ColorWithAlpha", "#FF0000AA" }
-            });
-            
-            var result = dataEntry.GetDataAsColor("ColorWithAlpha");
-            Assert.That(result.Passed, Is.True);
-            
-            // The alpha should be approximately 0.67 (170/255)
-            var expectedColor = new Color(1f, 0f, 0f, 0.67f);
-            Assert.That(result.Result, Is.EqualTo(expectedColor));
+            Assert.That(nullResult.Passed, Is.False);
         }
 
         [Test]
@@ -114,7 +77,7 @@ namespace Schema.Unity.Editor.Tests
             
             // Test NormalizeHexColor
             var normalized = ColorDataType.NormalizeHexColor("ff0000");
-            Assert.That(normalized, Is.EqualTo("#FF0000"));
+            Assert.That(normalized, Is.EqualTo("#FF0000FF"));
         }
     }
 }

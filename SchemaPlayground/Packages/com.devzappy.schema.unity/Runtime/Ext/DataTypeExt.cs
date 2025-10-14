@@ -35,19 +35,14 @@ namespace Schema.Runtime
         public static SchemaResult<Color> GetDataAsColor(this DataEntry dataEntry, string attribute)
         {
             var res = SchemaResult<Color>.New(CodeGenUtils.Context);
-            var hexString = dataEntry.GetDataAsString(attribute);
-            
-            if (string.IsNullOrWhiteSpace(hexString))
+            var value = dataEntry.GetData(attribute);
+
+            if (value is Color color)
             {
-                return res.Pass(Color.black, "Empty color value, using black");
+                return res.Pass(color);
             }
             
-            if (!ColorUtility.TryParseHtmlString(hexString, out Color color))
-            {
-                return res.Fail($"Failed to parse color from hex string '{hexString}'");
-            }
-            
-            return res.Pass(color, $"Successfully parsed color from '{hexString}'");
+            return res.Fail("Color not found");
         }
     }
 }

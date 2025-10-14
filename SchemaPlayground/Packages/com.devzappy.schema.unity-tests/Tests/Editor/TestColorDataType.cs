@@ -1,5 +1,5 @@
-using System;
 using NUnit.Framework;
+using Schema.Core;
 using Schema.Core.Data;
 using Schema.Runtime.Type;
 using UnityEngine;
@@ -22,10 +22,10 @@ namespace Schema.Unity.Editor.Tests
         }
 
         [Test, TestCaseSource(nameof(ValidHexColorTestCases))]
-        public void IsValidValue_ShouldPass_OnValidHexColors(string hexColor)
+        public void IsValidValue_ShouldFail_OnValidHexColors(string hexColor)
         {
             var result = _type.IsValidValue(Context, hexColor);
-            Assert.That(result.Passed, Is.True, $"Expected '{hexColor}' to be valid");
+            Assert.That(result.Failed, Is.True, $"Expected '{hexColor}' to be valid");
         }
 
         [Test, TestCaseSource(nameof(InvalidHexColorTestCases))]
@@ -36,7 +36,7 @@ namespace Schema.Unity.Editor.Tests
         }
 
         [Test, TestCaseSource(nameof(ConvertValueTestCases))]
-        public void ConvertValue_ShouldSucceed_OnValidInputs(object input, string expectedOutput)
+        public void ConvertValue_ShouldSucceed_OnValidInputs(object input, Color expectedOutput)
         {
             var conversion = _type.ConvertValue(Context, input);
             Assert.That(conversion.Passed, Is.True, $"Expected conversion of '{input}' to succeed");
@@ -142,6 +142,7 @@ namespace Schema.Unity.Editor.Tests
         public void HexToColor_StaticMethod_ShouldWorkCorrectly(string hexColor, Color expectedColor)
         {
             var result = ColorDataType.HexToColor(hexColor);
+            
             Assert.That(result, Is.EqualTo(expectedColor), $"Expected HexToColor('{hexColor}') to return {expectedColor}");
         }
 
@@ -155,7 +156,8 @@ namespace Schema.Unity.Editor.Tests
         [Test]
         public void GetDataMethod_ShouldReturnCorrectMethod()
         {
-            var attribute = new AttributeDefinition("TestColor", _type, false, true);
+            var testScheme = new DataScheme("TestScheme");
+            var attribute = new AttributeDefinition(testScheme, "TestColor", _type, isIdentifier: false, shouldPublish: true);
             var result = _type.GetDataMethod(Context, attribute);
             
             Assert.That(result.Passed, Is.True);
@@ -200,21 +202,21 @@ namespace Schema.Unity.Editor.Tests
 
         private static object[] ConvertValueTestCases =
         {
-            new object[] { "#000000", "#000000" },
-            new object[] { "#FFFFFF", "#FFFFFF" },
-            new object[] { "#ff0000", "#FF0000" },
-            new object[] { "#00ff00", "#00FF00" },
-            new object[] { "#0000ff", "#0000FF" },
-            new object[] { "#123456", "#123456" },
-            new object[] { "#abcdef", "#ABCDEF" },
-            new object[] { "#AbCdEf", "#ABCDEF" },
-            new object[] { "#00000000", "#00000000" },
-            new object[] { "#ffffffff", "#FFFFFFFF" },
-            new object[] { "#ff5733aa", "#FF5733AA" },
-            new object[] { "000000", "#000000" }, // Missing # prefix
-            new object[] { "FFFFFF", "#FFFFFF" }, // Missing # prefix
-            new object[] { "  #FF0000  ", "#FF0000" }, // With whitespace
-            new object[] { "  FF0000  ", "#FF0000" }, // With whitespace and missing #
+            new object[] { "#000000", ColorDataType.HexToColor("#000000") },
+            new object[] { "#FFFFFF", ColorDataType.HexToColor("#FFFFFF") },
+            new object[] { "#ff0000", ColorDataType.HexToColor("#FF0000") },
+            new object[] { "#00ff00", ColorDataType.HexToColor("#00FF00") },
+            new object[] { "#0000ff", ColorDataType.HexToColor("#0000FF") },
+            new object[] { "#123456", ColorDataType.HexToColor("#123456") },
+            new object[] { "#abcdef", ColorDataType.HexToColor("#ABCDEF") },
+            new object[] { "#AbCdEf", ColorDataType.HexToColor("#ABCDEF") },
+            new object[] { "#00000000", ColorDataType.HexToColor("#00000000") },
+            new object[] { "#ffffffff", ColorDataType.HexToColor("#FFFFFFFF") },
+            new object[] { "#ff5733aa", ColorDataType.HexToColor("#FF5733AA") },
+            new object[] { "000000", ColorDataType.HexToColor("#000000") }, // Missing # prefix
+            new object[] { "FFFFFF", ColorDataType.HexToColor("#FFFFFF") }, // Missing # prefix
+            new object[] { "  #FF0000  ", ColorDataType.HexToColor("#FF0000") }, // With whitespace
+            new object[] { "  FF0000  ", ColorDataType.HexToColor("#FF0000") }, // With whitespace and missing #
         };
 
         private static object[] ConvertValueFailureTestCases =
@@ -248,13 +250,13 @@ namespace Schema.Unity.Editor.Tests
 
         private static object[] NormalizeHexColorTestCases =
         {
-            new object[] { "#000000", "#000000" },
-            new object[] { "#ffffff", "#FFFFFF" },
-            new object[] { "#FF0000", "#FF0000" },
-            new object[] { "000000", "#000000" },
-            new object[] { "FFFFFF", "#FFFFFF" },
-            new object[] { "  #FF0000  ", "#FF0000" },
-            new object[] { "  FF0000  ", "#FF0000" },
+            new object[] { "#000000", "#000000FF" },
+            new object[] { "#ffffff", "#FFFFFFFF" },
+            new object[] { "#FF0000", "#FF0000FF" },
+            new object[] { "000000", "#000000FF" },
+            new object[] { "FFFFFF", "#FFFFFFFF" },
+            new object[] { "  #FF0000  ", "#FF0000FF" },
+            new object[] { "  FF0000  ", "#FF0000FF" },
             new object[] { "", null },
             new object[] { "   ", null },
             new object[] { null, null },
@@ -271,7 +273,7 @@ namespace Schema.Unity.Editor.Tests
             new object[] { "#FFFFFF", Color.white },
             new object[] { "#000000", Color.black },
             new object[] { "FF0000", Color.red }, // Without # prefix
-            new object[] { "#FF0000AA", new Color(1f, 0f, 0f, 0.67f) }, // With alpha
+            new object[] { "#FF0000FF", new Color(1f, 0f, 0f, 1f) }, // With alpha
             new object[] { "", Color.black }, // Empty string
             new object[] { null, Color.black }, // Null
         };

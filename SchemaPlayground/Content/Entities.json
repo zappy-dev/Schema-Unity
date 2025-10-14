@@ -56,7 +56,7 @@
       "ID": "Player",
       "MoveSpeed": 10.0,
       "Sprite": "4ba042bd-f841-30f4-98f9-52d0551c6911",
-      "Color": "#00FF00"
+      "Color": "#FFFFFF"
     },
     {
       "ID": "Enemy",
