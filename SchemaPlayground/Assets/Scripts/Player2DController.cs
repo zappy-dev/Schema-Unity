@@ -21,10 +21,7 @@ public class Player2DController : MonoBehaviour
 
     private void InitializeConfigs()
     {
-        // Call this method to initialize Schema
-        Schema.Core.Schema.ManifestUpdated += OnManifestUpdated;
-
-        if (SchemaRuntime.Initialize().TryErr(out var initError))
+        if (SchemaRuntime.Initialize(OnManifestUpdated).TryErr(out var initError))
         {
             Debug.LogError(initError.Message);
         }
@@ -41,6 +38,7 @@ public class Player2DController : MonoBehaviour
         Debug.Log($"Using player entry: {player}");
         playerEntry = player;
         spriteRenderer.sprite = playerEntry.Sprite;
+        spriteRenderer.color = playerEntry.Color;
     }
 
     // Update is called once per frame

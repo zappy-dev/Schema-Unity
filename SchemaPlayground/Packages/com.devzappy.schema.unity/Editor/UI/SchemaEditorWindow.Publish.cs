@@ -81,7 +81,11 @@ namespace Schema.Unity.Editor
             }
             
             // Publish asset links
-
+            var assetLinker = UnityAssetLinker.Instance;
+            if (assetLinker == null)
+            {
+                assetLinker = UnityAssetLinker.CreateAsset();
+            }
             foreach (var entry in schemeToPublish.AllEntries)
             {
                 foreach (var attribute in schemeToPublish.GetAttributes())
@@ -104,15 +108,11 @@ namespace Schema.Unity.Editor
                     var asset = AssetDatabase.LoadAssetAtPath(assetPath, unityAssetDataType.ObjectType);
 
                     var assetLink = new AssetLink(assetGuid, assetPath, asset);
-                    var assetLinker = UnityAssetLinker.Instance;
-                    if (assetLinker == null)
-                    {
-                        assetLinker = UnityAssetLinker.CreateAsset();
-                    }
-                    assetLinker.AddAssetLink(assetLink);
+                    assetLinker.AddAssetLink(context, assetLink);
                 }
             }
             
+            AssetDatabase.SaveAssetIfDirty(assetLinker);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             return Pass("Published assets");

@@ -147,7 +147,7 @@ namespace Schema.Core
                 // Uncomment reason: I want to make sure this fails if calling the result was wrong during list data type creation
                 if (status == RequestStatus.Failed)
                 {
-                    throw new InvalidOperationException($"The request status {status} is not supported.");
+                    throw new InvalidOperationException($"This result failed, reason: {Message}");
                 }
                 
                 return result;
@@ -195,6 +195,13 @@ namespace Schema.Core
         {
             result = this.result;
             return Passed;
+        }
+
+        public bool TryErr(out TResult result, out SchemaResult<TResult> error)
+        {
+            result = this.result;
+            error = this;
+            return Failed;
         }
 
         public bool Try(out TResult result, out SchemaResult<TResult> res)

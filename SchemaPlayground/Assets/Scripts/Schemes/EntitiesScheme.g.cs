@@ -89,6 +89,12 @@ namespace ExampleProject.Schemes
         /// </summary>
      
         public UnityEngine.Sprite Sprite => DataEntry.GetDataAsObject<UnityEngine.Sprite>("Sprite").Result;
+     
+        /// <summary>
+        /// Entity color in hex format (e.g., #FF0000 for red)
+        /// </summary>
+     
+        public UnityEngine.Color Color => DataEntry.GetDataAsColor("Color").Result;
  
     }
 }

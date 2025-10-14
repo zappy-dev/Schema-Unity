@@ -5,6 +5,7 @@ using Schema.Core.Data;
 using Schema.Core.Ext;
 using UnityEngine;
 using Object = UnityEngine.Object;
+using static Schema.Core.SchemaResult;
 
 namespace Schema.Runtime
 {
@@ -29,6 +30,19 @@ namespace Schema.Runtime
             
             var loadedAsset = Resources.Load<T>(sanitizedPath);
             return res.Pass(loadedAsset);
+        }
+        
+        public static SchemaResult<Color> GetDataAsColor(this DataEntry dataEntry, string attribute)
+        {
+            var res = SchemaResult<Color>.New(CodeGenUtils.Context);
+            var value = dataEntry.GetData(attribute);
+
+            if (value is Color color)
+            {
+                return res.Pass(color);
+            }
+            
+            return res.Fail("Color not found");
         }
     }
 }

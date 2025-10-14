@@ -15,6 +15,7 @@ A table-like definition with a unique `SchemeName`, a set of `Attributes` (colum
 A column definition with a `DataType`, optional identifier flag, and `ShouldPublish`. Common types include:
 - Text, Number, Boolean
 - FilePath, Folder
+- Color (Unity runtime plugin - hex color codes like #FF0000 or #FF0000AA)
 - Custom types can be added in code
 
 ### Entry
