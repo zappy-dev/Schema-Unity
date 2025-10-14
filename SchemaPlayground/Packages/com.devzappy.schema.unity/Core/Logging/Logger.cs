@@ -1,4 +1,3 @@
-#define SCHEMA_DEBUG
 using System.Diagnostics;
 using System.Text;
 

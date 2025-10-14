@@ -132,7 +132,7 @@ namespace Schema.Core.Data
                 index++;
             }
             
-            return Pass($"All {index} elements are valid", context);
+            return Pass("All elements are valid", context);
         }
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)

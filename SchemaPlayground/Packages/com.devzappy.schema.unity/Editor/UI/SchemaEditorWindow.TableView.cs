@@ -109,11 +109,10 @@ namespace Schema.Unity.Editor
             const float assetPreviewHeight = 64f; // Height for asset previews (e.g., Texture)
             
             float maxHeight = baseRowHeight;
-            
+
             // Check each attribute for list data types and asset types
-            for (int i = 0; i < scheme.AttributeCount; i++)
+            foreach (var attribute in  scheme.GetAttributes())
             {
-                var attribute = scheme.GetAttribute(i).Result;
                 if (attribute.DataType is ListDataType)
                 {
                     var entryValue = entry.GetDataDirect(attribute);
@@ -289,7 +288,6 @@ namespace Schema.Unity.Editor
                         if (string.IsNullOrEmpty(selectedSchemeLoadPath) && GetManifestEntryForScheme(scheme).Try(out var schemeManifestEntry))
                         {
                             selectedSchemeLoadPath = schemeManifestEntry.FilePath;
-                            selectedSchemeLoadPath = PathUtility.MakeAbsolutePath(selectedSchemeLoadPath, ProjectPath);
                         }
 
                         EditorGUILayout.TextField(selectedSchemeLoadPath);
@@ -297,7 +295,8 @@ namespace Schema.Unity.Editor
 
                     if (GUILayout.Button("Open", ExpandWidthOptions))
                     {
-                        EditorUtility.RevealInFinder(selectedSchemeLoadPath);
+                        var absSelectedSchemeLoadPath = PathUtility.MakeAbsolutePath(selectedSchemeLoadPath, ProjectPath);
+                        EditorUtility.RevealInFinder(absSelectedSchemeLoadPath);
                     }
 
                     var saveButtonText = scheme.IsDirty ? "Save*" : "Save";
@@ -464,7 +463,7 @@ namespace Schema.Unity.Editor
             
             var focusedTableCell = new TableCell(GUIUtility.keyboardControl - 1);
             var focusedIndex = table.IndexOf(focusedTableCell);
-            if (ev.type == EventType.Layout)
+            if (ev.type == EventType.Layout && focusedTableCell.IsSet)
             {
                 if (!Equals(focusedTableCell, lastFocusedCell))
                 {

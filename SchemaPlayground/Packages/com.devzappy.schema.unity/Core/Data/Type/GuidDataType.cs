@@ -24,7 +24,13 @@ namespace Schema.Core.Data
         {
             using var _ = new DataTypeContextScope(ref context, this);
             bool isGuid = value is Guid;
-            return CheckIf(isGuid, $"Value '{value}' is not a Guid", "Value is a Guid", context);
+            return CheckIf(isGuid,
+#if SCHEMA_DEBUG
+                errorMessage: $"Value '{value}' is not a Guid",
+#else
+                errorMessage: "Value is not a Guid",
+#endif
+                "Value is a Guid", context);
         }
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)

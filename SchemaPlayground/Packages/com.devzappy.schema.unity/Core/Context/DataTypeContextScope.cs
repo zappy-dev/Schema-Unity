@@ -8,13 +8,19 @@ namespace Schema.Core
         public DataTypeContextScope(ref SchemaContext context, DataType dataType)
         {
             Context = context;
-            Context.DataType = dataType;
+            if (Context != null)
+            {
+                Context.DataType = dataType;
+            }
         }
 
 
         public void Dispose()
         {
-            Context.DataType = null;
+            if (Context != null)
+            {
+                Context.DataType = null;
+            }
             Context = null;
         }
     }

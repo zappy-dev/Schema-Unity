@@ -1,4 +1,3 @@
-#define SCHEMA_DEBUG
 using System;
 using System.Threading;
 using UnityEngine;

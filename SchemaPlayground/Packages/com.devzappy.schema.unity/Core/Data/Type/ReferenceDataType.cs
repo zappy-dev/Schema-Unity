@@ -137,7 +137,13 @@ namespace Schema.Core.Data
             var matchingIdentifier = finalizedIdValues.FirstOrDefault(v => v.Equals(value));
             if (matchingIdentifier == null)
             {
-                return Fail($"Value '{value}' does not exist as an identifier", context);
+                return Fail(
+#if SCHEMA_DEBUG
+                errorMessage: $"Value '{value}' does not exist as an identifier",
+#else
+                errorMessage: "Value does not exist as an identifier",
+#endif
+                context);
             }
 
             // HACK: Do the conversion for the identifier value here...

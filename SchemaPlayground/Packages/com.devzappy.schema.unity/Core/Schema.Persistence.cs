@@ -62,7 +62,7 @@ namespace Schema.Core
 
             if (!PathUtility.IsAbsolutePath(manifestLoadPath))
             {
-                manifestLoadPath = PathUtility.MakeAbsolutePath(ProjectPath, manifestLoadPath);
+                manifestLoadPath = PathUtility.MakeAbsolutePath(manifestLoadPath, ProjectPath);
                 Logger.LogVerbose($"Converting manifest path to absolute path: {manifestLoadPath}");
             }
 
@@ -76,7 +76,7 @@ namespace Schema.Core
                 return res.Fail($"No Manifest scheme found.\nSearched the following path: {manifestLoadPath}\nLoad an existing manifest scheme or save the empty template.");
             }
             
-            progress?.Report((0f, $"Loading: {manifestLoadPath}..."));
+            progress?.Report((0f, $"Loading: {PathUtility.MakeRelativePath(manifestLoadPath, ProjectPath)}..."));
             Logger.LogDbgVerbose($"Loading manifest from file: {manifestLoadPath}...", "Manifest");
             var loadResult =
                 _storage.DefaultManifestStorageFormat.DeserializeFromFile(context, manifestLoadPath);
@@ -138,8 +138,9 @@ namespace Schema.Core
                 }
                 
                 // 1. Load schemes into memory
-                var progressWrapper = new Progress<string>(schemeFilePath =>
+                var progressWrapper = new ProgressWrapper<string>(schemeFilePath =>
                 {
+                    Logger.LogVerbose($"Loading scheme from file: {schemeFilePath}");
                     progress?.Report((currentSchema * 1.0f / schemeCount,
                         $"Loading ({currentSchema}/{schemeCount}): {schemeFilePath}"));
                 });
@@ -195,9 +196,14 @@ namespace Schema.Core
                 if (!DataScheme.TopologicalSortByReferences(context, loadedSchemes).Try(out var schemeLoadOrder, out var sortErr)) 
                     return sortErr.CastError<ManifestLoadStatus>();
 
+                var schemeLoadOrderList = schemeLoadOrder.ToList();
                 progress?.Report((0.1f, "Loading..."));
-                foreach (var scheme in schemeLoadOrder)
+                int numLoaded = 0;
+                int numSchemes = schemeLoadOrderList.Count;
+                foreach (var scheme in schemeLoadOrderList)
                 {
+                    numLoaded++;
+                    progress?.Report((0.1f, $"Loading '{scheme.ToString(false)}' into Schema ({numLoaded} / {numSchemes})"));
                     Logger.LogDbgVerbose($"Loading scheme from manifest: {scheme}", context: manifestDataScheme);
                     var loadRes = LoadDataScheme(context, scheme,
                         overwriteExisting: false,
@@ -255,14 +261,14 @@ namespace Schema.Core
             // Resolve relative path if needed
             // TODO: Unify logic to FS Data Type
             string resolvedPath = schemeFilePath;
-            Logger.Log("resolvedPath: " + resolvedPath);
-            Logger.Log("ManifestImportPath: " + ManifestImportPath);
-            Logger.Log("Is Absolute: " + PathUtility.IsAbsolutePath(schemeFilePath));
+            Logger.LogDbgVerbose("ResolvedPath: " + resolvedPath);
+            Logger.LogDbgVerbose("ManifestImportPath: " + ManifestImportPath);
+            Logger.LogDbgVerbose("Is Absolute: " + PathUtility.IsAbsolutePath(schemeFilePath));
             if (!PathUtility.IsAbsolutePath(schemeFilePath) && !string.IsNullOrEmpty(ManifestImportPath))
             {
                 resolvedPath = PathUtility.MakeAbsolutePath(schemeFilePath, ProjectPath);
             }
-            Logger.Log("resolvedPath2: " + resolvedPath);
+            Logger.LogDbgVerbose("Fina ResolvedPath: " + resolvedPath);
 
             var fileExistRes = _storage.FileSystem.FileExists(context, resolvedPath);
             if (fileExistRes.Failed)

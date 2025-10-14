@@ -16,7 +16,7 @@ namespace Schema.Unity.Editor
             EditorWindow.GetWindow<SchemaDebugWindow>("Schema Debugger");
         }
 
-#if SCHEMA_DEBUG
+#if SCHEMA_PERF || SCHEMA_DEBUG
         [MenuItem("Tools/Schema/Generate Test Data (50 entries)")]
         public static void GenerateTestData50()
         {

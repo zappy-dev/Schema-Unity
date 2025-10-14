@@ -28,8 +28,12 @@ namespace Schema.Core.Data
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
             using var _ = new DataTypeContextScope(ref context, this);
-            return CheckIf(value is bool, 
+            return CheckIf(value is bool,
+#if SCHEMA_DEBUG
                 errorMessage: $"Value '{value}' is not a boolean.",
+#else
+                errorMessage: "Value is not a boolean.",
+#endif
                 successMessage: "Value is a boolean.", context);
         }
 

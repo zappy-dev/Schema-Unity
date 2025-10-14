@@ -23,11 +23,10 @@ public class Player2DController : MonoBehaviour
     {
         // Call this method to initialize Schema
         Schema.Core.Schema.ManifestUpdated += OnManifestUpdated;
-        var loadRes = SchemaRuntime.Initialize();
 
-        if (loadRes.Failed)
+        if (SchemaRuntime.Initialize().TryErr(out var initError))
         {
-            Debug.LogError(loadRes.Message);
+            Debug.LogError(initError.Message);
         }
     }
 
