@@ -1,0 +1,17 @@
+{
+    "name": "Schema.Unity.Runtime.Tests",
+    "rootNamespace": "Schema.Unity.Runtime.Tests",
+    "references": [
+        "Schema.Runtime",
+        "Schema.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
