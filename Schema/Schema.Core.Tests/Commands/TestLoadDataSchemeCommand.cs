@@ -69,8 +69,10 @@ namespace Schema.Core.Tests.Commands
         [Test]
         public async Task ExecuteAsync_ExistingSchemeWithoutOverwrite_Fails()
         {
-            // Arrange
-            Schema.LoadDataScheme(Context, _testScheme, true);
+            // Arrange - Load the scheme directly without using the command to avoid manifest entry issues
+            var loadResult = Schema.LoadDataScheme(Context, _testScheme, true, true);
+            Assert.IsTrue(loadResult.Passed, "Setup failed: " + loadResult.Message);
+            
             var duplicateScheme = new DataScheme(_schemeName);
             var command = new LoadDataSchemeCommand(Context, duplicateScheme, overwriteExisting: false);
 

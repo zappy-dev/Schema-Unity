@@ -52,7 +52,7 @@ public class TestReferenceDataType
             { "Name", "Third Item", Context }
         });
 
-        Schema.LoadDataScheme(Context, _testScheme, overwriteExisting: true);
+        Schema.LoadDataScheme(Context, _testScheme, overwriteExisting: true, registerManifestEntry: true);
     }
 
     [TearDown]
@@ -463,7 +463,7 @@ public class TestReferenceDataType
         intScheme.AddAttribute(Context, "IntID", DataType.Integer, isIdentifier: true);
         intScheme.AddEntry(Context, new DataEntry { { "IntID", 1, Context } });
         intScheme.AddEntry(Context, new DataEntry { { "IntID", 2, Context } });
-        Schema.LoadDataScheme(Context, intScheme, overwriteExisting: true);
+        Schema.LoadDataScheme(Context, intScheme, overwriteExisting: true, registerManifestEntry: true);
 
         var refType = new ReferenceDataType("IntScheme", "IntID");
         
@@ -480,7 +480,7 @@ public class TestReferenceDataType
         intScheme.AddAttribute(Context, "IntID", DataType.Integer, isIdentifier: true);
         intScheme.AddEntry(Context, new DataEntry { { "IntID", 1, Context } });
         intScheme.AddEntry(Context, new DataEntry { { "IntID", 2, Context } });
-        Schema.LoadDataScheme(Context, intScheme, overwriteExisting: true);
+        Schema.LoadDataScheme(Context, intScheme, overwriteExisting: true, registerManifestEntry: true);
 
         var refType = new ReferenceDataType("IntScheme", "IntID");
         var result = refType.ConvertValue(Context, "1");
@@ -496,7 +496,7 @@ public class TestReferenceDataType
         var intScheme = new DataScheme("IntScheme");
         intScheme.AddAttribute(Context, "IntID", DataType.Integer, isIdentifier: true);
         intScheme.AddEntry(Context, new DataEntry { { "IntID", 1, Context } });
-        Schema.LoadDataScheme(Context, intScheme, overwriteExisting: true);
+        Schema.LoadDataScheme(Context, intScheme, overwriteExisting: true, registerManifestEntry: true);
 
         var refType = new ReferenceDataType("IntScheme", "IntID");
         var result = refType.ConvertValue(Context, "not a number");
@@ -519,7 +519,7 @@ public class TestReferenceDataType
         guidScheme.AddAttribute(Context, "GuidID", DataType.Guid, isIdentifier: true);
         guidScheme.AddEntry(Context, new DataEntry { { "GuidID", guid1, Context } });
         guidScheme.AddEntry(Context, new DataEntry { { "GuidID", guid2, Context } });
-        Schema.LoadDataScheme(Context, guidScheme, overwriteExisting: true);
+        Schema.LoadDataScheme(Context, guidScheme, overwriteExisting: true, registerManifestEntry: true);
 
         var refType = new ReferenceDataType("GuidScheme", "GuidID");
         
@@ -537,7 +537,7 @@ public class TestReferenceDataType
         var guidScheme = new DataScheme("GuidScheme");
         guidScheme.AddAttribute(Context, "GuidID", DataType.Guid, isIdentifier: true);
         guidScheme.AddEntry(Context, new DataEntry { { "GuidID", guid1, Context } });
-        Schema.LoadDataScheme(Context, guidScheme, overwriteExisting: true);
+        Schema.LoadDataScheme(Context, guidScheme, overwriteExisting: true, registerManifestEntry: true);
 
         var refType = new ReferenceDataType("GuidScheme", "GuidID");
         var result = refType.ConvertValue(Context, guid1.ToString());
@@ -583,7 +583,7 @@ public class TestReferenceDataType
         // Create scheme without identifier
         var noIdScheme = new DataScheme("NoIdScheme");
         noIdScheme.AddAttribute(Context, "Name", DataType.Text);
-        Schema.LoadDataScheme(Context, noIdScheme, overwriteExisting: true);
+        Schema.LoadDataScheme(Context, noIdScheme, overwriteExisting: true, registerManifestEntry: true);
 
         var refType = new ReferenceDataType("NoIdScheme", "Name");
         var result = refType.IsValidValue(Context, "test");
@@ -612,7 +612,7 @@ public class TestReferenceDataType
         // Create empty scheme
         var emptyScheme = new DataScheme("EmptyScheme");
         emptyScheme.AddAttribute(Context, "ID", DataType.Text, isIdentifier: true);
-        Schema.LoadDataScheme(Context, emptyScheme, overwriteExisting: true);
+        Schema.LoadDataScheme(Context, emptyScheme, overwriteExisting: true, registerManifestEntry: true);
 
         var refType = new ReferenceDataType("EmptyScheme", "ID");
         

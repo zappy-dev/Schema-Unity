@@ -74,7 +74,7 @@ public class TestSchema
         var newScheme = new DataScheme(newSchemeName);
 
         // Act
-        var addResponse = Schema.LoadDataScheme(Context, newScheme, overwriteExisting);
+        var addResponse = Schema.LoadDataScheme(Context, newScheme, overwriteExisting, true);
         
         // Assert
         Assert.IsTrue(addResponse.Passed);
@@ -314,7 +314,7 @@ public class TestSchema
         manifestSelfEntry.FilePath = System.IO.Path.Combine("Content", "Manifest.json");
         MockPersistScheme(manifestSavePath, manifestScheme, mockRead: false, mockWrite: true);
         
-        var loadRes = Schema.LoadDataScheme(Context, manifestScheme._, true);
+        var loadRes = Schema.LoadDataScheme(Context, manifestScheme._, true, true);
         loadRes.AssertPassed();
         
         var saveRes = Schema.SaveDataScheme(Context, manifestScheme._, true);
@@ -344,7 +344,7 @@ public class TestSchema
     {
         // Arrange: No schemes are dirty
         var scheme = new DataScheme("Clean");
-        Schema.LoadDataScheme(Context, scheme, true, importFilePath: "Clean.json");
+        Schema.LoadDataScheme(Context, scheme, true, true, importFilePath: "Clean.json");
         scheme.SetDirty(Context, false);
         
         // Act
@@ -365,7 +365,7 @@ public class TestSchema
         var scheme = new DataScheme("Dirty");
         _mockFileSystem.Setup(fs => fs.WriteAllText(Context, It.IsAny<string>(), _storage.DefaultManifestStorageFormat.Serialize(Context, scheme).AssertPassed(null))).Verifiable();
         
-        Schema.LoadDataScheme(Context, scheme, true, importFilePath: "Dirty.json");
+        Schema.LoadDataScheme(Context, scheme, true, true, importFilePath: "Dirty.json");
         scheme.SetDirty(Context, true);
         
         // Act
@@ -382,12 +382,12 @@ public class TestSchema
     {
         // Arrange
         var scheme = new DataScheme("Failing");
-        Schema.LoadDataScheme(Context, scheme, true);
+        Schema.LoadDataScheme(Context, scheme, true, true);
         scheme.SetDirty(Context, true);
         // Mock manifest entry
         var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(Context, String.Empty, String.Empty);
         manifestScheme.AddManifestEntry(Context, scheme.SchemeName, importFilePath: "Failing.json");
-        Schema.LoadDataScheme(Context, manifestScheme._, true);
+        Schema.LoadDataScheme(Context, manifestScheme._, true, true);
     }
 
     [Test]
@@ -396,15 +396,15 @@ public class TestSchema
         // Arrange
         var scheme1 = new DataScheme("Dirty1");
         var scheme2 = new DataScheme("Dirty2");
-        Schema.LoadDataScheme(Context, scheme1, true);
-        Schema.LoadDataScheme(Context, scheme2, true);
+        Schema.LoadDataScheme(Context, scheme1, true, true);
+        Schema.LoadDataScheme(Context, scheme2, true, true);
         scheme1.SetDirty(Context, true);
         scheme2.SetDirty(Context, true);
         // Mock manifest entries
         var manifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(Context, String.Empty, String.Empty);
         manifestScheme.AddManifestEntry(Context, scheme1.SchemeName, importFilePath: "Dirty1.json");
         manifestScheme.AddManifestEntry(Context, scheme2.SchemeName, importFilePath: "Dirty2.json");
-        Schema.LoadDataScheme(Context, manifestScheme._, true);
+        Schema.LoadDataScheme(Context, manifestScheme._, true, true);
         // As above, patching SaveDataScheme to fail for one scheme is not trivial without refactor
         // Placeholder for the failure path
     }

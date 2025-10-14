@@ -32,6 +32,7 @@ public class TestDataType
         _mockFileSystem = new Mock<IFileSystem>();
         
         Schema.SetStorage(new Storage(_mockFileSystem.Object));
+        Schema.InitializeTemplateManifestScheme(Context);
 
         _mockFileSystem.Setup(m => m.FileExists(Context, VALID_FILE_PATH)).Returns(SchemaResult.Pass());
         _mockFileSystem.Setup(m => m.FileExists(Context, INVALID_FILE_PATH)).Returns(SchemaResult.Fail(Context, ""));
@@ -44,7 +45,7 @@ public class TestDataType
         {
             { VALID_REFERENCE_ATTRIBUTE, VALID_REFERENCE_VALUE }
         }));
-        Schema.LoadDataScheme(Context, validScheme, true);
+        Schema.LoadDataScheme(Context, validScheme, true, true);
         
         var validSchemaNoIdentifier = new DataScheme(VALID_SCHEME_NAME_NO_IDENTIFIER);
         validSchemaNoIdentifier.AddAttribute(Context, VALID_REFERENCE_ATTRIBUTE, DataType.Text);
@@ -52,7 +53,7 @@ public class TestDataType
         {
             { VALID_REFERENCE_ATTRIBUTE, VALID_REFERENCE_VALUE }
         }));
-        Schema.LoadDataScheme(Context, validSchemaNoIdentifier, true);
+        Schema.LoadDataScheme(Context, validSchemaNoIdentifier, true, true);
     }
     
     [Test, TestCaseSource(nameof(ConversionTestCases))]

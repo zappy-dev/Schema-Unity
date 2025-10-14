@@ -178,7 +178,7 @@ namespace Schema.Core.Tests.Commands
             // The test needs better setup or the ability to load a scheme without auto-registering.
             
             // Arrange
-            Schema.LoadDataScheme(Context, _scheme, overwriteExisting: true);
+            Schema.LoadDataScheme(Context, _scheme, overwriteExisting: true, registerManifestEntry: true);
             
             var manifest = Schema.GetManifestScheme(Context).AssertPassed();
             
@@ -211,7 +211,7 @@ namespace Schema.Core.Tests.Commands
             // which needs the file to exist.
             
             // Arrange
-            Schema.LoadDataScheme(Context, _scheme, overwriteExisting: true);
+            Schema.LoadDataScheme(Context, _scheme, overwriteExisting: true, registerManifestEntry: true);
             
             var manifest = Schema.GetManifestScheme(Context).AssertPassed();
             var manifestDataEntry = new DataEntry();
