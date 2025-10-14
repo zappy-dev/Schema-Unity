@@ -25,8 +25,12 @@ namespace Schema.Core.Tests.Commands
                    .AssertPassed();
             _entry = _scheme.CreateNewEmptyEntry(Context).AssertPassed(); // create an empty entry
             _scheme.SetDataOnEntry(Context, _entry, AttributeName, "Alice").AssertPassed();
+            
+            // Initialize the manifest scheme
+            Schema.InitializeTemplateManifestScheme(Context);
+            
             // Load scheme into global context so identifier checks work as expected
-            Schema.LoadDataScheme(Context, _scheme, overwriteExisting: true);
+            Schema.LoadDataScheme(Context, _scheme, overwriteExisting: true, registerManifestEntry: true);
         }
 
         [Test]
