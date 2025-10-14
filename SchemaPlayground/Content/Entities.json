@@ -41,7 +41,7 @@
     {
       "AttributeName": "Color",
       "DataType": {
-        "$type": "Schema.Core.Data.ColorDataType, Schema.Core",
+        "$type": "Schema.Runtime.Type.ColorDataType, Schema.Runtime",
         "DefaultValue": "#FFFFFF"
       },
       "IsIdentifier": false,

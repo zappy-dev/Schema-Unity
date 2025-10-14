@@ -5,6 +5,7 @@ using Schema.Core.Data;
 using Schema.Core.Ext;
 using UnityEngine;
 using Object = UnityEngine.Object;
+using static Schema.Core.SchemaResult;
 
 namespace Schema.Runtime
 {
@@ -29,6 +30,24 @@ namespace Schema.Runtime
             
             var loadedAsset = Resources.Load<T>(sanitizedPath);
             return res.Pass(loadedAsset);
+        }
+        
+        public static SchemaResult<Color> GetDataAsColor(this DataEntry dataEntry, string attribute)
+        {
+            var res = SchemaResult<Color>.New(CodeGenUtils.Context);
+            var hexString = dataEntry.GetDataAsString(attribute);
+            
+            if (string.IsNullOrWhiteSpace(hexString))
+            {
+                return res.Pass(Color.black, "Empty color value, using black");
+            }
+            
+            if (!ColorUtility.TryParseHtmlString(hexString, out Color color))
+            {
+                return res.Fail($"Failed to parse color from hex string '{hexString}'");
+            }
+            
+            return res.Pass(color, $"Successfully parsed color from '{hexString}'");
         }
     }
 }

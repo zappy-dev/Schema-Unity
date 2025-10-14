@@ -49,11 +49,6 @@ namespace Schema.Core.Data
         public static readonly DataType Boolean = new BooleanDataType();
 
         /// <summary>
-        /// Built-in color data type.
-        /// </summary>
-        public static readonly DataType Color = new ColorDataType();
-
-        /// <summary>
         /// The default data type (Text).
         /// </summary>
         public static readonly DataType Default = Text;
@@ -81,7 +76,6 @@ namespace Schema.Core.Data
             Float,
             DateTime,
             Guid,
-            Color,
             FilePath_RelativePaths,
             Folder_RelativePaths,
         };

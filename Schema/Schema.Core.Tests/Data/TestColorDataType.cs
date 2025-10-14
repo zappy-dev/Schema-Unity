@@ -1,6 +1,8 @@
 using System;
 using NUnit.Framework;
 using Schema.Core.Data;
+using Schema.Runtime.Type;
+using UnityEngine;
 
 namespace Schema.Core.Tests.Data;
 
@@ -89,9 +91,9 @@ public class TestColorDataType
     }
 
     [Test]
-    public void CSDataType_ShouldReturnStringType()
+    public void CSDataType_ShouldReturnColorType()
     {
-        Assert.That(_type.CSDataType, Is.EqualTo(typeof(string).ToString()));
+        Assert.That(_type.CSDataType, Is.EqualTo(typeof(Color).ToString()));
     }
 
     [Test]
@@ -134,6 +136,31 @@ public class TestColorDataType
         
         Assert.That(color1.Equals(color3), Is.True); // Same type, different default values should still be equal
         Assert.That(color1 == color3, Is.True);
+    }
+
+    [Test, TestCaseSource(nameof(UnityColorConversionTestCases))]
+    public void HexToColor_StaticMethod_ShouldWorkCorrectly(string hexColor, Color expectedColor)
+    {
+        var result = ColorDataType.HexToColor(hexColor);
+        Assert.That(result, Is.EqualTo(expectedColor), $"Expected HexToColor('{hexColor}') to return {expectedColor}");
+    }
+
+    [Test, TestCaseSource(nameof(ColorToHexTestCases))]
+    public void ColorToHex_StaticMethod_ShouldWorkCorrectly(Color color, bool includeAlpha, string expectedHex)
+    {
+        var result = ColorDataType.ColorToHex(color, includeAlpha);
+        Assert.That(result, Is.EqualTo(expectedHex), $"Expected ColorToHex({color}, {includeAlpha}) to return '{expectedHex}'");
+    }
+
+    [Test]
+    public void GetDataMethod_ShouldReturnCorrectMethod()
+    {
+        var attribute = new AttributeDefinition("TestColor", _type, false, true);
+        var result = _type.GetDataMethod(Context, attribute);
+        
+        Assert.That(result.Passed, Is.True);
+        Assert.That(result.Result, Does.Contain("GetDataAsColor"));
+        Assert.That(result.Result, Does.Contain("TestColor"));
     }
 
     private static object[] ValidHexColorTestCases =
@@ -234,5 +261,32 @@ public class TestColorDataType
         new object[] { "not a color", null },
         new object[] { "#GGGGGG", null },
         new object[] { "#12345", null },
+    };
+
+    private static object[] UnityColorConversionTestCases =
+    {
+        new object[] { "#FF0000", Color.red },
+        new object[] { "#00FF00", Color.green },
+        new object[] { "#0000FF", Color.blue },
+        new object[] { "#FFFFFF", Color.white },
+        new object[] { "#000000", Color.black },
+        new object[] { "FF0000", Color.red }, // Without # prefix
+        new object[] { "#FF0000AA", new Color(1f, 0f, 0f, 0.67f) }, // With alpha
+        new object[] { "", Color.black }, // Empty string
+        new object[] { null, Color.black }, // Null
+    };
+
+    private static object[] ColorToHexTestCases =
+    {
+        new object[] { Color.red, false, "#FF0000" },
+        new object[] { Color.green, false, "#00FF00" },
+        new object[] { Color.blue, false, "#0000FF" },
+        new object[] { Color.white, false, "#FFFFFF" },
+        new object[] { Color.black, false, "#000000" },
+        new object[] { Color.red, true, "#FF0000FF" },
+        new object[] { Color.green, true, "#00FF00FF" },
+        new object[] { Color.blue, true, "#0000FFFF" },
+        new object[] { new Color(1f, 0f, 0f, 0.5f), true, "#FF000080" },
+        new object[] { new Color(1f, 0f, 0f, 0.5f), false, "#FF0000" },
     };
 }
