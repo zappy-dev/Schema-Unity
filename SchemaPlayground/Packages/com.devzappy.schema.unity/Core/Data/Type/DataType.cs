@@ -103,6 +103,7 @@ namespace Schema.Core.Data
         /// <param name="context"></param>
         /// <param name="value">The value to validate.</param>
         /// <returns>A <see cref="SchemaResult"/> indicating if the value is valid.</returns>
+        /// <remarks>This is a Hot Path!</remarks>
         public abstract SchemaResult IsValidValue(SchemaContext context, object value);
 
         /// <summary>

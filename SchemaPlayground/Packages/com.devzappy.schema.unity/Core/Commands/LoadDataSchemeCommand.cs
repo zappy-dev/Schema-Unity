@@ -1,4 +1,3 @@
-#define SCHEMA_DEBUG
 using System;
 using System.Linq;
 using System.Threading;

@@ -100,11 +100,7 @@ namespace Schema.Core.Data
 
         public override string ToString()
         {
-#if SCHEMA_DEBUG
-            return ToString(true);
-#else
             return ToString(SchemaResultSettings.Instance.LogVerboseScheme);
-#endif
         }
 
         public string ToString(bool verbose)

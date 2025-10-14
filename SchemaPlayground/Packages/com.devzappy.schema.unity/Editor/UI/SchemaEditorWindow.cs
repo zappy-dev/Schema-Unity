@@ -329,8 +329,9 @@ namespace Schema.Unity.Editor
 
         private SchemaResult OnLoadManifest(SchemaContext context)
         {
+            using var reporter = new EditorProgressReporter("Schema - Manifest Load");
             LogDbgVerbose($"Loading Manifest", context);
-            LatestManifestLoadResponse = LoadManifestFromPath(context, ManifestImportPath);
+            LatestManifestLoadResponse = LoadManifestFromPath(context, ManifestImportPath, reporter);
             LatestResponse = LatestManifestLoadResponse.Cast();
 
             if (LatestManifestLoadResponse.Passed)
@@ -655,16 +656,15 @@ namespace Schema.Unity.Editor
                 {
                     if (isInitialized)
                     {
-                        string path = string.Empty;
-#if SCHEMA_DEBUG
-                        path = $"({RuntimeHelpers.GetHashCode(LoadedManifestScheme._)}) {ManifestImportPath}";
-#else
-                    path = ManifestImportPath;
-#endif
+                        string manifestPath = ManifestImportPath;
                         // For hiding sensitive data
-                        string relativeManifestPath = PathUtility.MakeRelativePath(ProjectPath, path);
+                        string relativeManifestPath = PathUtility.MakeRelativePath(manifestPath, Application.dataPath);
                         
-                        var manifestPathContent = new GUIContent("Manifest Path", path);
+                        var manifestPathContent = new GUIContent("Manifest Path", manifestPath);
+                        
+#if SCHEMA_DEBUG
+                        relativeManifestPath = $"({RuntimeHelpers.GetHashCode(LoadedManifestScheme._)}) {relativeManifestPath}";
+#endif
                         EditorGUILayout.TextField(manifestPathContent, relativeManifestPath);
                     }
                 }

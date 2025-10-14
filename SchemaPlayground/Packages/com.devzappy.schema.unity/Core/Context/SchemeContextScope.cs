@@ -9,12 +9,18 @@ namespace Schema.Core
         public SchemeContextScope(ref SchemaContext context, DataScheme scheme)
         {
             Context = context;
-            context.Scheme = scheme;
+            if (context != null)
+            {
+                context.Scheme = scheme;
+            }
         }
         
         public void Dispose()
         {
-            Context.Scheme = null;
+            if (Context != null)
+            {
+                Context.Scheme = null;
+            }
             Context = null;
         }
     }

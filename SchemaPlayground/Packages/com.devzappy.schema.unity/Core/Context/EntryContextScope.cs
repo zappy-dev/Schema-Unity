@@ -9,12 +9,18 @@ namespace Schema.Core
         public EntryContextScope(ref SchemaContext ctx, DataEntry entry)
         {
             Context = ctx;
-            Context.Entry = entry;
+            if (Context != null)
+            {
+                Context.Entry = entry;
+            }
         }
 
         public void Dispose()
         {
-            Context.Entry = null;
+            if (Context != null)
+            {
+                Context.Entry = null;
+            }
             Context = null;
         }
     }

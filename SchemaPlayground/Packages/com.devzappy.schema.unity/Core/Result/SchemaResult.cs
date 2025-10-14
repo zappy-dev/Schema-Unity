@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
-using Schema.Core.Data;
 using Schema.Core.Logging;
 
 namespace Schema.Core
@@ -13,39 +12,11 @@ namespace Schema.Core
         Passed,
         Failed,
     }
-    
-    public class SchemaResultSettings
-    {
-        public static SchemaResultSettings Instance = new SchemaResultSettings();
-        
-        /// <summary>
-        /// Determines whether to log stack traces for new Schema Results. Useful for debugging, but not recommended during production
-        /// </summary>
-        public bool LogStackTrace { get; set; } = false;
 
-        /// <summary>
-        /// Determines whether to log failure information. Useful for debugging, but not recommended during production
-        /// </summary>
-        public bool LogFailure { get; set; } = false;
-
-        /// <summary>
-        /// Determines whether to log verbose scheme information. Useful for debugging, but not recommended during production
-        /// </summary>
-        public bool LogVerboseScheme { get; set; } = false;
-
-        private SchemaResultSettings()
-        {
-#if SCHEMA_DEBUG
-            LogFailure = true;
-            LogVerboseScheme = true;
-#endif
-        }
-    }
-    
-    public struct SchemaResult
+    public struct SchemaResult : ISchemeResult
     {
         public const string MESSAGE_NOT_SET = "Message not set!";
-        public static readonly SchemaResult NoOp = new SchemaResult(status: RequestStatus.Passed, "NoOp");
+        public static readonly SchemaResult NoOp = new SchemaResult(status: RequestStatus.Passed, "NoOp", context: null);
 
         /// <summary>
         /// Performs the operation across the given entries under a bulk operation context
@@ -84,25 +55,25 @@ namespace Schema.Core
 
         private string message;
         public string Message => message;
-        private string context;
-        public string Context => context;
+        private object context;
+        public object Context => context;
         public bool Passed => status == RequestStatus.Passed;
         public bool Failed => status == RequestStatus.Failed;
-
+        
         public SchemaResult(RequestStatus status, string message, object context = null)
         {
             this.status = status;
             this.message = string.IsNullOrEmpty(message) ? MESSAGE_NOT_SET : message;
-            this.context = context?.ToString(); // TODO: this is probably performance intensive to do for every result...
+            this.context = context; // NOTE: Context may change
+            
+            if (SchemaResultSettings.Instance.LogFailure && status == RequestStatus.Failed)
+            {
+                OnSchemaResultFailed(message, this.context);
+            }
+        }
 
-            // TODO: Maybe create a preference for whether schema results automatically create a log?
-            // TODO: Handle logging when creating an empty result
-// #if SCHEMA_DEBUG
-             if (SchemaResultSettings.Instance.LogFailure && status == RequestStatus.Failed)
-             {
-                 OnSchemaResultFailed(message, this.context);
-             }
-// #endif
+        public SchemaResult(RequestStatus status, string message, ICloneable cloneableContext = null) : this(status, message, cloneableContext?.Clone())
+        {
         }
 
         internal static void OnSchemaResultFailed(string message, object context)
@@ -155,9 +126,15 @@ namespace Schema.Core
             err = this;
             return this.status == RequestStatus.Passed;
         }
+        
+        public bool TryErr(out SchemaResult err)
+        {
+            err = this;
+            return this.status == RequestStatus.Failed;
+        }
     }
 
-    public struct SchemaResult<TResult>
+    public struct SchemaResult<TResult> : ISchemeResult
     {
         private RequestStatus status;
         public RequestStatus Status => status;
@@ -184,12 +161,12 @@ namespace Schema.Core
         public bool Passed => status == RequestStatus.Passed;
         public bool Failed => status == RequestStatus.Failed;
 
-        public SchemaResult(RequestStatus status, TResult result, string message, object context = null)
+        public SchemaResult(RequestStatus status, TResult result, string message, ICloneable context = null)
         {
             this.status = status;
             this.message = (string.IsNullOrEmpty(message) ? SchemaResult.MESSAGE_NOT_SET : message);
             this.result = result;
-            this.context = context;;
+            this.context = context?.Clone();
 
             // TODO: Maybe create a preference for whether schema results automatically create a log?
             // TODO: Handle logging when creating an empty result
@@ -214,18 +191,6 @@ namespace Schema.Core
             return $"SchemaResponse[status={status}, Message={message}]";
         }
 
-        #region Implicit conversions
-
-        // public static implicit operator SchemaResult<Res>(Res result) where 
-        // {
-        //     // HACK: Prevent 
-        
-        //     
-        //     return Pass(result);
-        // }
-
-        #endregion
-
         public bool Try(out TResult result)
         {
             result = this.result;
@@ -241,7 +206,8 @@ namespace Schema.Core
 
         public SchemaResult<TResult> Pass(TResult result, string successMessage = "")
         {
-            return Pass(result, successMessage, context: context);
+            return Pass(result, successMessage, context: null); // fast pass, skip context closing
+            // return Pass(result, successMessage, context: context);
         }
         
         public SchemaResult<TResult> CheckIf(bool conditional, TResult result, string errorMessage, string successMessage = "")
@@ -279,7 +245,7 @@ namespace Schema.Core
         
         public SchemaResult Cast()
         {
-            return new SchemaResult(status, message, context);
+            return new SchemaResult(status, message, context: context);
         }
 
         public SchemaResult<TOut> CastError<TOut>()

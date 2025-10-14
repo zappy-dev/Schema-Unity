@@ -9,7 +9,10 @@ namespace Schema.Core
         public AttributeContextScope(ref SchemaContext context, string attrName)
         {
             this.Context = context;
-            Context.AttributeName = attrName;
+            if (Context != null)
+            {
+                Context.AttributeName = attrName;
+            }
         }
         
         public AttributeContextScope(ref SchemaContext context, AttributeDefinition attribute) : this(ref context, attribute.AttributeName)
@@ -18,7 +21,10 @@ namespace Schema.Core
 
         public void Dispose()
         {
-            Context.AttributeName = null;
+            if (Context != null)
+            {
+                Context.AttributeName = null;
+            }
             Context = null;
         }
     }

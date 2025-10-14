@@ -4,7 +4,7 @@ using Schema.Core.Data;
 
 namespace Schema.Core
 {
-    public class SchemaContext : IEquatable<SchemaContext>
+    public class SchemaContext : IEquatable<SchemaContext>, ICloneable
     {
         public DataScheme Scheme { get; set; }
         public string AttributeName { get; set; }
@@ -49,6 +49,18 @@ namespace Schema.Core
             }
 
             return sb.ToString();
+        }
+
+        public object Clone()
+        {
+            return new SchemaContext
+            {
+                Scheme = Scheme,
+                AttributeName = AttributeName,
+                DataType = DataType,
+                Entry = Entry,
+                Driver = Driver
+            };
         }
 
         public static SchemaContext Merge(SchemaContext ctxA, SchemaContext ctxB)

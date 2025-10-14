@@ -13,6 +13,7 @@ namespace Schema.Unity.Editor
     {
         internal static SchemaResult GenerateTestData(int entryCount)
         {
+            using var reporter = new EditorProgressReporter("Schema - Generate Test Data", "Generating test data...");
             // Create a test scheme with multiple data types
             var testScheme = new DataScheme($"VirtualScrollingTest_{entryCount}");
             var ctx = new SchemaContext
@@ -33,7 +34,12 @@ namespace Schema.Unity.Editor
             // Generate test entries
             for (int i = 0; i < entryCount; i++)
             {
-                if (testScheme.CreateNewEmptyEntry(ctx).Try(out var entry, out var newErr))
+                if (i % 100 == 0)
+                {
+                    var progress = (i * 1.0f / entryCount * .6f, $"Building Test Scheme ({i} / {entryCount} entries)...");
+                    reporter.Report(progress);
+                }
+                if (!testScheme.CreateNewEmptyEntry(ctx).Try(out var entry, out var newErr))
                 {
                     return newErr.Cast();
                 }
@@ -48,10 +54,14 @@ namespace Schema.Unity.Editor
             // HACK - setting idAttribute to an identifier after creating entries
             idAttribute.IsIdentifier = true;
             
+            reporter.Report((0.6f, "Loading Test Scheme..."));
             // Save the scheme
-            var targetFilePath = $"{testScheme.SchemeName}.json";
+            var targetFilePath = GetContentPath($"{testScheme.SchemeName}.json");
+            
             LoadDataScheme(ctx, testScheme, overwriteExisting: true, registerManifestEntry: true, importFilePath: targetFilePath);
             
+            reporter.Report((0.9f, "Saving Test Scheme..."));
+            // Should we save the manifest?
             var result = SaveDataScheme(ctx, testScheme, alsoSaveManifest: false);
 
             if (result.Passed)
