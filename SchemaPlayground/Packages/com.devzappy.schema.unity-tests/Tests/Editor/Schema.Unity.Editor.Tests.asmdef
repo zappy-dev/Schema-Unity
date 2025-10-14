@@ -3,6 +3,7 @@
     "rootNamespace": "Schema.Unity.Editor.Tests",
     "references": [
         "Schema.Unity.Editor",
+        "Schema.Runtime",
         "Schema.Core"
     ],
     "includePlatforms": [

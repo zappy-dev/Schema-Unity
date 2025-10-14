@@ -4,6 +4,7 @@ using System.Linq;
 using Schema.Core;
 using UnityEditor;
 using UnityEngine;
+using static Schema.Core.SchemaResult;
 using Object = UnityEngine.Object;
 
 namespace Schema.Runtime
@@ -35,8 +36,13 @@ namespace Schema.Runtime
             return res.CheckIf(assetLink.IsSet, assetLink, $"No asset link found for {assetGuid}");
         }
 
-        internal SchemaResult AddAssetLink(AssetLink assetLink)
+        internal SchemaResult AddAssetLink(SchemaContext ctx, AssetLink assetLink)
         {
+            if (assetLink.Asset is null)
+            {
+                return Fail(ctx, "Attempting to add asset link without asset");
+            }
+            
             if (assetLinks == null)
             {
                 assetLinks = new List<AssetLink>();
@@ -44,12 +50,15 @@ namespace Schema.Runtime
             
             if (assetLinks.Contains(assetLink))
             {
-                return SchemaResult.Pass();
+                return Pass();
             }
             
             assetLinks.Add(assetLink);
+#if UNITY_EDITOR
+            EditorUtility.SetDirty(this);
+#endif
             
-            return SchemaResult.Pass();
+            return Pass();
         }
     }
 
@@ -73,12 +82,26 @@ namespace Schema.Runtime
             this.assetPath = assetPath;
         }
         
-        public bool IsSet =>  !(asset == null &&  assetGUID == null && assetPath == null);
+        public bool IsSet =>  !(asset is null &&  assetGUID == null && assetPath == null);
         public string Path => assetPath;
+        public object Asset => asset;
 
         public bool Equals(AssetLink other)
         {
-            return Equals(asset, other.asset) && assetGUID == other.assetGUID && assetPath == other.assetPath;
+            if (asset is null ^ other.asset is null)
+            {
+                return false;
+            }
+
+            if (!(asset is null && other.asset is null))
+            {
+                if (!Equals(asset, other.asset))
+                {
+                    return false;
+                }
+            }
+            
+            return assetGUID == other.assetGUID && assetPath == other.assetPath;
         }
 
         public override bool Equals(object obj)
@@ -90,7 +113,7 @@ namespace Schema.Runtime
         {
             unchecked
             {
-                var hashCode = (asset != null ? asset.GetHashCode() : 0);
+                var hashCode = (!(asset is null) ? asset.GetHashCode() : 0);
                 hashCode = (hashCode * 397) ^ (assetGUID != null ? assetGUID.GetHashCode() : 0);
                 hashCode = (hashCode * 397) ^ (assetPath != null ? assetPath.GetHashCode() : 0);
                 return hashCode;

@@ -37,18 +37,32 @@
       "AttributeToolTip": null,
       "ColumnWidth": 150,
       "DefaultValue": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "AttributeName": "Color",
+      "DataType": {
+        "$type": "Schema.Runtime.Type.ColorDataType, Schema.Runtime",
+        "DefaultValue": "#FFFFFF"
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Entity color in hex format (e.g., #FF0000 for red)",
+      "ColumnWidth": 150,
+      "DefaultValue": "#FFFFFF"
     }
   ],
   "Entries": [
     {
       "ID": "Player",
       "MoveSpeed": 10.0,
-      "Sprite": "4ba042bd-f841-30f4-98f9-52d0551c6911"
+      "Sprite": "4ba042bd-f841-30f4-98f9-52d0551c6911",
+      "Color": "#FFFFFF"
     },
     {
       "ID": "Enemy",
       "MoveSpeed": 0.5,
-      "Sprite": "00000000-0000-0000-f000-000000000000"
+      "Sprite": "00000000-0000-0000-f000-000000000000",
+      "Color": "#FF0000"
     }
   ]
 }

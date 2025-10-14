@@ -26,8 +26,17 @@ namespace Schema.Runtime
             Driver = "Runtime",
         };
         
-        public static SchemaResult Initialize()
+        public static SchemaResult Initialize(Action onManifestUpdated = null)
         {
+            // Call this method to initialize Schema
+            Schema.Core.Schema.ManifestUpdated += () =>
+            {
+                if (Application.isPlaying)
+                {
+                    onManifestUpdated?.Invoke();
+                }
+            };
+            
             // TODO: This sets the core storage interface, overriding the editor interface
             Core.Schema.SetStorage(new Storage(new TextAssetResourcesFileSystem()));
 

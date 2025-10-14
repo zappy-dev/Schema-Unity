@@ -1240,15 +1240,18 @@ namespace Schema.Unity.Editor
                         UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case UnityAssetDataType unityAssetDataType:
-                    RenderAssetCell(unityAssetDataType, cellRect, entryValue is Guid ? (Guid)entryValue : default, cellStyle,
+                    RenderAssetCell(unityAssetDataType, cellRect, entryValue is Guid guid1 ? guid1 : default, cellStyle,
                         value => UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case GuidDataType _:
-                    RenderGuidCell(cellRect, entryValue is Guid ? (Guid)entryValue : default, cellStyle,
+                    RenderGuidCell(cellRect, entryValue is Guid guid ? guid : default, cellStyle,
                         value => UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case ListDataType listDataType:
                     RenderListCell(renderCtx, cellRect, entryValue, listDataType, cellStyle, value => UpdateEntryValue(updateCtx, entry,  attribute, value, scheme));
+                    break;
+                case ColorDataType _:
+                    RenderColorCell(cellRect, entryValue is Color color ? color : default, value => UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 default:
                     RenderUnmappedFieldCell(cellRect, entryValue, cellStyle);
@@ -1476,6 +1479,16 @@ namespace Schema.Unity.Editor
             EditorGUI.TextField(cellRect, entryValue.ToString(), cellStyle.FieldStyle);
         }
 
+        private void RenderColorCell(Rect cellRect, Color entryValue, Action<Color> onValueChanged)
+        {
+            var newValue = EditorGUI.ColorField(cellRect, entryValue);
+
+            if (newValue != entryValue)
+            {
+                onValueChanged?.Invoke(newValue);
+            }
+        }
+
         private void RenderAssetCell(UnityAssetDataType assetDataType, Rect cellRect, Guid entryValue, CellStyle cellStyle, Action<Guid> onValueChanged)
         {
             Type assetType = assetDataType.ObjectType;
@@ -1507,7 +1520,6 @@ namespace Schema.Unity.Editor
         /// </summary>
         private void RenderIntegerCell(Rect cellRect, int value, CellStyle cellStyle, Action<int> onValueChanged)
         {
-            // var newValue = EditorGUI.IntField(cellRect, value, cellStyle.FieldStyle);
             var newValue = SchemaGUI.IntField(cellRect, value, cellStyle.FieldStyle);
             if (newValue != value)
             {
@@ -1520,7 +1532,6 @@ namespace Schema.Unity.Editor
         /// </summary>
         private void RenderFloatCell(Rect cellRect, float value, CellStyle cellStyle, Action<float> onValueChanged)
         {
-            // var newValue = EditorGUI.IntField(cellRect, value, cellStyle.FieldStyle);
             var newValue = SchemaGUI.FloatField(cellRect, value, cellStyle.FieldStyle);
             if (!Mathf.Approximately(newValue, value))
             {
