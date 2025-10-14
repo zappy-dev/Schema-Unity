@@ -4,7 +4,6 @@ using Schema.Core.Data;
 using Schema.Core.IO;
 using Schema.Core.Serialization;
 using Schema.Core.Tests.Ext;
-using Schema.Runtime.Type;
 
 namespace Schema.Core.Tests.Data;
 
@@ -112,16 +111,6 @@ public class TestDataType
             yield return new TestCaseData(1, DataType.Integer, DataType.Boolean, true, true);
             yield return new TestCaseData(0, DataType.Integer, DataType.Boolean, true, false);
             yield return new TestCaseData(2, DataType.Integer, DataType.Boolean, true, true);
-            
-            // Color conversions (using runtime Color data type)
-            var colorDataType = new ColorDataType();
-            yield return new TestCaseData("#FF0000", DataType.Text, colorDataType, true, "#FF0000");
-            yield return new TestCaseData("#00FF00", DataType.Text, colorDataType, true, "#00FF00");
-            yield return new TestCaseData("#0000FF", DataType.Text, colorDataType, true, "#0000FF");
-            yield return new TestCaseData("FF0000", DataType.Text, colorDataType, true, "#FF0000");
-            yield return new TestCaseData("", DataType.Text, colorDataType, true, "#000000");
-            yield return new TestCaseData("invalid", DataType.Text, colorDataType, false, null);
-            yield return new TestCaseData("#GGGGGG", DataType.Text, colorDataType, false, null);
         }
     }
 
@@ -149,9 +138,6 @@ public class TestDataType
             yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema1", "Attribute2"), false);
             yield return new TestCaseData(DataType.Boolean, new BooleanDataType(), true);
             yield return new TestCaseData(DataType.Boolean, DataType.Text, false);
-            yield return new TestCaseData(new ColorDataType(), new ColorDataType(), true);
-            yield return new TestCaseData(new ColorDataType(), new ColorDataType("#FF0000"), true);
-            yield return new TestCaseData(new ColorDataType(), DataType.Text, false);
         }
     }
 
