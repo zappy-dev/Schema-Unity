@@ -274,19 +274,25 @@ public class TestDataScheme
         }
     }
 
-    [TestCase("Field", "Field2")]
-    public void Test_CreateNewEntry(params string[] attributeNames)
+    [TestCase(["Field", "Field2"])]
+    public void Test_CreateNewEntry(params string[] additionalAttributeNames)
     {
         string defaultValue = "Bar";
-        foreach (var attributeName in attributeNames)
+        testScheme.AddAttribute(Context, "ID", DataType.Integer, defaultValue: 0, isIdentifier: true).AssertPassed();
+        foreach (var attributeName in additionalAttributeNames)
         {
             testScheme.AddAttribute(Context, attributeName, DataType.Text, defaultValue: defaultValue);
         }
-        
-        var entry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
-        foreach (var attributeName in attributeNames)
+
+        for (int i = 0; i < 10; i++)
         {
-            Assert.That(entry.GetDataAsString(attributeName), Is.EqualTo(defaultValue));
+            var entry = testScheme.CreateNewEmptyEntry(Context).AssertPassed();
+            Assert.That(entry.GetDataAsInt("ID"), Is.EqualTo(i)); // ensure ID auto-increments
+            
+            foreach (var attributeName in additionalAttributeNames)
+            {
+                Assert.That(entry.GetDataAsString(attributeName), Is.EqualTo(defaultValue));
+            }
         }
     }
 

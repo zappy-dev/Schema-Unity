@@ -298,7 +298,11 @@ namespace Schema.Core
         /// <param name="registerManifestEntry">If true, registers a new manifest entry in the currently loaded manifest for the given scheme if loaded.</param>
         /// <param name="importFilePath">File path from where this scheme was imported, if imported</param>
         /// <returns></returns>
-        public static SchemaResult LoadDataScheme(SchemaContext context, DataScheme scheme, bool overwriteExisting, bool registerManifestEntry = true, string importFilePath = null)
+        public static SchemaResult LoadDataScheme(SchemaContext context, 
+            DataScheme scheme, 
+            bool overwriteExisting, 
+            bool registerManifestEntry = true,
+            string importFilePath = null)
         {
             using var schemeScope = new SchemeContextScope(ref context, scheme);
             string schemeName = scheme.SchemeName;

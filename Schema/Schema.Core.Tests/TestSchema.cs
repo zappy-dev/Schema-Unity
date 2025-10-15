@@ -86,6 +86,46 @@ public class TestSchema
         Assert.That(loadedScheme, Is.EqualTo(newScheme));
     }
 
+    [Test]
+    public void Test_LoadDataScheme_StressTest()
+    {
+        var newSchemeName = "Foo";
+        var newScheme = new DataScheme(newSchemeName);
+        newScheme.AddAttribute(Context, "TestString", DataType.Text, isIdentifier: true).AssertPassed();
+        newScheme.AddAttribute(Context, "TestInt", DataType.Integer, isIdentifier: false).AssertPassed();
+        newScheme.AddAttribute(Context, "TestBool", DataType.Boolean, isIdentifier: false).AssertPassed();
+        newScheme.AddAttribute(Context, "TestDateTime", DataType.DateTime, isIdentifier: false).AssertPassed();
+
+        newScheme.AddEntry(Context, new DataEntry
+        {
+            { "TestString", "bar", Context },
+            { "TestInt", "1", Context }, // type to auto-convert
+            // missing fields, TestBool and TestDateTime should get auto-filled
+            { "TestDateTime", "foo", Context }, // bad conversion
+            { "TestBoolOld", true, Context }
+        }, runDataValidation: false, fillEmptyValues: false).AssertPassed();
+        
+        
+        // Act
+        Schema.LoadDataScheme(Context, newScheme, overwriteExisting: true).AssertPassed();
+        
+        // Assert
+        Schema.GetNumAvailableSchemes(Context).TryAssert(out var numAvailableSchemes);
+        Assert.That(numAvailableSchemes, Is.EqualTo(2));
+        Schema.GetAllSchemes(Context).TryAssert(out var allSchemes);
+        Assert.That(allSchemes, Contains.Item(newScheme.SchemeName));
+        Schema.GetScheme(Context, newSchemeName).TryAssert(out var loadedScheme);
+        Assert.That(loadedScheme, Is.EqualTo(newScheme));
+
+        var loadedDataEntry = loadedScheme.GetEntry(0);
+        Assert.That(loadedDataEntry, Is.Not.Null);
+        
+        Assert.That(loadedDataEntry.GetDataDirect("TestString"),  Is.EqualTo("bar"));
+        Assert.That(loadedDataEntry.GetDataDirect("TestInt"),  Is.EqualTo(1));
+        Assert.That(loadedDataEntry.GetDataDirect("TestBool"),  Is.EqualTo(false));
+        Assert.That(loadedDataEntry.GetDataDirect("TestDateTime"),  Is.EqualTo("foo"));
+        Assert.That(loadedDataEntry.GetDataDirect("TestBoolOld"), Is.Null, "Expect that value for unregistered attribute is not set");
+    }
 
     [TestCase("")]
     [TestCase(null)]
