@@ -23,7 +23,7 @@ namespace Schema.Core.Data
         
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             return CheckIf(value is float || value is double, 
                 errorMessage: "Value is not an floating point number.",
                 successMessage: "Value is an floating point number.", context);

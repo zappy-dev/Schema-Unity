@@ -1,4 +1,3 @@
-#define SCHEMA_DEBUG
 using System;
 using System.Linq;
 using System.Threading;
@@ -172,17 +171,17 @@ namespace Schema.Core.Commands
                     if (entryData.Failed)
                     {
                         // Set default value
-                        scheme.SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue(), context: Context);
+                        scheme.SetDataOnEntry(context: Context, entry: entry, attributeName: attribute.AttributeName, value: attribute.CloneDefaultValue());
                     }
                     else
                     {
                         // Validate and potentially convert data
                         var fieldData = entryData.Result;
-                        var validateResult = attribute.CheckIfValidData(Context, fieldData);
+                        var validateResult = attribute.IsValidValue(Context, fieldData);
                         
                         if (validateResult.Failed && !scheme.IsManifest)
                         {
-                            var conversionResult = attribute.ConvertData(Context, fieldData);
+                            var conversionResult = attribute.ConvertValue(Context, fieldData);
                             if (conversionResult.Failed)
                             {
                                 // Allow file path types to load even if file doesn't exist
@@ -195,7 +194,7 @@ namespace Schema.Core.Commands
                             }
                             else
                             {
-                                scheme.SetDataOnEntry(entry, attribute.AttributeName, conversionResult.Result, context: Context);
+                                scheme.SetDataOnEntry(context: Context, entry: entry, attributeName: attribute.AttributeName, value: conversionResult.Result);
                             }
                         }
                     }
@@ -269,7 +268,7 @@ namespace Schema.Core.Commands
                         filePathAttr.DataType is FilePathDataType)
                     {
                         // Let the FilePathDataType handle the path conversion
-                        var convertResult = filePathAttr.ConvertData(Context, importFilePath);
+                        var convertResult = filePathAttr.ConvertValue(Context, importFilePath);
                         if (convertResult.Try(out var convertedPath))
                         {
                             manifestEntry.FilePath = convertedPath as string;

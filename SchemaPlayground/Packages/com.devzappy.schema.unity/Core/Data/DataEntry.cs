@@ -55,9 +55,16 @@ namespace Schema.Core.Data
         /// </summary>
         /// <param name="attribute">The attribute to get data for.</param>
         /// <returns>The value if found, null otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public object GetDataDirect(AttributeDefinition attribute)
         {
-            return entryData.TryGetValue(attribute.AttributeName, out var value) ? value : null;
+            return GetData(attribute.AttributeName);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public object GetDataDirect(string attributeName)
+        {
+            return entryData.TryGetValue(attributeName, out var value) ? value : null;
         }
 
         public SchemaResult<object> GetData(AttributeDefinition attribute)
@@ -68,11 +75,12 @@ namespace Schema.Core.Data
             return SchemaResult<object>.Pass(value, successMessage: "Found value for attribute", Context);
 
         }
-
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public string GetDataAsString(string attributeName)
         {
             // TODO: Should this default to the default value for the attribute?
-            return entryData.TryGetValue(attributeName, out var value) ? value.ToString() : string.Empty;
+            return entryData.TryGetValue(attributeName, out var value) ? value == null ? string.Empty : value.ToString() : string.Empty;
         }
 
         public int GetDataAsInt(string attributeName)
@@ -409,19 +417,20 @@ namespace Schema.Core.Data
             int numEntriesToPrint = numAttributesToPrint == -1 ? entryData.Count : numAttributesToPrint;
             foreach (var kvp in entryData.Take(numEntriesToPrint))
             {
-                sb.Append("(");
-                sb.Append(kvp.Key).Append(": ");
+                sb.Append("{");
+                sb.Append(kvp.Key).Append(": \'");
                 if (kvp.Value != null)
                 {
                     sb.Append(kvp.Value);
-                    sb.Append(':');
+                    sb.Append("\' (t:");
                     sb.Append(kvp.Value.GetType().Name);
+                    sb.Append(")");
                 }
                 else
                 {
                     sb.Append("(not set)");
                 }
-                sb.Append(")");
+                sb.Append("}");
                 
                 if (entryIndex != numEntriesToPrint - 1)
                 {

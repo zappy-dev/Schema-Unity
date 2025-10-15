@@ -11,20 +11,46 @@ namespace Schema.Core.Data
         
         #region Entry Mutations
         
-        public DataEntry CreateNewEmptyEntry(SchemaContext context)
+        public SchemaResult<DataEntry> CreateNewEmptyEntry(SchemaContext context)
         {
+            var res = SchemaResult<DataEntry>.New(context);
             var entry = new DataEntry();
             foreach (var attribute in attributes)
             {
-                SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue(), allowIdentifierUpdate: true, context: context);
+                // Determine a good default value to set for a new entry's Identifier
+                var defaultValue = attribute.CloneDefaultValue();
+                if (attribute.IsIdentifier)
+                {
+                    if (!GetIdentifierAttribute().Try(out var idAttr, out var idErr))
+                        return idErr.CastError(res);
+
+                    var idValues = GetIdentifierValues().ToList();
+
+                    // if the values doesn't contain the default value, then we are safe to use it
+                    // this probably doesn't work alone in the case of a user rapidly creating multiple new entries.
+                    if (idValues.Contains(defaultValue))
+                    {
+                        // Need to find a unique value to set for the correct data type..
+                        switch (idAttr.DataType)
+                        {
+                            case IntegerDataType _:
+                                defaultValue = idValues.Cast<Int32>().Max() + 1;
+                                break;
+                            default:
+                                return res.Fail($"Could not determine a unique identifier value to set for attribute: {attribute}");
+                        }
+                    }
+                }
+                
+                SetDataOnEntry(context: context, entry: entry, attributeName: attribute.AttributeName, value: defaultValue, allowIdentifierUpdate: true);
             }
             
             entries.Add(entry);
             SetDirty(context, true);
-            return entry;
+            return res.Pass(entry);
         }
 
-        public SchemaResult AddEntry(SchemaContext context, DataEntry newEntry, bool runDataValidation = true)
+        public SchemaResult AddEntry(SchemaContext context, DataEntry newEntry, bool runDataValidation = true, bool fillEmptyValues = true)
         {
             using var _ = new SchemeContextScope(ref context, this);
             Logger.LogDbgVerbose($"Adding {newEntry}...", context);
@@ -41,17 +67,16 @@ namespace Schema.Core.Data
                 string attributeName = kvp.Key;
                 // Don't need to validate invalid attribute names, since adding new entry data already does that.
 
-                if (!GetAttributeByName(attributeName, context: context).Try(out var attribute))
-                {
-                    // TODO: Figure out a better solution for adding entries that contain unknown attributes
-                    Logger.LogWarning($"Skipping validation for unknown attribute: {attributeName}");
-                    return SchemaResult.Fail(context, $"No matching attribute found for '{kvp.Key}'");
-                }
-
-                var entryValue = kvp.Value;
                 if (runDataValidation)
                 {
-                    var isValidRes = attribute.CheckIfValidData(context, entryValue);
+                    if (!GetAttributeByName(attributeName, context: context).Try(out var attribute))
+                    {
+                        Logger.LogWarning($"Skipping validation for unknown attribute: {attributeName}");
+                        return SchemaResult.Fail(context, $"No matching attribute found for '{kvp.Key}'");
+                    }
+
+                    var entryValue = kvp.Value;
+                    var isValidRes = attribute.IsValidValue(context, entryValue);
                     if (isValidRes.Failed)
                     {
                         return isValidRes;
@@ -59,14 +84,17 @@ namespace Schema.Core.Data
                 }
             }
 
-            foreach (var attribute in AllAttributes)
+            if (fillEmptyValues)
             {
-                if (newEntry.HasData(attribute))
+                foreach (var attribute in AllAttributes)
                 {
-                    continue;
-                }
+                    if (newEntry.HasData(attribute))
+                    {
+                        continue;
+                    }
 
-                newEntry.SetData(context, attribute.AttributeName, attribute.CloneDefaultValue());
+                    newEntry.SetData(context, attribute.AttributeName, attribute.CloneDefaultValue());
+                }
             }
             
             entries.Add(newEntry);
@@ -100,6 +128,17 @@ namespace Schema.Core.Data
         public DataEntry GetEntry(int entryIndex)
         {
             return entries[entryIndex];
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public SchemaResult<DataEntry> GetEntrySafe(SchemaContext context, int entryIndex)
+        {
+            var res = SchemaResult<DataEntry>.New(context);
+            if (entryIndex < 0 || entryIndex >= entries.Count)
+            {
+                return res.Fail("Entry index out of range");
+            }
+            return res.Pass(entries[entryIndex]);
         }
 
         #endregion

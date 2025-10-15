@@ -1,9 +1,7 @@
 // using System.IO;
 
 using System;
-using System.Collections.Generic;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using Schema.Core.Data;
 using Schema.Core.IO;
 using static Schema.Core.SchemaResult;
@@ -12,7 +10,6 @@ namespace Schema.Core.Serialization
 {
     public class JsonSchemeStorageFormat : ISchemeStorageFormat
     {
-        private JsonSerializerSettings settings;
         public string Extension => "json";
         public string DisplayName => "JSON";
         public bool IsImportSupported => false;
@@ -23,21 +20,6 @@ namespace Schema.Core.Serialization
         public JsonSchemeStorageFormat(IFileSystem fileSystem)
         {
             this.fileSystem = fileSystem;
-            settings = new JsonSerializerSettings
-            {
-                TypeNameHandling = TypeNameHandling.Auto,
-                ContractResolver = new DefaultContractResolver
-                {
-                    NamingStrategy = new DefaultNamingStrategy()
-                },
-                Converters = new List<JsonConverter>
-                {
-                    new DataTypeJsonConverter(),
-                    new DataEntryJsonConverter(),
-                    new PluginDataTypeJsonConverter(),
-                },
-                Formatting = Formatting.Indented,
-            };
         }
         
         public SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath)
@@ -57,7 +39,7 @@ namespace Schema.Core.Serialization
             // TODO: Handle a non-scheme formatted file, converting into scheme format
             try
             {
-                var data = JsonConvert.DeserializeObject<DataScheme>(content, settings);
+                var data = JsonConvert.DeserializeObject<DataScheme>(content, JsonSettings.Settings);
                 return SchemaResult<DataScheme>.Pass(data, "Parsed json data", this);
             }
             catch (Exception ex)
@@ -79,7 +61,7 @@ namespace Schema.Core.Serialization
 
         public SchemaResult<string> Serialize(SchemaContext context, DataScheme data)
         {
-            var jsonContent = JsonConvert.SerializeObject(data, Formatting.Indented, settings);
+            var jsonContent = JsonConvert.SerializeObject(data, Formatting.Indented, JsonSettings.Settings);
             return SchemaResult<string>.Pass(jsonContent, successMessage: "Serialized json data", this);
         }
     }

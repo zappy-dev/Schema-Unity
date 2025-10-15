@@ -35,7 +35,7 @@ namespace Schema.Core.Data
             DefaultValue = string.Empty;
         }
 
-        public ReferenceDataType(string schemeName, string identifierAttribute) : base(null)
+        public ReferenceDataType(string schemeName, string identifierAttribute, bool validateSchemeLoaded = true) : base(null)
         {
             ReferenceSchemeName = schemeName;
             ReferenceAttributeName = identifierAttribute;
@@ -43,11 +43,11 @@ namespace Schema.Core.Data
             var ctx = new SchemaContext
             {
                 Driver = "Reference_DataType_Constructor",
-                DataType = $"Reference/{ReferenceSchemeName} (ID: {ReferenceAttributeName})"
+                DataType = this
             };
             
             // Set an initial default value
-            if (Schema.GetScheme(ctx, ReferenceSchemeName).Try(out var refScheme))
+            if (validateSchemeLoaded && Schema.GetScheme(ctx, ReferenceSchemeName).Try(out var refScheme))
             {
                 var values = refScheme.GetIdentifierValues().Select(v => v?.ToString() ?? "").ToList();
                 DefaultValue = values.Count > 0 ? values[0] : "";
@@ -58,7 +58,7 @@ namespace Schema.Core.Data
 
         public override string ToString()
         {
-            return $"ReferenceDataType: {ReferenceSchemeName}, Attribute: {ReferenceAttributeName}";
+            return $"ReferenceDataType[Scheme: '{ReferenceSchemeName}', Attribute: '{ReferenceAttributeName}', EmptyReferences?: '{SupportsEmptyReferences}']";
         }
 
         public override object Clone()
@@ -74,7 +74,7 @@ namespace Schema.Core.Data
 
         public SchemaResult<AttributeDefinition> GetReferencedIdentifierAttribute(SchemaContext context)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             
             if (!GetReferencedScheme(context).Try(out var refSchema, out var refErr))
                 return refErr.CastError<AttributeDefinition>();
@@ -94,9 +94,9 @@ namespace Schema.Core.Data
 
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             
-            if (value == null)
+            if (string.IsNullOrEmpty(value?.ToString()))
             {
                 return CheckIf(SupportsEmptyReferences, 
                     errorMessage: "Empty references are not allowed.",
@@ -137,7 +137,13 @@ namespace Schema.Core.Data
             var matchingIdentifier = finalizedIdValues.FirstOrDefault(v => v.Equals(value));
             if (matchingIdentifier == null)
             {
-                return Fail($"Value '{value}' does not exist as an identifier", context);
+                return Fail(
+#if SCHEMA_DEBUG
+                errorMessage: $"Value '{value}' does not exist as an identifier",
+#else
+                errorMessage: "Value does not exist as an identifier",
+#endif
+                context);
             }
 
             // HACK: Do the conversion for the identifier value here...
@@ -176,17 +182,18 @@ namespace Schema.Core.Data
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
+            var res = SchemaResult<object>.New(context);
             // this is incorrect
             // var data = value as string;
             
             // First, convert the value to the same data type as a reference's attribute
             if (!GetReferencedScheme(context).Try(out var refSchema, out var refError))
-                return refError.CastError<object>();
+                return refError.CastError(res);
 
             if (!refSchema.GetIdentifierAttribute().Try(out var identifier))
             {
-                return Fail<object>("Reference Scheme does not contain Identifier Attribute.", context);
+                return res.Fail("Reference Scheme does not contain Identifier Attribute.");
             }
 
             var isValidRes = identifier.DataType.IsValidValue(context, value);
@@ -197,7 +204,7 @@ namespace Schema.Core.Data
 
                 if (convertRes.Failed)
                 {
-                    return Fail<object>(convertRes.Message, context);
+                    return res.Fail(convertRes.Message);
                 }
 
                 // set value to the converted data type for the referenced attribute
@@ -208,16 +215,16 @@ namespace Schema.Core.Data
             var validate = IsValidValue(context, value);
             
             // If it doesn't, the conversion failed
-            return SchemaResult<object>.CheckIf(
+            return res.CheckIf(
                 conditional: validate.Passed,
                 result: value,
                 errorMessage: validate.Message,
-                successMessage: validate.Message,
-                context: this);
+                successMessage: validate.Message);
         }
 
         private SchemaResult<DataScheme> GetReferencedScheme(SchemaContext context)
         {
+            using var _ = new DataTypeContextScope(ref context, this);
             // Try normal API first (requires initialization)
             var refScheme = Schema.GetScheme(context, ReferenceSchemeName);
             if (refScheme.Passed)

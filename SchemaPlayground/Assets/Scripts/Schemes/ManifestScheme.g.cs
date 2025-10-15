@@ -4,8 +4,10 @@
 // </auto-generated>
 
 using Schema.Core;
+using Schema.Core.CodeGen;
 using Schema.Core.Data;
 using Schema.Core.Schemes;
+using Schema.Runtime;
 using static Schema.Core.Schema;
 
 namespace ExampleProject.Schemes 
@@ -61,20 +63,20 @@ namespace ExampleProject.Schemes
         /// The name of the scheme
         /// </summary>
      
-        public string SchemeName
+        public System.String SchemeName
         {
             get => DataEntry.GetDataAsString("SchemeName");
-            set => DataScheme.SetDataOnEntry(DataEntry, "SchemeName", value);
+            set => DataScheme.SetDataOnEntry(CodeGenUtils.Context, DataEntry, "SchemeName", value);
         }
      
         /// <summary>
         /// Relative path to the staging file from this scheme
         /// </summary>
      
-        public string FilePath
+        public System.String FilePath
         {
             get => DataEntry.GetDataAsString("FilePath");
-            set => DataScheme.SetDataOnEntry(DataEntry, "FilePath", value);
+            set => DataScheme.SetDataOnEntry(CodeGenUtils.Context, DataEntry, "FilePath", value);
         }
  
     }

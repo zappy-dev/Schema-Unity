@@ -23,15 +23,19 @@ namespace Schema.Core.Data
         
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
-            return CheckIf(value is int, 
+            using var _ = new DataTypeContextScope(ref context, this);
+            return CheckIf(value is int,
+#if SCHEMA_DEBUG
                 errorMessage: $"Value '{value}' is not an integer.",
+#else
+                errorMessage: $"Value is not an integer.",
+#endif
                 successMessage: "Value is an integer.", context);
         }
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object fromData)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
+            using var _ = new DataTypeContextScope(ref context, this);
             try
             {
                 var intData = Convert.ToInt32(fromData);

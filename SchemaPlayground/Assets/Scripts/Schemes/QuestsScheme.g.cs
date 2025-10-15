@@ -4,8 +4,10 @@
 // </auto-generated>
 
 using Schema.Core;
+using Schema.Core.CodeGen;
 using Schema.Core.Data;
 using Schema.Core.Schemes;
+using Schema.Runtime;
 using static Schema.Core.Schema;
 
 
@@ -72,7 +74,7 @@ using static Schema.Core.Schema;
         /// Gets the value of 'ID'.
         /// </summary>
      
-        public string ID => DataEntry.GetDataAsString("ID");
+        public System.String ID => DataEntry.GetDataAsString("ID");
  
     }
 

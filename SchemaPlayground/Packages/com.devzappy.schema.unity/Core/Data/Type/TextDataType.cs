@@ -28,8 +28,13 @@ namespace Schema.Core.Data
         
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
-            return CheckIf(value is string, errorMessage: $"Value {value} is not text",
+            using var _ = new DataTypeContextScope(ref context, this);
+            return CheckIf(value is string,
+#if SCHEMA_DEBUG
+                errorMessage: $"Value {value} is not text",
+#else
+                errorMessage: "Value is not text",
+#endif
                 successMessage: "Value is text", context: context);
         }
 

@@ -179,15 +179,7 @@ namespace Schema.Core.Data
                     referencingAttributesUpdated++;
                 }
 
-                // Update all data entries as well
-                int entriesUpdated = 0;
-                foreach (var entry in otherScheme.entries)
-                {
-                    entry.MigrateData(context, prevAttributeName, newAttributeName);
-                    entriesUpdated++;
-                }
-
-                if (referencingAttributesUpdated > 0 && entriesUpdated > 0)
+                if (referencingAttributesUpdated > 0)
                 {
                     otherScheme.SetDirty(context, true);
                 }
@@ -213,6 +205,7 @@ namespace Schema.Core.Data
 
         public SchemaResult<AttributeDefinition> GetAttributeByName(string attributeName, SchemaContext context = default)
         {
+            using var _ = new SchemeContextScope(ref context, this);
             var attribute = attributes.FirstOrDefault(a => a.AttributeName.Equals(attributeName));
             
             return CheckIf(attribute != null, attribute, 

@@ -62,7 +62,7 @@ namespace Schema.Core
 
             if (!PathUtility.IsAbsolutePath(manifestLoadPath))
             {
-                manifestLoadPath = PathUtility.MakeAbsolutePath(ProjectPath, manifestLoadPath);
+                manifestLoadPath = PathUtility.MakeAbsolutePath(manifestLoadPath, ProjectPath);
                 Logger.LogVerbose($"Converting manifest path to absolute path: {manifestLoadPath}");
             }
 
@@ -76,7 +76,7 @@ namespace Schema.Core
                 return res.Fail($"No Manifest scheme found.\nSearched the following path: {manifestLoadPath}\nLoad an existing manifest scheme or save the empty template.");
             }
             
-            progress?.Report((0f, $"Loading: {manifestLoadPath}..."));
+            progress?.Report((0f, $"Loading: {PathUtility.MakeRelativePath(manifestLoadPath, ProjectPath)}..."));
             Logger.LogDbgVerbose($"Loading manifest from file: {manifestLoadPath}...", "Manifest");
             var loadResult =
                 _storage.DefaultManifestStorageFormat.DeserializeFromFile(context, manifestLoadPath);
@@ -85,12 +85,16 @@ namespace Schema.Core
                 return loadResult.CastError<ManifestLoadStatus>();
             }
 
+            manifestImportPath = manifestLoadPath;
             var loadManifestRes = LoadManifest(context, manifestDataScheme, progress);
 
+            // WARNING
+            // Time lost debugging this code: 10 hours
+            Logger.Log($"Load Manifest from file: {manifestLoadPath}, status: {loadManifestRes}", context);
             if (loadManifestRes.Passed)
             {
-                // Update manifest import path to support Edit-mode validation
-                manifestImportPath = manifestLoadPath;
+                // TODO: If this fails, revert back to previous manifest import path?
+                // Manifest import path is really load-bearing and fragile..
             }
             
             return loadManifestRes;
@@ -134,8 +138,9 @@ namespace Schema.Core
                 }
                 
                 // 1. Load schemes into memory
-                var progressWrapper = new Progress<string>(schemeFilePath =>
+                var progressWrapper = new ProgressWrapper<string>(schemeFilePath =>
                 {
+                    Logger.LogVerbose($"Loading scheme from file: {schemeFilePath}");
                     progress?.Report((currentSchema * 1.0f / schemeCount,
                         $"Loading ({currentSchema}/{schemeCount}): {schemeFilePath}"));
                 });
@@ -188,12 +193,17 @@ namespace Schema.Core
                     loadedSchemes.Add(loadedScheme);
                 }
                 
-                // TODO: topological sort so schemes are loaded in reference order
-                var schemeLoadOrder = loadedSchemes.OrderBy(scheme => scheme.GetReferenceAttributes().Count() );
+                if (!DataScheme.TopologicalSortByReferences(context, loadedSchemes).Try(out var schemeLoadOrder, out var sortErr)) 
+                    return sortErr.CastError<ManifestLoadStatus>();
 
+                var schemeLoadOrderList = schemeLoadOrder.ToList();
                 progress?.Report((0.1f, "Loading..."));
-                foreach (var scheme in schemeLoadOrder)
+                int numLoaded = 0;
+                int numSchemes = schemeLoadOrderList.Count;
+                foreach (var scheme in schemeLoadOrderList)
                 {
+                    numLoaded++;
+                    progress?.Report((0.1f, $"Loading '{scheme.ToString(false)}' into Schema ({numLoaded} / {numSchemes})"));
                     Logger.LogDbgVerbose($"Loading scheme from manifest: {scheme}", context: manifestDataScheme);
                     var loadRes = LoadDataScheme(context, scheme,
                         overwriteExisting: false,
@@ -251,10 +261,14 @@ namespace Schema.Core
             // Resolve relative path if needed
             // TODO: Unify logic to FS Data Type
             string resolvedPath = schemeFilePath;
+            Logger.LogDbgVerbose("ResolvedPath: " + resolvedPath);
+            Logger.LogDbgVerbose("ManifestImportPath: " + ManifestImportPath);
+            Logger.LogDbgVerbose("Is Absolute: " + PathUtility.IsAbsolutePath(schemeFilePath));
             if (!PathUtility.IsAbsolutePath(schemeFilePath) && !string.IsNullOrEmpty(ManifestImportPath))
             {
                 resolvedPath = PathUtility.MakeAbsolutePath(schemeFilePath, ProjectPath);
             }
+            Logger.LogDbgVerbose("Fina ResolvedPath: " + resolvedPath);
 
             var fileExistRes = _storage.FileSystem.FileExists(context, resolvedPath);
             if (fileExistRes.Failed)
@@ -284,8 +298,13 @@ namespace Schema.Core
         /// <param name="registerManifestEntry">If true, registers a new manifest entry in the currently loaded manifest for the given scheme if loaded.</param>
         /// <param name="importFilePath">File path from where this scheme was imported, if imported</param>
         /// <returns></returns>
-        public static SchemaResult LoadDataScheme(SchemaContext context, DataScheme scheme, bool overwriteExisting, bool registerManifestEntry = true, string importFilePath = null)
+        public static SchemaResult LoadDataScheme(SchemaContext context, 
+            DataScheme scheme, 
+            bool overwriteExisting, 
+            bool registerManifestEntry = true,
+            string importFilePath = null)
         {
+            using var schemeScope = new SchemeContextScope(ref context, scheme);
             string schemeName = scheme.SchemeName;
             
             // input validation
@@ -304,6 +323,7 @@ namespace Schema.Core
             // process all incoming entry data and make sure it is in a valid formats 
             foreach (var entry in scheme.AllEntries)
             {
+                using var entryScope = new EntryContextScope(ref context, entry);
                 var attributesToRemove = new List<string>();
                 // prune unknown attributes
                 using var entryEnumerator = entry.GetEnumerator();
@@ -330,60 +350,65 @@ namespace Schema.Core
                     }
                 }
                 
+                // WARNING
+                // Number of hours spent on this code: 10
                 foreach (var attribute in schemeAttributes)
                 {
+                    using var attrScope =  new AttributeContextScope(ref context, attribute);
                     attribute._scheme = scheme;
                     
                     var entryData = entry.GetData(attribute);
                     if (entryData.Failed)
                     {
                         // Don't have the data for this attribute, set to default value
-                        scheme.SetDataOnEntry(entry, attribute.AttributeName, attribute.CloneDefaultValue(), context: context);
+                        scheme.SetDataOnEntry(context: context, entry: entry, attributeName: attribute.AttributeName, value: attribute.CloneDefaultValue(), shouldDirtyScheme: true);
+                        continue;
                     }
-                    else
+                    
+                    // Prompt users that there's an issue, maybe cause a failure in downstream publishing, but allow for editor fixes
+                    var fieldData = entryData.Result;
+                    var validateData = attribute.IsValidValue(context, fieldData);
+                    if (validateData.Failed) // Try to force the manifest to be loaded
                     {
-                        // Prompt users that there's an issue, maybe cause a failure in downstream publishing, but allow for editor fixes
-                        
-                        var fieldData = entryData.Result;
-                        var validateData = attribute.CheckIfValidData(context, fieldData);
-                        if (validateData.Failed) // Try to force the manifest to be loaded
+                        //for manifest, handle partial load failures, if a manifest entry refers to a file that doesn't exist
+                        Logger.LogDbgWarning($"Entry {entry} failed attribute validate {attribute} in scheme: {scheme}");
+                        if (scheme.IsManifest && (attribute.DataType is FilePathDataType || attribute.DataType is FolderDataType))
                         {
-                            //for manifest, handle partial load failures, if a manifest entry refers to a file that doesn't exist
-                            Logger.LogDbgWarning($"Entry {entry} failed attribute validate {attribute} in scheme: {scheme}");
-                            if (scheme.IsManifest && (attribute.DataType is FilePathDataType || attribute.DataType is FolderDataType))
-                            {
-                                Logger.LogDbgWarning($"Error validating Manifest data for attribute: {attribute}, {fieldData}, error: {validateData.Message}");
-                                continue;
-                            }
+                            Logger.LogDbgWarning($"Error validating Manifest data for attribute: {attribute}, {fieldData}, error: {validateData.Message}");
+                            continue;
+                        }
 
-                            if (attribute.DataType is PluginDataType)
-                            {
-                                Logger.LogDbgWarning($"Attempting to load a scheme with unknown type: {attribute.DataType.TypeName}");
-                                continue;
-                            }
+                        if (attribute.DataType is PluginDataType)
+                        {
+                            Logger.LogDbgWarning($"Attempting to load a scheme with unknown type: {attribute.DataType.TypeName}");
+                            continue;
+                        }
                             
-                            var conversion = attribute.ConvertData(context, fieldData);
-                            if (conversion.Failed)
-                            {
-                                // TODO: What should the user flow be here? Auto-convert? Prompt for user feedback?
-                                // tried to convert the data, failed
+                        var conversion = attribute.ConvertValue(context, fieldData);
+                        if (conversion.Failed)
+                        {
+                            // TODO: What should the user flow be here? Auto-convert? Prompt for user feedback?
+                            // tried to convert the data, failed
                                 
-                                // Allow file path data types to load in, even if the file doesn't exist.
-                                // TODO: Runtime warn users when a filepath doesn't exist
-                                // var allowFailedConversion = attribute.DataType == DataType.FilePath ||
-                                //                             attribute.DataType is ReferenceDataType;
-                                //
-                                // if (!allowFailedConversion)
-                                // {
-                                    return Fail(context, errorMessage: $"{scheme}.{attribute}: {conversion.Message}");
-                                // }
-                            }
+                            // Allow file path data types to load in, even if the file doesn't exist.
+                            // TODO: Runtime warn users when a filepath doesn't exist
+                            // var allowFailedConversion = attribute.DataType == DataType.FilePath ||
+                            //                             attribute.DataType is ReferenceDataType;
+                            //
+                            // if (!allowFailedConversion)
+                            // {
+                            // return Fail(context, errorMessage: $"{scheme}.{attribute}: {conversion.Message}");
+                            // }
+                            
+                            // Let's try continuing with the failure.
+                            Logger.LogError(conversion.Message, conversion.Context);
+                            continue;
+                        }
 
-                            var updateData = scheme.SetDataOnEntry(entry, attribute.AttributeName, conversion.Result, allowIdentifierUpdate: true, context: context);
-                            if (updateData.Failed)
-                            {
-                                return Fail(context, updateData.Message);
-                            }
+                        var updateData = scheme.SetDataOnEntry(context: context, entry: entry, attributeName: attribute.AttributeName, value: conversion.Result, allowIdentifierUpdate: true, shouldDirtyScheme: false);
+                        if (updateData.Failed)
+                        {
+                            return Fail(context, updateData.Message);
                         }
                     }
                 }

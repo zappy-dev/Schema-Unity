@@ -219,4 +219,108 @@ public class TestDataEntry
         Assert.That(entry.TryGetDataAsEnum<SampleEnum>("bad", out var badEnum), Is.False);
         Assert.That(badEnum, Is.EqualTo(SampleEnum.ValueA));
     }
+
+    [Test]
+    public void Test_GetDataAsList_VariousCases()
+    {
+        var entry = new DataEntry();
+
+        // Missing key -> empty list
+        var missing = entry.GetDataAsList<int>("missing");
+        Assert.That(missing, Is.Empty);
+
+        // Null value -> empty list
+        entry.Add("null", null, Context);
+        var nullList = entry.GetDataAsList<string>("null");
+        Assert.That(nullList, Is.Empty);
+
+        // Exact List<T>
+        entry.Add("listInt", new System.Collections.Generic.List<int> { 1, 2, 3 }, Context);
+        var listInt = entry.GetDataAsList<int>("listInt");
+        Assert.That(listInt, Is.EquivalentTo(new[] { 1, 2, 3 }));
+
+        // Array -> converted to List<T>
+        entry.Add("arrayStr", new[] { "a", "b" }, Context);
+        var arrayStr = entry.GetDataAsList<string>("arrayStr");
+        Assert.That(arrayStr, Is.EquivalentTo(new[] { "a", "b" }));
+
+        // IEnumerable<T>
+        System.Collections.Generic.IEnumerable<float> enumFloat = new System.Collections.Generic.List<float> { 1.5f, 2.5f };
+        entry.Add("ienumFloat", enumFloat, Context);
+        var listFloat = entry.GetDataAsList<float>("ienumFloat");
+        Assert.That(listFloat, Is.EquivalentTo(new[] { 1.5f, 2.5f }));
+
+        // Non-generic IEnumerable with convertible items
+        System.Collections.ArrayList arrayList = new System.Collections.ArrayList { "1", 2, 3.0 };
+        entry.Add("nongenericConvertible", arrayList, Context);
+        var converted = entry.GetDataAsList<int>("nongenericConvertible");
+        Assert.That(converted, Is.EquivalentTo(new[] { 1, 2, 3 }));
+
+        // Non-generic IEnumerable with some non-convertible items (should skip those)
+        System.Collections.ArrayList mixed = new System.Collections.ArrayList { "x", "4", new object() };
+        entry.Add("nongenericMixed", mixed, Context);
+        var mixedResult = entry.GetDataAsList<int>("nongenericMixed");
+        Assert.That(mixedResult, Is.EquivalentTo(new[] { 4 }));
+
+        // Type mismatch not enumerable -> empty list
+        entry.Add("scalar", 42, Context);
+        var scalarResult = entry.GetDataAsList<int>("scalar");
+        Assert.That(scalarResult, Is.Empty);
+    }
+
+    [Test]
+    public void Test_GetDataAsGuid_VariousCases()
+    {
+        var entry = new DataEntry();
+
+        // Missing attribute returns Guid.Empty
+        Assert.That(entry.GetDataAsGuid("missing"), Is.EqualTo(System.Guid.Empty));
+
+        // Guid value is returned as-is
+        var g = System.Guid.NewGuid();
+        entry.Add("guid", g, Context);
+        Assert.That(entry.GetDataAsGuid("guid"), Is.EqualTo(g));
+
+        // String representation of Guid is parsed
+        entry.Add("stringGuid", g.ToString(), Context);
+        Assert.That(entry.GetDataAsGuid("stringGuid"), Is.EqualTo(g));
+
+        // Bad string returns Guid.Empty
+        entry.Add("badString", "not-a-guid", Context);
+        Assert.That(entry.GetDataAsGuid("badString"), Is.EqualTo(System.Guid.Empty));
+
+        // Non-Guid type not parseable returns Guid.Empty
+        entry.Add("intVal", 123, Context);
+        Assert.That(entry.GetDataAsGuid("intVal"), Is.EqualTo(System.Guid.Empty));
+    }
+
+    [Test]
+    public void Test_GetDataAsDateTime_VariousCases()
+    {
+        var entry = new DataEntry();
+
+        // Missing key -> DateTime.MinValue
+        Assert.That(entry.GetDataAsDateTime("missing"), Is.EqualTo(System.DateTime.MinValue));
+
+        // DateTime value is returned as-is
+        var dt = new System.DateTime(2024, 5, 4, 3, 2, 1, System.DateTimeKind.Utc);
+        entry.Add("dt", dt, Context);
+        Assert.That(entry.GetDataAsDateTime("dt"), Is.EqualTo(dt));
+
+        // String date is not parsed -> DateTime.MinValue
+        entry.Add("strDate", "2024-05-04T03:02:01Z", Context);
+        Assert.That(entry.GetDataAsDateTime("strDate"), Is.EqualTo(System.DateTime.MinValue));
+
+        // Null value -> DateTime.MinValue
+        entry.Add("null", null, Context);
+        Assert.That(entry.GetDataAsDateTime("null"), Is.EqualTo(System.DateTime.MinValue));
+
+        // Ticks/long not parsed -> DateTime.MinValue
+        entry.Add("ticksLong", 637812345678901234L, Context);
+        Assert.That(entry.GetDataAsDateTime("ticksLong"), Is.EqualTo(System.DateTime.MinValue));
+
+        // Non-DateTime type -> DateTime.MinValue
+        entry.Add("intVal", 123, Context);
+        Assert.That(entry.GetDataAsDateTime("intVal"), Is.EqualTo(System.DateTime.MinValue));
+    }
 }

@@ -15,10 +15,22 @@ namespace Schema.Core.Data
             };
         }
 
+        public GuidDataType() : base(System.Guid.Empty)
+        {
+            
+        }
+
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
-            using var _ = new DataTypeContextScope(ref context, this.TypeName);
-            return CheckIf(value is Guid, "Value is not a Guid", "Value is a Guid", context);
+            using var _ = new DataTypeContextScope(ref context, this);
+            bool isGuid = value is Guid;
+            return CheckIf(isGuid,
+#if SCHEMA_DEBUG
+                errorMessage: $"Value '{value}' is not a Guid",
+#else
+                errorMessage: "Value is not a Guid",
+#endif
+                "Value is a Guid", context);
         }
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)

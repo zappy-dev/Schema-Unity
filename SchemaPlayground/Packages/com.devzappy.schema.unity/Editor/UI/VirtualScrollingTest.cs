@@ -11,8 +11,9 @@ namespace Schema.Unity.Editor
     /// </summary>
     internal static class VirtualScrollingTest
     {
-        internal static void GenerateTestData(int entryCount)
+        internal static SchemaResult GenerateTestData(int entryCount)
         {
+            using var reporter = new EditorProgressReporter("Schema - Generate Test Data", "Generating test data...");
             // Create a test scheme with multiple data types
             var testScheme = new DataScheme($"VirtualScrollingTest_{entryCount}");
             var ctx = new SchemaContext
@@ -33,23 +34,36 @@ namespace Schema.Unity.Editor
             // Generate test entries
             for (int i = 0; i < entryCount; i++)
             {
-                var entry = testScheme.CreateNewEmptyEntry(ctx);
-                testScheme.SetDataOnEntry(entry, "ID", i + 1, context: ctx);
-                testScheme.SetDataOnEntry(entry, "Name", $"Test Entry {i + 1:D4}", context: ctx);
-                testScheme.SetDataOnEntry(entry, "Description", $"This is a test description for entry {i + 1}. It contains some text to make it longer and more realistic.", context: ctx);
-                testScheme.SetDataOnEntry(entry, "IsActive", i % 3 == 0, context: ctx); // Every third entry is active
-                testScheme.SetDataOnEntry(entry, "CreatedDate", System.DateTime.Now.AddDays(-i), context: ctx);
-                testScheme.SetDataOnEntry(entry, "Value", Random.Range(1, 1000), context: ctx);
+                if (i % 100 == 0)
+                {
+                    var progress = (i * 1.0f / entryCount * .6f, $"Building Test Scheme ({i} / {entryCount} entries)...");
+                    reporter.Report(progress);
+                }
+                if (!testScheme.CreateNewEmptyEntry(ctx).Try(out var entry, out var newErr))
+                {
+                    return newErr.Cast();
+                }
+                
+                testScheme.SetDataOnEntry(ctx, entry, "ID", i + 1);
+                testScheme.SetDataOnEntry(ctx, entry, "Name", $"Test Entry {i + 1:D4}");
+                testScheme.SetDataOnEntry(ctx, entry, "Description", $"This is a test description for entry {i + 1}. It contains some text to make it longer and more realistic.");
+                testScheme.SetDataOnEntry(ctx, entry, "IsActive", i % 3 == 0); // Every third entry is active
+                testScheme.SetDataOnEntry(ctx, entry, "CreatedDate", System.DateTime.Now.AddDays(-i));
+                testScheme.SetDataOnEntry(ctx, entry, "Value", Random.Range(1, 1000));
             }
             // HACK - setting idAttribute to an identifier after creating entries
             idAttribute.IsIdentifier = true;
             
+            reporter.Report((0.6f, "Loading Test Scheme..."));
             // Save the scheme
-            var targetFilePath = $"{testScheme.SchemeName}.json";
+            var targetFilePath = GetContentPath($"{testScheme.SchemeName}.json");
+            
             LoadDataScheme(ctx, testScheme, overwriteExisting: true, registerManifestEntry: true, importFilePath: targetFilePath);
             
+            reporter.Report((0.9f, "Saving Test Scheme..."));
+            // Should we save the manifest?
             var result = SaveDataScheme(ctx, testScheme, alsoSaveManifest: false);
-            
+
             if (result.Passed)
             {
                 Debug.Log($"Successfully generated test data with {entryCount} entries in scheme '{testScheme.SchemeName}'");
@@ -59,6 +73,8 @@ namespace Schema.Unity.Editor
             {
                 Debug.LogError($"Failed to generate test data: {result.Message}");
             }
+            
+            return result;
         }
     }
 } 

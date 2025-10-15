@@ -12,6 +12,9 @@ namespace Schema.Unity.Editor
 {
     public class SchemaDebugWindow : EditorWindow
     {
+        private const string DEBUG_MODE_SCRIPTING_DEFINE = "SCHEMA_DEBUG";
+        private const string PERF_MODE_SCRIPTING_DEFINE = "SCHEMA_PERF";
+        
         private void OnGUI()
         {
             var renderCtx = new SchemaContext
@@ -35,11 +38,15 @@ namespace Schema.Unity.Editor
             {
                 var isInitRes = IsInitialized(context);
                 var isInit = isInitRes.Passed;
+                EditorGUILayout.HelpBox(isInitRes.Message, (isInitRes.Failed) ? MessageType.Error : MessageType.Info);
                 EditorGUILayout.Toggle("Is Schema Initialized?", isInit);
-                EditorGUILayout.TextField("Project Path", ProjectPath);
-                EditorGUILayout.TextField("Default Content Directory", DefaultContentDirectory);
-                EditorGUILayout.TextField("Default Content", DefaultContentPath);
-                EditorGUILayout.Toggle("Is Load In Progress?", IsManifestLoadInProgress);
+                if (isInit)
+                {
+                    EditorGUILayout.TextField("Project Path", ProjectPath);
+                    EditorGUILayout.TextField("Default Content Directory", DefaultContentDirectory);
+                    EditorGUILayout.TextField("Default Content", DefaultContentPath);
+                    EditorGUILayout.Toggle("Is Load In Progress?", IsManifestLoadInProgress);
+                }
 
 
                 using (var guiEventScroll = new EditorGUILayout.ScrollViewScope(guiEventsScrollPos))
@@ -73,7 +80,7 @@ namespace Schema.Unity.Editor
 
                                 foreach (var loadedScheme in LoadedSchemes)
                                 {
-                                    EditorGUILayout.TextField(loadedScheme.Value.ToString());
+                                    EditorGUILayout.TextField(loadedScheme.Value.ToString(false));
                                 }
                             }
                         }
@@ -215,13 +222,13 @@ namespace Schema.Unity.Editor
             var buildTargetGroup = EditorUserBuildSettings.selectedBuildTargetGroup;
             var defines = PlayerSettings.GetScriptingDefineSymbolsForGroup(buildTargetGroup);
 
-            if (defines.Contains("SCHEMA_DEBUG"))
+            if (defines.Contains(DEBUG_MODE_SCRIPTING_DEFINE))
             {
                 if (GUILayout.Button("Disable Schema Debug Mode"))
                 {
-                    var newDefines = string.Join(";", defines.Split(';').Where(d => d != "SCHEMA_DEBUG"));
+                    var newDefines = string.Join(";", defines.Split(';').Where(d => d != DEBUG_MODE_SCRIPTING_DEFINE));
                     PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, newDefines);
-                    LogDbgVerbose("Removed SCHEMA_DEBUG scripting define.");
+                    LogDbgVerbose($"Removed {DEBUG_MODE_SCRIPTING_DEFINE} scripting define.");
                 }
             }
             else
@@ -231,9 +238,31 @@ namespace Schema.Unity.Editor
 
                     if (!string.IsNullOrEmpty(defines))
                         defines += ";";
-                    defines += "SCHEMA_DEBUG";
+                    defines += DEBUG_MODE_SCRIPTING_DEFINE;
                     PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, defines);
-                    LogDbgVerbose("Added SCHEMA_DEBUG scripting define.");
+                    LogDbgVerbose($"Added {DEBUG_MODE_SCRIPTING_DEFINE} scripting define.");
+                }
+            }
+            
+            if (defines.Contains(PERF_MODE_SCRIPTING_DEFINE))
+            {
+                if (GUILayout.Button("Disable Schema Perf Mode"))
+                {
+                    var newDefines = string.Join(";", defines.Split(';').Where(d => d != PERF_MODE_SCRIPTING_DEFINE));
+                    PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, newDefines);
+                    LogDbgVerbose($"Removed {PERF_MODE_SCRIPTING_DEFINE} scripting define.");
+                }
+            }
+            else
+            {
+                if (GUILayout.Button("Enable Schema Perf Mode"))
+                {
+
+                    if (!string.IsNullOrEmpty(defines))
+                        defines += ";";
+                    defines += PERF_MODE_SCRIPTING_DEFINE;
+                    PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, defines);
+                    LogDbgVerbose($"Added {PERF_MODE_SCRIPTING_DEFINE} scripting define.");
                 }
             }
 

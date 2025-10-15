@@ -49,7 +49,7 @@ namespace Schema.Core.Commands
                 _hasCapturedOldValue = true;
             }
 
-            var result = _scheme.SetDataOnEntry(_entry, _attributeName, _newValue, _allowIdentifierUpdate, Context);
+            var result = _scheme.SetDataOnEntry(Context, _entry, _attributeName, _newValue, _allowIdentifierUpdate);
 
             var cmdResult = result.Passed
                 ? Pass(result)
@@ -60,7 +60,7 @@ namespace Schema.Core.Commands
 
         protected override Task<CommandResult> UndoInternalAsync(CancellationToken cancellationToken)
         {
-            var result = _scheme.SetDataOnEntry(_entry, _attributeName, _oldValue, allowIdentifierUpdate: true, context: Context);
+            var result = _scheme.SetDataOnEntry(context: Context, entry: _entry, attributeName: _attributeName, value: _oldValue, allowIdentifierUpdate: true);
             return Task.FromResult(result.Passed ? Pass("Undo successful") : Fail(result.Message));
         }
     }

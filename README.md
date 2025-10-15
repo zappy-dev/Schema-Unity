@@ -91,7 +91,7 @@ See the full [Quickstart](docs/Quickstart.md).
    - Click `+`
    - Select `Add package by name...` or `Add package from git URL...`
    - Paste `com.devzappy.schema.unity` into name
-   - Paste `0.2.0` into version
+   - Paste `0.3.0` into version
    - Click **Add**
    
 #### Alternatively, merge the snippet to Packages/manifest.json 
@@ -107,7 +107,7 @@ See the full [Quickstart](docs/Quickstart.md).
         }
     ],
     "dependencies": {
-        "com.devzappy.schema.unity": "0.2.0"
+        "com.devzappy.schema.unity": "0.3.0"
     }
 }
 ```

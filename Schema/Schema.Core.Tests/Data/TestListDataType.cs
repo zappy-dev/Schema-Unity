@@ -138,7 +138,7 @@ public class TestListDataType
         var result = listType.IsValidValue(Context, new int[] { 1, 2, 3 });
         
         Assert.That(result.Passed, Is.True);
-        Assert.That(result.Message, Does.Contain("3 elements"));
+        Assert.That(result.Message, Does.Contain("All elements are valid"));
     }
 
     [Test]

@@ -10,6 +10,9 @@ public class Player2DController : MonoBehaviour
     [SerializeField]
     private EntitiesEntry playerEntry;
     
+    [SerializeField]
+    private SpriteRenderer spriteRenderer;
+    
     // Start is called before the first frame update
     void Start()
     {
@@ -18,13 +21,9 @@ public class Player2DController : MonoBehaviour
 
     private void InitializeConfigs()
     {
-        // Call this method to initialize Schema
-        Schema.Core.Schema.ManifestUpdated += OnManifestUpdated;
-        var loadRes = SchemaRuntime.Initialize();
-
-        if (loadRes.Failed)
+        if (SchemaRuntime.Initialize(OnManifestUpdated).TryErr(out var initError))
         {
-            Debug.LogError(loadRes.Message);
+            Debug.LogError(initError.Message);
         }
     }
 
@@ -38,6 +37,8 @@ public class Player2DController : MonoBehaviour
 
         Debug.Log($"Using player entry: {player}");
         playerEntry = player;
+        spriteRenderer.sprite = playerEntry.Sprite;
+        spriteRenderer.color = playerEntry.Color;
     }
 
     // Update is called once per frame

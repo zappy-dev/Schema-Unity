@@ -186,13 +186,13 @@ namespace Schema.Core.Data
             AttributeName = newAttributeName;
         }
 
-        public SchemaResult CheckIfValidData(SchemaContext context, object value)
+        public SchemaResult IsValidValue(SchemaContext context, object value)
         {
             using var _ = new AttributeContextScope(ref context, this.AttributeName);
             return DataType.IsValidValue(context, value);
         }
 
-        public SchemaResult<object> ConvertData(SchemaContext context, object value)
+        public SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
             return DataType.ConvertValue(context, value);
         }
