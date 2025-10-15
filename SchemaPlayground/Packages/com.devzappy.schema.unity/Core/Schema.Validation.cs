@@ -50,6 +50,7 @@ namespace Schema.Core
                             return entryData.Cast();
                         }
 
+                        // How to handle if a entry contains no-data for an attribute? incur runtiem conversions?
                         var fieldData = entryData.Result;
                         var validateData = attribute.IsValidValue(ctx, fieldData);
                         if (validateData.Failed)

@@ -408,4 +408,56 @@ public class TestSchema
         // As above, patching SaveDataScheme to fail for one scheme is not trivial without refactor
         // Placeholder for the failure path
     }
+
+    [Test]
+    public void Test_IsValidScheme_ValidScheme_Passes()
+    {
+        var scheme = new DataScheme("Valid");
+        scheme.AddAttribute(Context, "Name", DataType.Text).AssertPassed();
+        scheme.AddAttribute(Context, "Age", DataType.Integer).AssertPassed();
+        scheme.AddEntry(Context, new DataEntry { { "Name", "Alice", Context }, { "Age", 30, Context } }).AssertPassed();
+        scheme.AddEntry(Context, new DataEntry { { "Name", "Bob", Context }, { "Age", 25, Context } }).AssertPassed();
+
+        var result = Schema.IsValidScheme(Context, scheme);
+        Assert.IsTrue(result.Passed, result.Message);
+    }
+
+    [Test]
+    public void Test_IsValidScheme_DuplicateIdentifiers_Fails()
+    {
+        var scheme = new DataScheme("WithId");
+        scheme.AddAttribute(Context, "Id", DataType.Text, isIdentifier: true).AssertPassed();
+        scheme.AddAttribute(Context, "Field", DataType.Text).AssertPassed();
+        scheme.AddEntry(Context, new DataEntry { { "Id", "dup", Context }, { "Field", "A", Context } }).AssertPassed();
+        scheme.AddEntry(Context, new DataEntry { { "Id", "dup", Context }, { "Field", "B", Context } }).AssertPassed();
+
+        var result = Schema.IsValidScheme(Context, scheme);
+        Assert.IsTrue(result.Failed);
+        Assert.That(result.Message, Does.Contain("duplicate identifiers"));
+    }
+
+    [Test]
+    public void Test_IsValidScheme_MissingEntryData_Passes()
+    {
+        var scheme = new DataScheme("MissingData");
+        scheme.AddAttribute(Context, "Name", DataType.Text).AssertPassed();
+        scheme.AddAttribute(Context, "Age", DataType.Integer).AssertPassed();
+        // Add entry with missing "Age" key
+        scheme.AddEntry(Context, new DataEntry { { "Name", "Alice", Context } }).AssertPassed();
+
+        var result = Schema.IsValidScheme(Context, scheme);
+        Assert.IsTrue(result.Passed);
+    }
+
+    [Test]
+    public void Test_IsValidScheme_InvalidValueType_Fails()
+    {
+        var scheme = new DataScheme("InvalidType");
+        scheme.AddAttribute(Context, "Name", DataType.Text).AssertPassed();
+        scheme.AddEntry(Context, new DataEntry { { "Name", 12345, Context } }, runDataValidation: false).AssertPassed();
+
+        var result = Schema.IsValidScheme(Context, scheme);
+        Assert.IsTrue(result.Failed);
+        Assert.That(result.Message, Does.Contain("Failed to validate all entries"));
+    }
 }
