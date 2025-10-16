@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,10 +14,10 @@ using UnityEditor;
 using UnityEngine;
 using Random = System.Random;
 using Schema.Core.Schemes;
-using Schema.Runtime;
 using Schema.Unity.Editor.Ext;
 using static Schema.Core.Logging.Logger;
 using static Schema.Core.Schema;
+using static Schema.Core.SchemaContext;
 using static Schema.Core.SchemaResult;
 using static Schema.Unity.Editor.LayoutUtils;
 using static Schema.Unity.Editor.SchemaLayout;
@@ -31,6 +30,7 @@ namespace Schema.Unity.Editor
     {
         #region Static Fields and Constants
 
+        private static string _defaultUnityProjectPath;
         public static SchemaEditorWindow Instance { get; private set; }
 
         private const string EDITORPREFS_KEY_SELECTEDSCHEME = "Schema:SelectedSchemeName";
@@ -39,7 +39,7 @@ namespace Schema.Unity.Editor
         private static ProfilerMarker _tableViewMarker = new ProfilerMarker("SchemaEditor:TableView");
 
         // TODO: Move to Schema Core?
-        private static string _defaultManifestLoadPath;
+        private static string _defaultManifestLoadPath => GetDefaultContentPath(_defaultUnityProjectPath, "Manifest.json");
         
         #endregion
         
@@ -119,6 +119,7 @@ namespace Schema.Unity.Editor
         private void OnEnable()
         {
             Instance = this;
+            _defaultUnityProjectPath = Path.GetFullPath(Application.dataPath + "/..");
             LogDbgVerbose("Schema Editor enabled", this);
             isInitialized = false;
             EditorApplication.update += InitializeSafely;
@@ -127,7 +128,7 @@ namespace Schema.Unity.Editor
             // Initialize virtual scrolling
             _virtualTableView = new VirtualTableView();
 
-            ManifestUpdated += RefreshTableEntriesForSelectedScheme;
+            ProjectLoaded += RefreshTableEntriesForSelectedScheme;
             OnAttributeFiltersUpdated += RefreshTableEntriesForSelectedScheme;
             OnSelectedSchemeChanged += RefreshTableEntriesForSelectedScheme;
             OnSelectedSchemeChanged += () =>
@@ -164,19 +165,8 @@ namespace Schema.Unity.Editor
             newAttributeName = string.Empty;
 
             SetStorage(StorageFactory.GetEditorStorage());
-
-            ProjectPath = Path.GetFullPath(Application.dataPath + "/..");
-            // _defaultContentPath = Path.Combine(Path.GetFullPath(Application.dataPath + "/.."), "Content");
-            _defaultManifestLoadPath = GetContentPath("Manifest.json");
-            // if (!IsInitialized)
-            // {
-            ManifestImportPath = _defaultManifestLoadPath;
-            // }
-            // return;
-            var ctx = new SchemaContext
-            {
-                Driver = "Editor_Initialization",
-            };
+            
+            var ctx = EditContext.WithDriver("Editor_Initialization");
             LatestResponse = OnLoadManifest(ctx);
             
             if (LatestResponse.Passed)
@@ -185,7 +175,7 @@ namespace Schema.Unity.Editor
                 // TODO: Solve publishing Tooltips for schema itself, multiple schema contexts...
                 // tooltipOfTheDay = $"Tip Of The Day: {GetTooltipMessage()}";
 
-                InitializeFileWatcher();
+                InitializeFileWatcher(ctx);
             }
 
             var storedSelectedSchema = EditorPrefs.GetString(EDITORPREFS_KEY_SELECTEDSCHEME, null);
@@ -202,15 +192,16 @@ namespace Schema.Unity.Editor
         #region Manifest File Changing Handling
         
         // TODO: Migrate to separate file
-        private void InitializeFileWatcher()
+        private void InitializeFileWatcher(SchemaContext ctx)
         {
-            if (manifestWatcher == null)
+            // TODO: update this if the manifest import path changes?
+            if (manifestWatcher == null && !string.IsNullOrEmpty(ctx.Project.ManifestImportPath))
             {
-                LogDbgVerbose($"Initializing file watch for path: {Path.GetDirectoryName(ManifestImportPath)}", this);
+                LogDbgVerbose($"Initializing file watch for path: {Path.GetDirectoryName(ctx.Project.ManifestImportPath)}", this);
                 manifestWatcher = new FileSystemWatcher 
                 {
-                    Path = Path.GetDirectoryName(ManifestImportPath),
-                    Filter = Path.GetFileName(ManifestImportPath),
+                    Path = Path.GetDirectoryName(ctx.Project.ManifestImportPath),
+                    Filter = Path.GetFileName(ctx.Project.ManifestImportPath),
                     NotifyFilter = NotifyFilters.LastWrite
                 };
                 manifestWatcher.Changed += OnManifestFileChanged;
@@ -236,10 +227,7 @@ namespace Schema.Unity.Editor
             {
                 // You can now safely interact with Unity API on the main thread here
                 
-                OnLoadManifest(new SchemaContext
-                {
-                    Driver = "Editor_Detected_Manifest_File_Change",
-                });
+                OnLoadManifest(EditContext.WithDriver("Editor_Detected_Manifest_File_Change"));
                 Repaint();
             };
         }
@@ -331,7 +319,7 @@ namespace Schema.Unity.Editor
         {
             using var reporter = new EditorProgressReporter("Schema - Manifest Load");
             LogDbgVerbose($"Loading Manifest", context);
-            LatestManifestLoadResponse = LoadManifestFromPath(context, ManifestImportPath, reporter);
+            LatestManifestLoadResponse = LoadManifestFromPath(context, _defaultManifestLoadPath, _defaultUnityProjectPath, reporter);
             LatestResponse = LatestManifestLoadResponse.Cast();
 
             if (LatestManifestLoadResponse.Passed)
@@ -374,10 +362,7 @@ namespace Schema.Unity.Editor
 
         private SchemaResult RunManifestMigrationWizard()
         {
-            var context = new SchemaContext
-            {
-                Driver = "Manifest Migration Wizard"
-            };
+            var context = EditContext.WithDriver("Manifest Migration Wizard");
             // validate manifest is up-to-date with latest template
             var templateManifest = ManifestDataSchemeFactory.BuildTemplateManifestSchema(context, 
                 DEFAULT_SCRIPTS_PUBLISH_PATH, 
@@ -485,7 +470,7 @@ namespace Schema.Unity.Editor
                 return migrateRes;
             }
 
-            LatestManifestLoadResponse = LoadManifest(context, templateManifest._);
+            LatestManifestLoadResponse = LoadManifest(context, templateManifest._, manifestImportPath: _defaultManifestLoadPath, projectPath: _defaultUnityProjectPath);
             LatestResponse = CheckIf(context, LatestManifestLoadResponse.Passed, LatestManifestLoadResponse.Message);
             return Pass();
         }
@@ -590,10 +575,7 @@ namespace Schema.Unity.Editor
         
         private void OnGUI()
         {
-            var renderCtx = new SchemaContext
-            {
-                Driver = $"{nameof(SchemaEditorWindow)}_Render"
-            };
+            var renderCtx = EditContext.WithDriver($"{nameof(SchemaEditorWindow)}_Render");
             
             if (!isInitialized)
             {
@@ -618,11 +600,9 @@ namespace Schema.Unity.Editor
                 if (GUILayout.Button("Create Empty Project"))
                 {
                     // TODO: Handle this better? move to Schema Core?
-                    var ctx = new SchemaContext
-                    {
-                        Driver = "User_Create_New_Project"
-                    };
-                    var initRes = InitializeTemplateManifestScheme(ctx, DEFAULT_SCRIPTS_PUBLISH_PATH);
+                    var ctx = EditContext.WithDriver("User_Create_New_Project");
+                    
+                    var initRes = InitializeTemplateManifestScheme(ctx, projectPath: _defaultUnityProjectPath, defaultScriptExportPath: DEFAULT_SCRIPTS_PUBLISH_PATH);
                     LatestResponse = SaveManifest(ctx);
                     LatestManifestLoadResponse = SchemaResult<(ManifestLoadStatus, SchemaProjectContainer)>.CheckIf(LatestResponse.Passed && initRes.Passed, 
                         (ManifestLoadStatus.FULLY_LOADED, initRes.Result), 
@@ -634,13 +614,13 @@ namespace Schema.Unity.Editor
             using (new EditorGUILayout.HorizontalScope())
             {
                 // For hiding sensitive data
-                string relativeProjectPath = PathUtility.MakeRelativePath(ProjectPath, Application.dataPath);
-                var projectPathContent = new GUIContent("Project Path", ProjectPath);
+                string relativeProjectPath = PathUtility.MakeRelativePath(renderCtx.Project.ProjectPath, Application.dataPath);
+                var projectPathContent = new GUIContent("Project Path", renderCtx.Project.ProjectPath);
                 EditorGUILayout.TextField(projectPathContent, relativeProjectPath);
 
                 if (GUILayout.Button("Open", DoNotExpandWidthOptions))
                 {
-                    EditorUtility.RevealInFinder(ProjectPath);
+                    EditorUtility.RevealInFinder(renderCtx.Project.ProjectPath);
                 }
             }
             
@@ -656,7 +636,7 @@ namespace Schema.Unity.Editor
                 {
                     if (isInitialized)
                     {
-                        string manifestPath = ManifestImportPath;
+                        string manifestPath = renderCtx.Project.ManifestImportPath;
                         // For hiding sensitive data
                         string relativeManifestPath = PathUtility.MakeRelativePath(manifestPath, Application.dataPath);
                         
@@ -671,32 +651,23 @@ namespace Schema.Unity.Editor
 
                 if (GUILayout.Button("Load", DoNotExpandWidthOptions))
                 {
-                    OnLoadManifest(new SchemaContext
-                    {
-                        Driver = "User_Load_Manifest"
-                    });
+                    OnLoadManifest(EditContext.WithDriver("User_Load_Manifest"));
                 }
 
                 if (GUILayout.Button("Open", DoNotExpandWidthOptions))
                 {
-                    EditorUtility.RevealInFinder(ManifestImportPath);
+                    EditorUtility.RevealInFinder(renderCtx.Project.ManifestImportPath);
                 }
 
                 if (GUILayout.Button("Save All", DoNotExpandWidthOptions))
                 {
-                    LatestResponse = Save(new SchemaContext
-                    {
-                        Driver = "User_Request_Save_All"
-                    }, saveManifest: true);
+                    LatestResponse = Save(EditContext.WithDriver("User_Request_Save_All"), saveManifest: true);
                 }
                 
                 if (GUILayout.Button("Publish All", DoNotExpandWidthOptions))
                 {
                     using var progressReporter = new EditorProgressReporter("Schema - Publish All");
-                    LatestResponse = PublishAllSchemes(new SchemaContext
-                    {
-                        Driver = "User_Request_Publish_All"
-                    }, UnityEditorPublishConfig, progressReporter);
+                    LatestResponse = PublishAllSchemes(EditContext.WithDriver("User_Request_Publish_All"), UnityEditorPublishConfig, progressReporter);
                     
                     EditorUtility.DisplayDialog("Schema", (LatestResponse.Passed) ? "Successfully published all Schemes!" : LatestResponse.Message, "Ok");
                 }
@@ -821,10 +792,7 @@ namespace Schema.Unity.Editor
                                 {
                                     menu.AddItem(new GUIContent($"{storageFormat.DisplayName}/{soType.Name} - {soType.Assembly.GetName().Name}"), false, () =>
                                     {
-                                        ImportScriptableObjectToDataScheme(new SchemaContext
-                                        {
-                                            Driver = "User_Import_ScriptableObject"
-                                        }, soType);
+                                        ImportScriptableObjectToDataScheme(EditContext.WithDriver("User_Import_ScriptableObject"), soType);
                                     });
                                 }
                             }
@@ -832,10 +800,7 @@ namespace Schema.Unity.Editor
                             {
                                 menu.AddItem(new GUIContent(storageFormat.DisplayName), false, () =>
                                 {
-                                    var ctx = new SchemaContext
-                                    {
-                                        Driver = "User_Import_Schema"
-                                    };
+                                    var ctx = EditContext.WithDriver("User_Import_Schema");
                                     if (storageFormat.TryImport(ctx, out var importedSchema, out var importFilePath))
                                     {
                                         SubmitAddSchemeRequest(ctx, importedSchema, importFilePath: importFilePath).FireAndForget();
@@ -1029,13 +994,23 @@ namespace Schema.Unity.Editor
                     }
                                             
                     // Need to finally reference this enum ID attribute
-                    dataType = new ReferenceDataType(enumSchemeName, enumIdAttr.AttributeName);
+                    if (ReferenceDataTypeFactory
+                        .CreateReferenceDataType(context, enumSchemeName, enumIdAttr.AttributeName)
+                        .Try(out var refDataType))
+                    {
+                        dataType = refDataType;
+                    }
                 }
                 else if (field.FieldType == soType)
                 {
                     // Handle self references
                     // Create a Reference Data Type that references self scheme
-                    dataType = new ReferenceDataType(newSOSchemeName, assetGuidAttr.AttributeName);
+                    if (ReferenceDataTypeFactory
+                        .CreateReferenceDataType(context, newSOSchemeName, assetGuidAttr.AttributeName)
+                        .Try(out var refDataType))
+                    {
+                        dataType = refDataType;
+                    }
                 }
 
                 // TODO: How to handle field type references for non-scriptable objects?

@@ -50,11 +50,12 @@ namespace Schema.Core
         #region Load Operations
         
         
-        public static SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> LoadManifestFromPath(SchemaContext context,
+        public static SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> LoadManifestFromPath(SchemaContext ctx,
             string manifestLoadPath,
+            string projectPath,
             IProgress<(float, string)> progress = null)
         {
-            SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> res = SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer container)>.New(context);
+            SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> res = SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer container)>.New(ctx);
             if (string.IsNullOrWhiteSpace(manifestLoadPath))
             {
                 return res.Fail("Manifest path is invalid: " + manifestLoadPath);
@@ -62,35 +63,35 @@ namespace Schema.Core
 
             if (!PathUtility.IsAbsolutePath(manifestLoadPath))
             {
-                manifestLoadPath = PathUtility.MakeAbsolutePath(manifestLoadPath, ProjectPath);
+                manifestLoadPath = PathUtility.MakeAbsolutePath(manifestLoadPath, ctx.Project.ProjectPath);
                 Logger.LogVerbose($"Converting manifest path to absolute path: {manifestLoadPath}");
             }
 
-            if (!GetStorage(context).Try(out var storage, out var storageErr))
+            if (!GetStorage(ctx).Try(out var storage, out var storageErr))
             {
                 return storageErr.CastError(res);
             }
 
-            if (storage.FileSystem.FileExists(context, manifestLoadPath).Failed)
+            if (storage.FileSystem.FileExists(ctx, manifestLoadPath).Failed)
             {
                 return res.Fail($"No Manifest scheme found.\nSearched the following path: {manifestLoadPath}\nLoad an existing manifest scheme or save the empty template.");
             }
             
-            progress?.Report((0f, $"Loading: {PathUtility.MakeRelativePath(manifestLoadPath, ProjectPath)}..."));
+            progress?.Report((0f, $"Loading: {manifestLoadPath}..."));
             Logger.LogDbgVerbose($"Loading manifest from file: {manifestLoadPath}...", "Manifest");
             var loadResult =
-                _storage.DefaultManifestStorageFormat.DeserializeFromFile(context, manifestLoadPath);
+                _storage.DefaultManifestStorageFormat.DeserializeFromFile(ctx, manifestLoadPath);
             if (!loadResult.Try( out var manifestDataScheme))
             {
                 return loadResult.CastError(res);
             }
 
-            manifestImportPath = manifestLoadPath;
-            var loadManifestRes = LoadManifest(context, manifestDataScheme, progress);
+            var loadManifestRes = LoadManifest(ctx, manifestDataScheme, manifestImportPath: manifestLoadPath,
+                projectPath, progress);
 
             // WARNING
             // Time lost debugging this code: 10 hours
-            Logger.Log($"Load Manifest from file: {manifestLoadPath}, status: {loadManifestRes}", context);
+            Logger.Log($"Load Manifest from file: {manifestLoadPath}, status: {loadManifestRes}", ctx);
             if (loadManifestRes.Passed)
             {
                 // TODO: If this fails, revert back to previous manifest import path?
@@ -100,13 +101,19 @@ namespace Schema.Core
             return loadManifestRes;
         }
         
-        public static SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> LoadManifest(SchemaContext context,
+        public static SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> LoadManifest(SchemaContext ctx,
             DataScheme manifestDataScheme,
+            string manifestImportPath,
+            string projectPath,
             IProgress<(float, string)> progress = null)
         {
-            SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> res = SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer container)>.New(context);
+            SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> res = SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer container)>.New(ctx);
+            
+            // initial new project container
             var newProjectContainer = new SchemaProjectContainer();
-            context.Project = newProjectContainer; // set up the project container in the context for future load operations to use.
+            if (newProjectContainer.SetManifestImportPath(ctx, manifestImportPath).TryErr(out var err)) return err.CastError(res);
+            newProjectContainer.ProjectPath = projectPath;
+            ctx.Project = newProjectContainer; // set up the project container in the context for future load operations to use.
             
             lock (manifestOperationLock)
             {
@@ -120,7 +127,7 @@ namespace Schema.Core
                 int schemeCount = manifestDataScheme.EntryCount;
 
                 nextManifestScheme = new ManifestScheme(manifestDataScheme);
-                var saveManifestResponse = LoadDataScheme(context, manifestDataScheme, overwriteExisting: true,
+                var saveManifestResponse = LoadDataScheme(ctx, manifestDataScheme, overwriteExisting: true,
                     registerManifestEntry: false);
                 Logger.LogDbgVerbose(saveManifestResponse.Message, saveManifestResponse.Context);
                 if (!saveManifestResponse.Passed)
@@ -150,7 +157,7 @@ namespace Schema.Core
                         $"Loading ({currentSchema}/{schemeCount}): {schemeFilePath}"));
                 });
                 var loadedSchemes = new List<DataScheme>();
-                if (!nextManifestScheme.GetEntries(context).Try(out var entries, out var error))
+                if (!nextManifestScheme.GetEntries(ctx).Try(out var entries, out var error))
                     return error.CastError(res);
                 
                 foreach (var manifestEntry in entries)
@@ -168,7 +175,7 @@ namespace Schema.Core
                         }
                     }
                     
-                    var loadSchemeRes = LoadSchemeFromManifestEntry(context, manifestEntry,
+                    var loadSchemeRes = LoadSchemeFromManifestEntry(ctx, manifestEntry,
                         progress: progressWrapper);
                     if (!loadSchemeRes.Try(out var loadedScheme))
                     {
@@ -180,7 +187,7 @@ namespace Schema.Core
 
                     // allow loaded manifest to overwrite in-memory manifest
                     bool isSelfEntry = loadedScheme.IsManifest;
-                    loadedScheme.SetDirty(context, false); // is the loaded scheme dirty? type conversions?
+                    loadedScheme.SetDirty(ctx, false); // is the loaded scheme dirty? type conversions?
                     if (isSelfEntry)
                     {
                         // if (!manifestDataScheme.Equals(loadedScheme))
@@ -198,7 +205,7 @@ namespace Schema.Core
                     loadedSchemes.Add(loadedScheme);
                 }
                 
-                if (!DataScheme.TopologicalSortByReferences(context, loadedSchemes).Try(out var schemeLoadOrder, out var sortErr)) 
+                if (!DataScheme.TopologicalSortByReferences(ctx, loadedSchemes).Try(out var schemeLoadOrder, out var sortErr)) 
                     return sortErr.CastError(res);
 
                 var schemeLoadOrderList = schemeLoadOrder.ToList();
@@ -210,7 +217,7 @@ namespace Schema.Core
                     numLoaded++;
                     progress?.Report((0.1f, $"Loading '{scheme.ToString(false)}' into Schema ({numLoaded} / {numSchemes})"));
                     Logger.LogDbgVerbose($"Loading scheme from manifest: {scheme}", context: manifestDataScheme);
-                    var loadRes = LoadDataScheme(context, scheme,
+                    var loadRes = LoadDataScheme(ctx, scheme,
                         overwriteExisting: false,
                         registerManifestEntry: false);
                     if (loadRes.Failed)
@@ -224,9 +231,12 @@ namespace Schema.Core
                 }
                 
                 LatestProject = newProjectContainer;
+                
+                ManifestUpdated?.Invoke();
+                ProjectLoaded?.Invoke();
                 if (!success)
                 {
-                    context.Project.Manifest = nextManifestScheme;
+                    ctx.Project.Manifest = nextManifestScheme;
                     nextManifestScheme = null;
                     return res.Pass((ManifestLoadStatus.FAILED_TO_LOAD_ENTRIES, newProjectContainer), $"Failed to load all schemes found in manifest, errors: {sb}");
                 }
@@ -234,16 +244,16 @@ namespace Schema.Core
                 // overwrite existing manifest
                 loadStopwatch.Stop();
 
-                context.Project.Manifest = nextManifestScheme;
+                ctx.Project.Manifest = nextManifestScheme;
                 nextManifestScheme = null;
                 return res.Pass((ManifestLoadStatus.FULLY_LOADED, newProjectContainer), $"Loaded {schemeCount} schemes from manifest in {loadStopwatch.ElapsedMilliseconds:N0} ms");
             }
         }
         
-        internal static SchemaResult<DataScheme> LoadSchemeFromManifestEntry(SchemaContext context, ManifestEntry manifestEntry,
+        internal static SchemaResult<DataScheme> LoadSchemeFromManifestEntry(SchemaContext ctx, ManifestEntry manifestEntry,
             IProgress<string> progress = null)
         {
-            var res = SchemaResult<DataScheme>.New(context);
+            var res = SchemaResult<DataScheme>.New(ctx);
             if (manifestEntry == null)
             {
                 return res.Fail($"Failed to load manifest from {manifestEntry}");
@@ -268,15 +278,15 @@ namespace Schema.Core
             // TODO: Unify logic to FS Data Type
             string resolvedPath = schemeFilePath;
             Logger.LogDbgVerbose("ResolvedPath: " + resolvedPath);
-            Logger.LogDbgVerbose("ManifestImportPath: " + ManifestImportPath);
+            Logger.LogDbgVerbose("ManifestImportPath: " + ctx.Project.ManifestImportPath);
             Logger.LogDbgVerbose("Is Absolute: " + PathUtility.IsAbsolutePath(schemeFilePath));
-            if (!PathUtility.IsAbsolutePath(schemeFilePath) && !string.IsNullOrEmpty(ManifestImportPath))
+            if (!PathUtility.IsAbsolutePath(schemeFilePath) && !string.IsNullOrEmpty(ctx.Project.ManifestImportPath))
             {
-                resolvedPath = PathUtility.MakeAbsolutePath(schemeFilePath, ProjectPath);
+                resolvedPath = PathUtility.MakeAbsolutePath(schemeFilePath, ctx.Project.ProjectPath);
             }
             Logger.LogDbgVerbose("Fina ResolvedPath: " + resolvedPath);
 
-            var fileExistRes = _storage.FileSystem.FileExists(context, resolvedPath);
+            var fileExistRes = _storage.FileSystem.FileExists(ctx, resolvedPath);
             if (fileExistRes.Failed)
             {
                 return fileExistRes.CastError<DataScheme>();
@@ -285,7 +295,7 @@ namespace Schema.Core
             progress?.Report(resolvedPath);
                 
             // TODO support async loading
-            if (!_storage.DefaultSchemeStorageFormat.DeserializeFromFile(context, resolvedPath)
+            if (!_storage.DefaultSchemeStorageFormat.DeserializeFromFile(ctx, resolvedPath)
                     .Try(out var loadedSchema, out var loadErr))
             {
                 return res.Fail($"Failed to load scheme from file: {resolvedPath}, reason: {loadErr.Message}");
@@ -298,7 +308,7 @@ namespace Schema.Core
         /// Load a new scheme into memory.
         /// Note: This does not persist the new data scheme to disk
         /// </summary>
-        /// <param name="context"></param>
+        /// <param name="ctx"></param>
         /// <param name="scheme">New scheme to load</param>
         /// <param name="overwriteExisting">If true, overwrites an existing scheme. If false, fails to overwrite an existing scheme if it exists</param>
         /// <param name="registerManifestEntry">If true, registers a new manifest entry in the currently loaded manifest for the given scheme if loaded.</param>
@@ -430,18 +440,18 @@ namespace Schema.Core
             if (registerManifestEntry)
             {
                 // add new manifest entry if not existing. Only do this for non-manifest schemes, else this could end up in an stack overflow
-                if (scheme.IsManifest || GetManifestEntryForScheme(schemeName, ctx).Try(out _)) 
+                if (scheme.IsManifest || GetManifestEntryForScheme(ctx, schemeName).Try(out _)) 
                     return Pass("Schema added", ctx);
                 
                 // Add a new entry to the manifest for this loaded scheme
                 lock (manifestOperationLock)
                 {
-                    if (!GetManifestEntryForScheme(schemeName, ctx).Try(out _))
+                    if (!GetManifestEntryForScheme(ctx, schemeName).Try(out _))
                     {
                         // add manifest record for new scheme
                     
                         Logger.LogDbgVerbose($"Adding manifest entry for {schemeName} with import path: {importFilePath}...", ctx);
-                        var manifest = GetManifestScheme();
+                        var manifest = GetManifestScheme(ctx);
                         if (!manifest.Try(out var manifestScheme))
                         {
                             return Fail(ctx, manifest.Message);
@@ -466,23 +476,23 @@ namespace Schema.Core
         #endregion
 
         #region Save Operations
-        public static SchemaResult SaveManifest(SchemaContext context, IProgress<float> progress = null)
+        public static SchemaResult SaveManifest(SchemaContext ctx, IProgress<float> progress = null)
         {
-            Logger.LogDbgVerbose($"Saving manifest to file: {ManifestImportPath}...", "Manifest");
-            if (string.IsNullOrWhiteSpace(ManifestImportPath))
+            Logger.LogDbgVerbose($"Saving manifest to file: {ctx.Project.ManifestImportPath}...", "Manifest");
+            if (string.IsNullOrWhiteSpace(ctx.Project.ManifestImportPath))
             {
-                return Fail(context, "Manifest path is invalid: " + ManifestImportPath);
+                return Fail(ctx, "Manifest path is invalid: " + ctx.Project.ManifestImportPath);
             }
             // Align behavior with tests: when manifest is not initialized, treat path as invalid rather than initialization error
-            if (IsInitialized(context).Failed)
+            if (IsInitialized(ctx).Failed)
             {
-                return Fail(context, "Manifest path is invalid: " + ManifestImportPath);
+                return Fail(ctx, "Manifest path is invalid: " + ctx.Project.ManifestImportPath);
             }
             
             progress?.Report(0f);
             lock (manifestOperationLock)
             {
-                if (!GetManifestSelfEntry(context).Try(out var manifestSelfEntry, out var manifestError))
+                if (!GetManifestSelfEntry(ctx).Try(out var manifestSelfEntry, out var manifestError))
                 {
                     return manifestError.Cast();
                 }
@@ -491,12 +501,14 @@ namespace Schema.Core
                 try
                 {
                     // TODO: Unify with FS Data Type
-                    var manifestRelativeLoadPath = PathUtility.MakeRelativePath(ManifestImportPath, ProjectPath);
+                    var manifestRelativeLoadPath = ctx.Project.ProjectRelativeManifestLoadPath;
                     manifestSelfEntry.FilePath = manifestRelativeLoadPath;
 
-                    if (_storage.DefaultManifestStorageFormat.SerializeToFile(context, ManifestImportPath, GetManifestScheme().Result._).Passed)
+                    if (GetManifestScheme(ctx).TryErr(out var manifestScheme, out var err)) return err.Cast();
+
+                    if (_storage.DefaultManifestStorageFormat.SerializeToFile(ctx, ctx.Project.ManifestImportPath, manifestScheme._).Passed)
                     {
-                        GetManifestScheme().Result.SetDirty(context, false);
+                        manifestScheme.SetDirty(ctx, false);
                     }
                 }
                 catch (Exception ex)
@@ -504,28 +516,33 @@ namespace Schema.Core
                     // rollback bad path
                     manifestSelfEntry.FilePath = previousManifestPath;
                     Logger.LogError(ex.ToString());
-                    return Fail(context,$"Failed to save manifest to {ManifestImportPath}\n{ex.Message}");
+                    return Fail(ctx,$"Failed to save manifest to {ctx.Project.ManifestImportPath}\n{ex.Message}");
                 }
             }
             
-            return Pass($"Saved manifest to path: {ManifestImportPath}");
+            return Pass($"Saved manifest to path: {ctx.Project.ManifestImportPath}");
         }
 
-        public static SchemaResult Save(SchemaContext context, bool saveManifest = false)
+        public static SchemaResult Save(SchemaContext ctx, bool saveManifest = false)
         {
-            // When explicitly saving the manifest, validate path first to match expected behavior in tests
-            if (saveManifest && string.IsNullOrWhiteSpace(ManifestImportPath))
+            if (ctx.Project == null)
             {
-                return Fail(context, "Manifest path is invalid: " + ManifestImportPath);
+                return Fail(ctx, "No project specified");
+            }
+            
+            // When explicitly saving the manifest, validate path first to match expected behavior in tests
+            if (saveManifest && string.IsNullOrWhiteSpace(ctx.Project.ManifestImportPath))
+            {
+                return Fail(ctx, "Manifest path is invalid: " + ctx.Project.ManifestImportPath);
             }
 
-            var isInitRes = IsInitialized(context);
+            var isInitRes = IsInitialized(ctx);
             if (isInitRes.Failed)
             {
                 return isInitRes;
             }
             
-            foreach (var scheme in GetSchemes(context))
+            foreach (var scheme in GetSchemes(ctx))
             {
                 if (scheme.IsDirty)
                 {
@@ -534,7 +551,7 @@ namespace Schema.Core
                         continue;
                     }
                     
-                    var result = SaveDataScheme(context, scheme, saveManifest);
+                    var result = SaveDataScheme(ctx, scheme, saveManifest);
                     if (result.Failed)
                     {
                         return result;
@@ -545,9 +562,9 @@ namespace Schema.Core
             return Pass("Saved all dirty schemes");
         }
 
-        public static SchemaResult SaveDataScheme(SchemaContext context, DataScheme scheme, bool alsoSaveManifest)
+        public static SchemaResult SaveDataScheme(SchemaContext ctx, DataScheme scheme, bool alsoSaveManifest)
         {
-            var isInitRes = IsInitialized(context);
+            var isInitRes = IsInitialized(ctx);
             if (isInitRes.Failed)
             {
                 return isInitRes;
@@ -556,16 +573,16 @@ namespace Schema.Core
             Logger.LogDbgVerbose($"Saving {scheme} to file...", "Storage");
             if (scheme == null)
             {
-                return Fail(context, "Attempted to save an invalid Data scheme");
+                return Fail(ctx, "Attempted to save an invalid Data scheme");
             }
             
             var saveStopwatch = Stopwatch.StartNew();
-            if (!GetManifestEntryForScheme(scheme.SchemeName, context).Try(out var schemeManifestEntry))
+            if (!GetManifestEntryForScheme(ctx, scheme.SchemeName).Try(out var schemeManifestEntry))
             {
-                return Fail(context, "Could not find manifest entry for scheme name: " + scheme.SchemeName);
+                return Fail(ctx, "Could not find manifest entry for scheme name: " + scheme.SchemeName);
             }
             
-            if (scheme.IsManifest && GetManifestScheme().Try(out var loadedManifestScheme) &&
+            if (scheme.IsManifest && GetManifestScheme(ctx).Try(out var loadedManifestScheme) &&
                 !loadedManifestScheme._.Equals(scheme))
             {
                 var sb = new StringBuilder();
@@ -577,7 +594,7 @@ namespace Schema.Core
                 sb.AppendLine("Saving Manifest Scheme");
                 scheme.Write(sb, true);
                 #endif
-                return Fail(context, sb.ToString());
+                return Fail(ctx, sb.ToString());
             }
 
             // Only serialize the manifest to disk once
@@ -591,20 +608,20 @@ namespace Schema.Core
                 // TODO: Unify with FS Data Type
                 // Resolve relative path if needed
                 string resolvedPath = savePath;
-                if (!PathUtility.IsAbsolutePath(savePath) && !string.IsNullOrEmpty(ProjectPath))
+                if (!PathUtility.IsAbsolutePath(savePath) && !string.IsNullOrEmpty(ctx.Project.ProjectPath))
                 {
-                    resolvedPath = PathUtility.MakeAbsolutePath(savePath, ProjectPath);
+                    resolvedPath = PathUtility.MakeAbsolutePath(savePath, ctx.Project.ProjectPath);
                     
                     // Ensure the directory exists
                     string directory = Path.GetDirectoryName(resolvedPath);
-                    if (!_storage.FileSystem.DirectoryExists(context, directory))
+                    if (!_storage.FileSystem.DirectoryExists(ctx, directory))
                     {
-                        _storage.FileSystem.CreateDirectory(context, directory);
+                        _storage.FileSystem.CreateDirectory(ctx, directory);
                     }
                 }
                 
                 Logger.LogDbgVerbose($"Saving {scheme} to file {resolvedPath} (from path {savePath})", "Storage");
-                result = _storage.DefaultSchemeStorageFormat.SerializeToFile(context, resolvedPath, scheme);
+                result = _storage.DefaultSchemeStorageFormat.SerializeToFile(ctx, resolvedPath, scheme);
             }
 
             if (scheme.IsManifest || alsoSaveManifest)
@@ -613,7 +630,7 @@ namespace Schema.Core
                 if (alsoSaveManifest)
                 {
                     // use loaded manifest schema to update entry
-                    var loadedManifestRes = GetManifestScheme();
+                    var loadedManifestRes = GetManifestScheme(ctx);
                     if (!loadedManifestRes.Try(out manifestScheme))
                     {
                         return loadedManifestRes.Cast();
@@ -625,26 +642,26 @@ namespace Schema.Core
                     manifestScheme = new ManifestScheme(scheme);
                 }
 
-                if (!manifestScheme.GetSelfEntry(context).Try(out var manifestSelfEntry, out var manifestError))
+                if (!manifestScheme.GetSelfEntry(ctx).Try(out var manifestSelfEntry, out var manifestError))
                 {
                     return manifestError.Cast();
                 }
                 
                 if (string.IsNullOrWhiteSpace(manifestSelfEntry.FilePath))
                 {
-                    manifestSelfEntry.FilePath = Path.GetFileName(ManifestImportPath);
+                    manifestSelfEntry.FilePath = Path.GetFileName(ctx.Project.ManifestImportPath);
                 }
                 
-                savePath = ManifestImportPath;
-                Logger.LogDbgVerbose($"Saving manifest {scheme} to file {ManifestImportPath}", "Storage");
-                result = SaveManifest(context);
+                savePath = ctx.Project.ManifestImportPath;
+                Logger.LogDbgVerbose($"Saving manifest {scheme} to file {ctx.Project.ManifestImportPath}", "Storage");
+                result = SaveManifest(ctx);
             }
             saveStopwatch.Stop();
 
             if (result.Passed)
             {
                 Logger.LogDbgVerbose($"Saved {scheme} to file {savePath} in {saveStopwatch.ElapsedMilliseconds:N0} ms", context: "Storage");
-                scheme.SetDirty(context, false);
+                scheme.SetDirty(ctx, false);
             }
             return result;
         }

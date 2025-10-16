@@ -21,7 +21,8 @@ namespace Schema.Core.Tests.Commands
         [SetUp]
         public void Setup()
         {
-            Schema.Reset();
+            TestFixtureSetup.Initialize(Context, out _mockFileSystem, out _);
+            
             _scheme = new DataScheme("TestScheme");
             _scheme.AddAttribute(Context, "Name", DataType.Text).AssertPassed();
             _scheme.AddAttribute(Context, "Value", DataType.Integer).AssertPassed();
@@ -29,10 +30,6 @@ namespace Schema.Core.Tests.Commands
             _entry = _scheme.CreateNewEmptyEntry(Context).AssertPassed();
             _scheme.SetDataOnEntry(context: Context, entry: _entry, attributeName: "Name", value: "TestEntry").AssertPassed();
             _scheme.SetDataOnEntry(context: Context, entry: _entry, attributeName: "Value", value: 42).AssertPassed();
-            
-            _mockFileSystem = new Mock<IFileSystem>();
-            Schema.SetStorage(new Storage(_mockFileSystem.Object));
-            Schema.InitializeTemplateManifestScheme(Context);
         }
 
         [Test]

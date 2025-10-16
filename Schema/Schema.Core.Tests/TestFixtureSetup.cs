@@ -1,5 +1,8 @@
+using Moq;
+using NUnit.Framework.Internal;
 using Schema.Core.IO;
-using Schema.Core.Logging;
+using Schema.Core.Tests.Ext;
+using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Core.Tests;
 
@@ -34,14 +37,35 @@ public class TestFixtureSetup
         Logger.Level = Logger.LogLevel.INFO;
         Logger.Log($"IS CI: {isCI}");
         Logger.Level = Logger.LogLevel.ERROR;
-        
-        // Establish a deterministic project root for path resolution in tests
-        if (PathUtility.IsWindowsSystem)
+    }
+
+    public static string ProjectPath
+    {
+        get
         {
-            Schema.ProjectPath = "C:\\Users\\TestUser\\src\\TestProject";
-        } else if (PathUtility.IsUnixSystem)
-        {
-            Schema.ProjectPath = "/usr/local/bin";
+            // Establish a deterministic project root for path resolution in tests
+            if (PathUtility.IsWindowsSystem)
+            {
+                return "C:\\Users\\TestUser\\src\\TestProject";
+            }
+
+            if (PathUtility.IsUnixSystem)
+            {
+                return "/usr/local/bin";
+            }
+            return string.Empty;
         }
+    }
+    
+    internal static void Initialize(SchemaContext context, out Mock<IFileSystem> mockFileSystem, out Storage storage)
+    {
+        Schema.Reset();
+        mockFileSystem = new Mock<IFileSystem>();
+        storage = new Storage(mockFileSystem.Object);
+        Schema.SetStorage(storage);
+        
+        Schema.InitializeTemplateManifestScheme(context, projectPath: ProjectPath, string.Empty).AssertPassed();
+        
+        Assert.That(Schema.LatestProject, Is.Not.Null);
     }
 }

@@ -16,11 +16,7 @@ public class TestDataSchemeEquality
     [SetUp]
     public void OnTestSetup()
     {
-        Schema.Reset();
-        
-        var mockFS = new Mock<IFileSystem>();
-        Schema.SetStorage(new Storage(mockFS.Object));
-        Schema.InitializeTemplateManifestScheme(Context);
+        TestFixtureSetup.Initialize(Context, out _, out _);
     }
 
     #region Basic Equals Tests

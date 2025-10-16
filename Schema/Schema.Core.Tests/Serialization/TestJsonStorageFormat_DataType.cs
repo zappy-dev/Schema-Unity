@@ -45,7 +45,7 @@ public class TestJsonStorageFormat_DataType
     public void Test_Serialize(string? expectedJsonString, bool _, DataType expectedData, bool expectedSuccess, string? altExpectedJsonString)
     {
         var testScheme = new DataScheme("test");
-        testScheme.AddAttribute(Context, "testAttribute", expectedData);
+        testScheme.AddAttribute(Context, "testAttribute", expectedData).AssertPassed();
         
         // Test code here
         if (_storageFormat.Serialize(Context, testScheme).TryAssertCondition(expectedSuccess, out var jsonString))
@@ -115,14 +115,14 @@ public class TestJsonStorageFormat_DataType
             //     new DateTimeDataType(DateTime.MinValue),
             //     true);
             // handle old serialization format
-            yield return new TestCaseData("{\n  \"$type\": \"Schema.Core.Data.ReferenceDataType, Schema.Core\",\n  \"ReferenceSchemeName\": \"SpellStatus\",\n \"ReferenceAttributeName\": \"Status\",\n   \"SupportsEmptyReferences\": true,\n \"DefaultValue\": null\n}",
+            yield return new TestCaseData("{\n  \"$type\": \"Schema.Core.Data.ReferenceDataType, Schema.Core\",\n  \"ReferenceSchemeName\": \"SpellStatus\",\n \"ReferenceAttributeName\": \"Status\",\n   \"SupportsEmptyReferences\": true,\n \"DefaultValue\": \"\"\n}",
                 true,
-                new ReferenceDataType("SpellStatus", "Status"),
+                ReferenceDataTypeFactory.CreateReferenceDataType(Context, "SpellStatus", "Status", validateSchemeLoaded: false).AssertPassed(),
                 true,
-                "{\n  \"$type\": \"Schema.Core.Data.ReferenceDataType, Schema.Core\",\n  \"ReferenceSchemeName\": \"SpellStatus\",\n  \"ReferenceAttributeName\": \"Status\",\n  \"SupportsEmptyReferences\": true,\n  \"DefaultValue\": null\n}");
-            yield return new TestCaseData("{\n  \"$type\":\"Schema.Core.Data.ReferenceDataType,Schema.Core\", \"ReferenceSchemeName\": \"SpellStatus\",\n  \"ReferenceAttributeName\": \"Status\",\n  \"SupportsEmptyReferences\": true,\n  \"DefaultValue\": null\n}",
+                "{\n  \"$type\": \"Schema.Core.Data.ReferenceDataType, Schema.Core\",\n  \"ReferenceSchemeName\": \"SpellStatus\",\n  \"ReferenceAttributeName\": \"Status\",\n  \"SupportsEmptyReferences\": true,\n  \"DefaultValue\": \"\"\n}");
+            yield return new TestCaseData("{\n  \"$type\":\"Schema.Core.Data.ReferenceDataType,Schema.Core\", \"ReferenceSchemeName\": \"SpellStatus\",\n  \"ReferenceAttributeName\": \"Status\",\n  \"SupportsEmptyReferences\": true,\n  \"DefaultValue\": \"\"\n}",
                 true,
-                new ReferenceDataType("SpellStatus", "Status"),
+                ReferenceDataTypeFactory.CreateReferenceDataType(Context, "SpellStatus", "Status", validateSchemeLoaded: false).AssertPassed(),
                 true,
                 null);
             yield return new TestCaseData("{\n  \"$type\": \"Schema.Runtime.Type.UnityAssetDataType, Schema.Runtime\",\n  \"ObjectType\": \"UnityEngine.Texture, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null\",\n  \"DefaultValue\": null\n}",

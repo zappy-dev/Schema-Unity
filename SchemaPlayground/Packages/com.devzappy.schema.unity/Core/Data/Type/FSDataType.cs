@@ -39,20 +39,19 @@ namespace Schema.Core.Data
         /// <summary>
         /// Gets the base path, either from the provided base path or from the default project path
         /// </summary>
-        protected string ResolveBasePath(SchemaContext context)
+        protected string ResolveBasePath(SchemaContext ctx)
         {
             if (!string.IsNullOrEmpty(basePath))
                 return basePath;
                 
             // Try to get the default content path from Schema
             // TODO: Refactor to SchemaResult API
-            var isInitRes = Schema.IsInitialized(context);
-            if (isInitRes.Failed)
+            if (ctx.Project == null)
             {
                 return null;
             }
 
-            var projectPath = Schema.ProjectPath;
+            var projectPath = ctx.Project.ProjectPath;
             if (!string.IsNullOrEmpty(projectPath))
             {
                 return projectPath;

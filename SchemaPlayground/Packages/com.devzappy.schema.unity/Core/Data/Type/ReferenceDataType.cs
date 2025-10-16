@@ -35,23 +35,10 @@ namespace Schema.Core.Data
             DefaultValue = string.Empty;
         }
 
-        public ReferenceDataType(string schemeName, string identifierAttribute, bool validateSchemeLoaded = true) : base(null)
+        internal ReferenceDataType(string referenceSchemeName, string identifierAttribute, object defaultValue) : base(defaultValue)
         {
-            ReferenceSchemeName = schemeName;
+            ReferenceSchemeName = referenceSchemeName;
             ReferenceAttributeName = identifierAttribute;
-
-            var ctx = new SchemaContext
-            {
-                Driver = "Reference_DataType_Constructor",
-                DataType = this
-            };
-            
-            // Set an initial default value
-            if (validateSchemeLoaded && Schema.GetScheme(ctx, ReferenceSchemeName).Try(out var refScheme))
-            {
-                var values = refScheme.GetIdentifierValues().Select(v => v?.ToString() ?? "").ToList();
-                DefaultValue = values.Count > 0 ? values[0] : "";
-            }
         }
 
         public override string TypeName => $"{TypeNamePrefix}/{ReferenceSchemeName} - {ReferenceAttributeName}";

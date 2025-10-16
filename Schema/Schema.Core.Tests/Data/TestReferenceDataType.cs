@@ -3,6 +3,7 @@ using Moq;
 using Schema.Core.Data;
 using Schema.Core.IO;
 using Schema.Core.Tests.Ext;
+using static Schema.Core.Data.ReferenceDataTypeFactory;
 
 namespace Schema.Core.Tests.Data;
 
@@ -25,34 +26,31 @@ public class TestReferenceDataType
     [SetUp]
     public void Setup()
     {
-        Schema.Reset();
-        _mockFileSystem = new Mock<IFileSystem>();
-        Schema.SetStorage(new Storage(_mockFileSystem.Object));
-        Schema.InitializeTemplateManifestScheme(Context);
+        TestFixtureSetup.Initialize(Context, out _mockFileSystem, out _);
 
         // Create a test scheme with string identifiers
         _testScheme = new DataScheme(REFERENCE_SCHEME_NAME);
-        _testScheme.AddAttribute(Context, REFERENCE_ATTRIBUTE_NAME, DataType.Text, isIdentifier: true);
-        _testScheme.AddAttribute(Context, "Name", DataType.Text);
+        _testScheme.AddAttribute(Context, REFERENCE_ATTRIBUTE_NAME, DataType.Text, isIdentifier: true).AssertPassed();
+        _testScheme.AddAttribute(Context, "Name", DataType.Text).AssertPassed();
         
         // Add some test entries
         _testScheme.AddEntry(Context, new DataEntry 
         { 
             { REFERENCE_ATTRIBUTE_NAME, "item1", Context },
             { "Name", "First Item", Context }
-        });
+        }).AssertPassed();
         _testScheme.AddEntry(Context, new DataEntry
         {
             { REFERENCE_ATTRIBUTE_NAME, "item2", Context },
             { "Name", "Second Item", Context }
-        });
+        }).AssertPassed();
         _testScheme.AddEntry(Context, new DataEntry
         {
             { REFERENCE_ATTRIBUTE_NAME, "item3", Context },
             { "Name", "Third Item", Context }
-        });
+        }).AssertPassed();
 
-        Schema.LoadDataScheme(Context, _testScheme, overwriteExisting: true);
+        Schema.LoadDataScheme(Context, _testScheme, overwriteExisting: true).AssertPassed();
     }
 
     [TearDown]
@@ -66,7 +64,7 @@ public class TestReferenceDataType
     [Test]
     public void Constructor_Default_SetsEmptyValues()
     {
-        var refType = new ReferenceDataType();
+        var refType = CreateReferenceDataType(Context, null, null, validateSchemeLoaded: false).AssertPassed();
         
         Assert.That(refType.ReferenceSchemeName, Is.Null);
         Assert.That(refType.ReferenceAttributeName, Is.Null);
@@ -77,7 +75,7 @@ public class TestReferenceDataType
     [Test]
     public void Constructor_WithValidScheme_SetsProperties()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(refType.ReferenceSchemeName, Is.EqualTo(REFERENCE_SCHEME_NAME));
         Assert.That(refType.ReferenceAttributeName, Is.EqualTo(REFERENCE_ATTRIBUTE_NAME));
@@ -87,19 +85,15 @@ public class TestReferenceDataType
     [Test]
     public void Constructor_WithValidScheme_SetsDefaultValueFromFirstEntry()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(refType.DefaultValue, Is.EqualTo("item1"));
     }
 
     [Test]
-    public void Constructor_WithNonExistentScheme_DoesNotThrow()
+    public void Constructor_WithNonExistentScheme_Fails()
     {
-        Assert.DoesNotThrow(() => 
-        {
-            var refType = new ReferenceDataType(NON_EXISTENT_SCHEME, REFERENCE_ATTRIBUTE_NAME);
-            Assert.That(refType.ReferenceSchemeName, Is.EqualTo(NON_EXISTENT_SCHEME));
-        });
+        CreateReferenceDataType(Context, NON_EXISTENT_SCHEME, REFERENCE_ATTRIBUTE_NAME).AssertFailed();
     }
 
     #endregion
@@ -109,7 +103,7 @@ public class TestReferenceDataType
     [Test]
     public void TypeName_ReturnsCorrectFormat()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(refType.TypeName, Is.EqualTo($"Reference/{REFERENCE_SCHEME_NAME} - {REFERENCE_ATTRIBUTE_NAME}"));
     }
@@ -117,7 +111,7 @@ public class TestReferenceDataType
     [Test]
     public void TypeName_WithNullValues_HandlesGracefully()
     {
-        var refType = new ReferenceDataType();
+        var refType = CreateReferenceDataType(Context, null, null, validateSchemeLoaded: false).AssertPassed();
         
         Assert.That(refType.TypeName, Does.Contain("Reference"));
     }
@@ -125,7 +119,7 @@ public class TestReferenceDataType
     [Test]
     public void ToString_ReturnsCorrectFormat()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(refType.ToString(), Does.Contain(REFERENCE_SCHEME_NAME));
         Assert.That(refType.ToString(), Does.Contain(REFERENCE_ATTRIBUTE_NAME));
@@ -138,7 +132,7 @@ public class TestReferenceDataType
     [Test]
     public void Clone_CreatesNewInstance()
     {
-        var original = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var original = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         var cloned = (ReferenceDataType)original.Clone();
         
         Assert.That(cloned, Is.Not.Null);
@@ -148,7 +142,7 @@ public class TestReferenceDataType
     [Test]
     public void Clone_CopiesAllProperties()
     {
-        var original = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var original = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         original.SupportsEmptyReferences = false;
         var cloned = (ReferenceDataType)original.Clone();
         
@@ -161,7 +155,7 @@ public class TestReferenceDataType
     [Test]
     public void Clone_WithDefaultConstructor_Works()
     {
-        var original = new ReferenceDataType();
+        var original = CreateReferenceDataType(Context, null, null, validateSchemeLoaded: false).AssertPassed();
         var cloned = (ReferenceDataType)original.Clone();
         
         Assert.That(cloned, Is.Not.Null);
@@ -174,8 +168,8 @@ public class TestReferenceDataType
     [Test]
     public void Equals_SameSchemeAndAttribute_ReturnsTrue()
     {
-        var ref1 = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
-        var ref2 = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var ref1 = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
+        var ref2 = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(ref1.Equals(ref2), Is.True);
         Assert.That(ref1 == ref2, Is.True);
@@ -184,8 +178,12 @@ public class TestReferenceDataType
     [Test]
     public void Equals_DifferentScheme_ReturnsFalse()
     {
-        var ref1 = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
-        var ref2 = new ReferenceDataType("OtherScheme", REFERENCE_ATTRIBUTE_NAME);
+        var otherScheme = new DataScheme("OtherScheme");
+        otherScheme.AddAttribute(Context, REFERENCE_ATTRIBUTE_NAME, DataType.Text, isIdentifier: true).AssertPassed();
+        otherScheme.Load(Context).AssertPassed();
+        
+        var ref1 = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
+        var ref2 = CreateReferenceDataType(Context, "OtherScheme", REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(ref1.Equals(ref2), Is.False);
         Assert.That(ref1 == ref2, Is.False);
@@ -194,17 +192,14 @@ public class TestReferenceDataType
     [Test]
     public void Equals_DifferentAttribute_ReturnsFalse()
     {
-        var ref1 = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
-        var ref2 = new ReferenceDataType(REFERENCE_SCHEME_NAME, "OtherAttribute");
-        
-        Assert.That(ref1.Equals(ref2), Is.False);
-        Assert.That(ref1 == ref2, Is.False);
+        CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
+        CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, "OtherAttribute").AssertFailed();
     }
 
     [Test]
     public void Equals_Null_ReturnsFalse()
     {
-        var ref1 = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var ref1 = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(ref1.Equals(null), Is.False);
     }
@@ -212,7 +207,7 @@ public class TestReferenceDataType
     [Test]
     public void Equals_DifferentType_ReturnsFalse()
     {
-        var ref1 = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var ref1 = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(ref1.Equals(DataType.Text), Is.False);
     }
@@ -220,8 +215,8 @@ public class TestReferenceDataType
     [Test]
     public void GetHashCode_SameSchemeAndAttribute_SameHashCode()
     {
-        var ref1 = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
-        var ref2 = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var ref1 = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
+        var ref2 = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(ref1.GetHashCode(), Is.EqualTo(ref2.GetHashCode()));
     }
@@ -233,7 +228,7 @@ public class TestReferenceDataType
     [Test]
     public void IsValidValue_ValidIdentifier_ReturnsTrue()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         var result = refType.IsValidValue(Context, "item1");
         
         Assert.That(result.Passed, Is.True);
@@ -243,7 +238,7 @@ public class TestReferenceDataType
     [Test]
     public void IsValidValue_AllValidIdentifiers_ReturnTrue()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(refType.IsValidValue(Context, "item1").Passed, Is.True);
         Assert.That(refType.IsValidValue(Context, "item2").Passed, Is.True);
@@ -253,7 +248,7 @@ public class TestReferenceDataType
     [Test]
     public void IsValidValue_InvalidIdentifier_ReturnsFalse()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         var result = refType.IsValidValue(Context, "nonexistent");
         
         Assert.That(result.Passed, Is.False);
@@ -263,7 +258,7 @@ public class TestReferenceDataType
     [Test]
     public void IsValidValue_NullWithEmptyReferencesAllowed_ReturnsTrue()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         refType.SupportsEmptyReferences = true;
         var result = refType.IsValidValue(Context, null);
         
@@ -274,7 +269,7 @@ public class TestReferenceDataType
     [Test]
     public void IsValidValue_NullWithEmptyReferencesDisallowed_ReturnsFalse()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         refType.SupportsEmptyReferences = false;
         var result = refType.IsValidValue(Context, null);
         
@@ -285,20 +280,13 @@ public class TestReferenceDataType
     [Test]
     public void IsValidValue_NonExistentScheme_ReturnsFalse()
     {
-        var refType = new ReferenceDataType(NON_EXISTENT_SCHEME, REFERENCE_ATTRIBUTE_NAME);
-        var result = refType.IsValidValue(Context, "item1");
-        
-        Assert.That(result.Passed, Is.False);
+        CreateReferenceDataType(Context, NON_EXISTENT_SCHEME, REFERENCE_ATTRIBUTE_NAME).AssertFailed();
     }
 
     [Test]
     public void IsValidValue_WrongAttributeName_ReturnsFalse()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, INVALID_ATTRIBUTE);
-        var result = refType.IsValidValue(Context, "item1");
-        
-        Assert.That(result.Passed, Is.False);
-        Assert.That(result.Message, Does.Contain("does not match"));
+        CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, INVALID_ATTRIBUTE).AssertFailed();
     }
 
     #endregion
@@ -308,7 +296,7 @@ public class TestReferenceDataType
     [Test]
     public void ConvertValue_ValidString_ConvertsSuccessfully()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         var result = refType.ConvertValue(Context, "item1");
         
         Assert.That(result.Passed, Is.True);
@@ -318,7 +306,7 @@ public class TestReferenceDataType
     [Test]
     public void ConvertValue_InvalidIdentifier_ReturnsFalse()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         var result = refType.ConvertValue(Context, "nonexistent");
         
         Assert.That(result.Passed, Is.False);
@@ -327,16 +315,13 @@ public class TestReferenceDataType
     [Test]
     public void ConvertValue_NonExistentScheme_ReturnsFalse()
     {
-        var refType = new ReferenceDataType(NON_EXISTENT_SCHEME, REFERENCE_ATTRIBUTE_NAME);
-        var result = refType.ConvertValue(Context, "item1");
-        
-        Assert.That(result.Passed, Is.False);
+        CreateReferenceDataType(Context, NON_EXISTENT_SCHEME, REFERENCE_ATTRIBUTE_NAME).AssertFailed();
     }
 
     [Test]
     public void ConvertValue_AllValidItems_Converts()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(refType.ConvertValue(Context, "item1").Passed, Is.True);
         Assert.That(refType.ConvertValue(Context, "item2").Passed, Is.True);
@@ -350,7 +335,7 @@ public class TestReferenceDataType
     [Test]
     public void GetReferencedIdentifierAttribute_ValidReference_ReturnsAttribute()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         var result = refType.GetReferencedIdentifierAttribute(Context);
         
         Assert.That(result.Passed, Is.True);
@@ -361,20 +346,13 @@ public class TestReferenceDataType
     [Test]
     public void GetReferencedIdentifierAttribute_NonExistentScheme_ReturnsFalse()
     {
-        var refType = new ReferenceDataType(NON_EXISTENT_SCHEME, REFERENCE_ATTRIBUTE_NAME);
-        var result = refType.GetReferencedIdentifierAttribute(Context);
-        
-        Assert.That(result.Passed, Is.False);
+        CreateReferenceDataType(Context, NON_EXISTENT_SCHEME, REFERENCE_ATTRIBUTE_NAME).AssertFailed();
     }
 
     [Test]
     public void GetReferencedIdentifierAttribute_WrongAttributeName_ReturnsFalse()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, INVALID_ATTRIBUTE);
-        var result = refType.GetReferencedIdentifierAttribute(Context);
-        
-        Assert.That(result.Passed, Is.False);
-        Assert.That(result.Message, Does.Contain("does not match"));
+        CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, INVALID_ATTRIBUTE).AssertFailed();
     }
 
     #endregion
@@ -384,7 +362,7 @@ public class TestReferenceDataType
     [Test]
     public void SupportsEmptyReferences_DefaultIsTrue()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(refType.SupportsEmptyReferences, Is.True);
     }
@@ -392,7 +370,7 @@ public class TestReferenceDataType
     [Test]
     public void SupportsEmptyReferences_CanBeSetToFalse()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         refType.SupportsEmptyReferences = false;
         
         Assert.That(refType.SupportsEmptyReferences, Is.False);
@@ -401,7 +379,7 @@ public class TestReferenceDataType
     [Test]
     public void SupportsEmptyReferences_AffectsNullValidation()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         // With support enabled
         refType.SupportsEmptyReferences = true;
@@ -419,7 +397,7 @@ public class TestReferenceDataType
     [Test]
     public void CSDataType_ReturnsSchemeEntryClassName()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(refType.CSDataType, Does.Contain(REFERENCE_SCHEME_NAME));
         Assert.That(refType.CSDataType, Does.Contain("Entry"));
@@ -432,7 +410,7 @@ public class TestReferenceDataType
     [Test]
     public void GetDataMethod_ValidReference_ReturnsGetEntryCode()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         var attribute = new AttributeDefinition(null, "TestAttr", refType);
         var result = refType.GetDataMethod(Context, attribute);
         
@@ -444,11 +422,7 @@ public class TestReferenceDataType
     [Test]
     public void GetDataMethod_NonExistentScheme_ReturnsFalse()
     {
-        var refType = new ReferenceDataType(NON_EXISTENT_SCHEME, REFERENCE_ATTRIBUTE_NAME);
-        var attribute = new AttributeDefinition(null, "TestAttr", refType);
-        var result = refType.GetDataMethod(Context, attribute);
-        
-        Assert.That(result.Passed, Is.False);
+        CreateReferenceDataType(Context, NON_EXISTENT_SCHEME, REFERENCE_ATTRIBUTE_NAME).AssertFailed();
     }
 
     #endregion
@@ -465,7 +439,7 @@ public class TestReferenceDataType
         intScheme.AddEntry(Context, new DataEntry { { "IntID", 2, Context } });
         Schema.LoadDataScheme(Context, intScheme, overwriteExisting: true);
 
-        var refType = new ReferenceDataType("IntScheme", "IntID");
+        var refType = CreateReferenceDataType(Context, "IntScheme", "IntID").AssertPassed();
         
         Assert.That(refType.IsValidValue(Context, 1).Passed, Is.True);
         Assert.That(refType.IsValidValue(Context, 2).Passed, Is.True);
@@ -482,7 +456,7 @@ public class TestReferenceDataType
         intScheme.AddEntry(Context, new DataEntry { { "IntID", 2, Context } });
         Schema.LoadDataScheme(Context, intScheme, overwriteExisting: true);
 
-        var refType = new ReferenceDataType("IntScheme", "IntID");
+        var refType = CreateReferenceDataType(Context, "IntScheme", "IntID").AssertPassed();
         var result = refType.ConvertValue(Context, "1");
         
         Assert.That(result.Passed, Is.True);
@@ -498,7 +472,7 @@ public class TestReferenceDataType
         intScheme.AddEntry(Context, new DataEntry { { "IntID", 1, Context } });
         Schema.LoadDataScheme(Context, intScheme, overwriteExisting: true);
 
-        var refType = new ReferenceDataType("IntScheme", "IntID");
+        var refType = CreateReferenceDataType(Context, "IntScheme", "IntID").AssertPassed();
         var result = refType.ConvertValue(Context, "not a number");
         
         Assert.That(result.Passed, Is.False);
@@ -521,7 +495,7 @@ public class TestReferenceDataType
         guidScheme.AddEntry(Context, new DataEntry { { "GuidID", guid2, Context } });
         Schema.LoadDataScheme(Context, guidScheme, overwriteExisting: true);
 
-        var refType = new ReferenceDataType("GuidScheme", "GuidID");
+        var refType = CreateReferenceDataType(Context, "GuidScheme", "GuidID").AssertPassed();
         
         Assert.That(refType.IsValidValue(Context, guid1).Passed, Is.True);
         Assert.That(refType.IsValidValue(Context, guid2).Passed, Is.True);
@@ -539,7 +513,7 @@ public class TestReferenceDataType
         guidScheme.AddEntry(Context, new DataEntry { { "GuidID", guid1, Context } });
         Schema.LoadDataScheme(Context, guidScheme, overwriteExisting: true);
 
-        var refType = new ReferenceDataType("GuidScheme", "GuidID");
+        var refType = CreateReferenceDataType(Context, "GuidScheme", "GuidID").AssertPassed();
         var result = refType.ConvertValue(Context, guid1.ToString());
         
         Assert.That(result.Passed, Is.True);
@@ -560,7 +534,7 @@ public class TestReferenceDataType
             { "Name", "Empty Item", Context }
         });
 
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         refType.SupportsEmptyReferences = true;
         
         var result = refType.IsValidValue(Context, "");
@@ -570,7 +544,7 @@ public class TestReferenceDataType
     [Test]
     public void ConvertValue_CaseSensitive_DifferentCase_ReturnsFalse()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         var result = refType.ConvertValue(Context, "ITEM1");
         
         // Assuming case-sensitive comparison
@@ -585,17 +559,13 @@ public class TestReferenceDataType
         noIdScheme.AddAttribute(Context, "Name", DataType.Text);
         Schema.LoadDataScheme(Context, noIdScheme, overwriteExisting: true);
 
-        var refType = new ReferenceDataType("NoIdScheme", "Name");
-        var result = refType.IsValidValue(Context, "test");
-        
-        Assert.That(result.Passed, Is.False);
-        Assert.That(result.Message, Does.Contain("Identifier"));
+        CreateReferenceDataType(Context, "NoIdScheme", "Name").AssertFailed();
     }
 
     [Test]
     public void IsValidValue_SchemeWithMultipleAttributes_OnlyValidatesIdentifier()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         // "First Item" is a Name value, not an ID value
         var result = refType.IsValidValue(Context, "First Item");
@@ -614,7 +584,7 @@ public class TestReferenceDataType
         emptyScheme.AddAttribute(Context, "ID", DataType.Text, isIdentifier: true);
         Schema.LoadDataScheme(Context, emptyScheme, overwriteExisting: true);
 
-        var refType = new ReferenceDataType("EmptyScheme", "ID");
+        var refType = CreateReferenceDataType(Context, "EmptyScheme", "ID").AssertPassed();
         
         Assert.That(refType.DefaultValue, Is.EqualTo(""));
     }
@@ -622,7 +592,7 @@ public class TestReferenceDataType
     [Test]
     public void DefaultValue_WithEntries_SetsToFirstIdentifier()
     {
-        var refType = new ReferenceDataType(REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME);
+        var refType = CreateReferenceDataType(Context, REFERENCE_SCHEME_NAME, REFERENCE_ATTRIBUTE_NAME).AssertPassed();
         
         Assert.That(refType.DefaultValue, Is.EqualTo("item1"));
     }

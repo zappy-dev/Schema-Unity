@@ -23,16 +23,13 @@ namespace Schema.Core.Tests.Commands
         [SetUp]
         public void Setup()
         {
-            Schema.Reset();
+            TestFixtureSetup.Initialize(Context, out _mockFileSystem, out _);
+            
             _schemeName = "TestScheme";
             _testScheme = new DataScheme(_schemeName);
             _testScheme.AddAttribute(Context, "FieldA", DataType.Text).AssertPassed();
             _testScheme.AddEntry(Context, new DataEntry { { "FieldA", "Value1", Context } });
             _mockProgress = new Mock<IProgress<CommandProgress>>();
-            
-            _mockFileSystem = new Mock<IFileSystem>();
-            Schema.SetStorage(new Storage(_mockFileSystem.Object));
-            Schema.InitializeTemplateManifestScheme(Context);
         }
 
         [Test]

@@ -238,7 +238,17 @@ namespace Schema.Core.Data
         }
 
         public SchemaResult<AttributeDefinition> GetIdentifierAttribute()
-            => GetAttribute(a => a.IsIdentifier);
+        {
+            var idRes = GetAttribute(a => a.IsIdentifier);
+            
+            // TODO: clean this up... messy because it doesn't take a context, but I don't want to refactor these references right now.
+            if (idRes.Failed)
+            {
+                return SchemaResult<AttributeDefinition>.Fail("No identifier attribute found", idRes.Context);
+            }
+
+            return idRes;
+        }
         
         public IEnumerable<AttributeDefinition> GetReferenceAttributes()
         {

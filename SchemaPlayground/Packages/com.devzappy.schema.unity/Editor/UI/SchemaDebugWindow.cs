@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEngine;
 using static Schema.Core.Logging.Logger;
 using static Schema.Core.Schema;
+using static Schema.Core.SchemaContext;
 using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Unity.Editor
@@ -17,10 +18,7 @@ namespace Schema.Unity.Editor
         
         private void OnGUI()
         {
-            var renderCtx = new SchemaContext
-            {
-                Driver = $"{nameof(SchemaDebugWindow)}_Render"
-            };
+            var renderCtx = EditContext.WithDriver($"{nameof(SchemaDebugWindow)}_Render");
             
             RenderDebugView(renderCtx);
             
@@ -30,21 +28,21 @@ namespace Schema.Unity.Editor
             EditorGUILayout.EnumPopup("Log Level", Logger.Level);
         }
 
-        private void RenderDebugView(SchemaContext context)
+        private void RenderDebugView(SchemaContext ctx)
         {
             RenderSchemaDebugSettings();
             
             using (new EditorGUI.DisabledScope())
             {
-                var isInitRes = IsInitialized(context);
+                var isInitRes = IsInitialized(ctx);
                 var isInit = isInitRes.Passed;
                 EditorGUILayout.HelpBox(isInitRes.Message, (isInitRes.Failed) ? MessageType.Error : MessageType.Info);
                 EditorGUILayout.Toggle("Is Schema Initialized?", isInit);
                 if (isInit)
                 {
-                    EditorGUILayout.TextField("Project Path", ProjectPath);
+                    EditorGUILayout.TextField("Project Path", ctx.Project.ProjectPath);
                     EditorGUILayout.TextField("Default Content Directory", DefaultContentDirectory);
-                    EditorGUILayout.TextField("Default Content", DefaultContentPath);
+                    EditorGUILayout.TextField("Default Content", ctx.Project.DefaultContentPath);
                     EditorGUILayout.Toggle("Is Load In Progress?", IsManifestLoadInProgress);
                 }
                 
@@ -65,7 +63,7 @@ namespace Schema.Unity.Editor
                     guiEventsScrollPos = guiEventScroll.scrollPosition;
                     if (isInit)
                     {
-                        if (!GetAllSchemes(context).Try(out var allSchemes, out var allSchemesError))
+                        if (!GetAllSchemes(ctx).Try(out var allSchemes, out var allSchemesError))
                         {
                             EditorGUILayout.HelpBox(allSchemesError.Message, MessageType.Error);
                         }
@@ -80,7 +78,7 @@ namespace Schema.Unity.Editor
                                     using (new EditorGUILayout.HorizontalScope())
                                     {
                                         EditorGUILayout.TextField(scheme);
-                                        var getRes = GetScheme(context, scheme);
+                                        var getRes = GetScheme(ctx, scheme);
                                         EditorGUILayout.Toggle("Loaded?", getRes.Passed);
                                         if (getRes.Failed)
                                         {
@@ -181,10 +179,7 @@ namespace Schema.Unity.Editor
 
         private static SchemaResult FixDuplicateEntries()
         {
-            var ctx = new SchemaContext
-            {
-                Driver = "Debug_User_Fix_Duplicate_Entries"
-            };
+            var ctx = EditContext.WithDriver("Debug_User_Fix_Duplicate_Entries");
             
             if (!GetAllSchemes(ctx).Try(out var allSchemes, out var allSchemesError)) return allSchemesError.Cast();
 
@@ -303,10 +298,7 @@ namespace Schema.Unity.Editor
                 
                 if (GUILayout.Button("Sim Click - Explorer Scheme"))
                 {
-                    var ctx = new SchemaContext
-                    {
-                        Driver = "Sim_Click_Explorer_Scheme"
-                    };
+                    var ctx = EditContext.WithDriver("Sim_Click_Explorer_Scheme");
                     var coroutine = SchemaEditorWindow.Instance.SimClick_ExplorerSelectSchemeByIndex(ctx, schemeIdx);
                     EditorCoroutineUtility.StartCoroutine(coroutine, this);
                 }

@@ -254,7 +254,7 @@ namespace Schema.Core.Commands
             // This is a simplified implementation - will be enhanced with proper manifest management
             await Task.Run(() =>
             {
-                if (Schema.GetManifestScheme().Try(out var manifestScheme))
+                if (Schema.GetManifestScheme(Context).Try(out var manifestScheme))
                 {
                     // Add or update manifest entry
                     if (!manifestScheme.GetEntryForSchemeName(Context, scheme.SchemeName).Try(out var manifestEntry))
@@ -298,7 +298,7 @@ namespace Schema.Core.Commands
             
             await Task.Run(() =>
             {
-                if (Schema.GetManifestScheme().Try(out var manifestScheme))
+                if (Schema.GetManifestScheme(Context).Try(out var manifestScheme))
                 {
                     if (manifestScheme.GetEntryForSchemeName(Context, schemeName).Try(out var manifestEntry))
                     {

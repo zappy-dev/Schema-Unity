@@ -4,6 +4,7 @@ using Schema.Core.Data;
 using UnityEditor;
 using UnityEngine;
 using static Schema.Core.Schema;
+using static Schema.Core.SchemaContext;
 
 namespace Schema.Unity.Editor
 {
@@ -30,10 +31,7 @@ namespace Schema.Unity.Editor
 
         private void OnGUI()
         {
-            var renderCtx = new SchemaContext
-            {
-                Driver = $"{nameof(AttributeSettingsPrompt)}_OnGUI"
-            };
+            var renderCtx = EditContext.WithDriver($"{nameof(AttributeSettingsPrompt)}_OnGUI");
             // Text field for entering the width
             editAttribute.AttributeName = EditorGUILayout.TextField("Attribute Name", editAttribute.AttributeName);
             
@@ -116,7 +114,7 @@ namespace Schema.Unity.Editor
                 Scheme = scheme,
                 AttributeName = editAttribute.AttributeName,
                 Driver = "User_Update_Attribute"
-            };
+            } | EditContext;
             
             if (attribute.AttributeName != editAttribute.AttributeName)
             {

@@ -66,7 +66,7 @@ namespace Schema.Core
         public static SchemaResult PublishScheme(SchemaContext ctx, PublishConfig publishConfig, string schemeName)
         {
             Logger.LogDbgVerbose($"Publishing {schemeName}");
-            var schemeEntry = GetManifestEntryForScheme(schemeName);
+            var schemeEntry = GetManifestEntryForScheme(ctx, schemeName);
             if (!schemeEntry.Try(out ManifestEntry manifestEntry) ||
                 !GetScheme(ctx, schemeName).Try(out var schemeToPublish))
             {

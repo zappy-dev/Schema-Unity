@@ -16,6 +16,7 @@ using UnityEditor;
 using UnityEngine;
 using static Schema.Core.Schema;
 using static Schema.Core.Logging.Logger;
+using static Schema.Core.SchemaContext;
 using static Schema.Unity.Editor.LayoutUtils;
 using static Schema.Unity.Editor.SchemaLayout;
 using Logger = Schema.Core.Logging.Logger;
@@ -175,10 +176,7 @@ namespace Schema.Unity.Editor
 
         private void RefreshTableEntriesForSelectedScheme()
         {
-            var refreshCtx = new SchemaContext
-            {
-                Driver = "Editor_Refresh_Table_Entries"
-            };
+            var refreshCtx = EditContext.WithDriver("Editor_Refresh_Table_Entries");
             
             if (!GetSelectedScheme(refreshCtx).Try(out var scheme))
             {
@@ -285,7 +283,7 @@ namespace Schema.Unity.Editor
                     EditorGUILayout.LabelField(pathLabel, DoNotExpandWidthOptions);
                     using (new EditorGUI.DisabledScope())
                     {
-                        if (string.IsNullOrEmpty(selectedSchemeLoadPath) && GetManifestEntryForScheme(scheme).Try(out var schemeManifestEntry))
+                        if (string.IsNullOrEmpty(selectedSchemeLoadPath) && GetManifestEntryForScheme(renderCtx, scheme).Try(out var schemeManifestEntry))
                         {
                             selectedSchemeLoadPath = schemeManifestEntry.FilePath;
                         }
@@ -295,7 +293,7 @@ namespace Schema.Unity.Editor
 
                     if (GUILayout.Button("Open", ExpandWidthOptions))
                     {
-                        var absSelectedSchemeLoadPath = PathUtility.MakeAbsolutePath(selectedSchemeLoadPath, ProjectPath);
+                        var absSelectedSchemeLoadPath = PathUtility.MakeAbsolutePath(selectedSchemeLoadPath, renderCtx.Project.ProjectPath);
                         EditorUtility.RevealInFinder(absSelectedSchemeLoadPath);
                     }
 
@@ -303,7 +301,7 @@ namespace Schema.Unity.Editor
 
                     if (GUILayout.Button(saveButtonText, ExpandWidthOptions))
                     {
-                        LatestResponse = SaveDataScheme(new SchemaContext
+                        LatestResponse = SaveDataScheme(EditContext | new SchemaContext
                         {
                             Scheme = scheme,
                             Driver = "User_Save_Scheme",
@@ -312,7 +310,7 @@ namespace Schema.Unity.Editor
 
                     if (GUILayout.Button("Publish", ExpandWidthOptions))
                     {
-                        BulkPublishSchemes(new SchemaContext
+                        BulkPublishSchemes(EditContext | new SchemaContext
                         {
                             Scheme = scheme,
                             Driver = "User_Request_Publish_Scheme",
@@ -449,7 +447,7 @@ namespace Schema.Unity.Editor
                     if (AddButton("Create New Entry", expandWidth: true, height: 50f))
                     {
                         // TODO: Convert to command
-                        LatestResponse = scheme.CreateNewEmptyEntry(new SchemaContext
+                        LatestResponse = scheme.CreateNewEmptyEntry(EditContext | new SchemaContext
                         {
                             Scheme = scheme,
                             Driver = "User_Create_Entry",
@@ -653,10 +651,7 @@ namespace Schema.Unity.Editor
         private void TableCellFocusChanged(TableCell lastFocusedCell, TableCell nextFocusedCell)
         {
             Logger.LogDbgVerbose($"{lastFocusedCell} - {nextFocusedCell}, {Event.current}, last value: {lastEntryValue}");
-            var ctx = new SchemaContext
-            {
-                Driver = "Editor_TableView_CellFocusChanged"
-            };
+            var ctx = EditContext.WithDriver("Editor_TableView_CellFocusChanged");
             
             DetectIDValueModificationError(ctx, lastFocusedCell);
             
@@ -727,7 +722,7 @@ namespace Schema.Unity.Editor
         private SchemaResult RenderExportOptions(DataScheme scheme)
         {
             GenericMenu menu = new GenericMenu();
-            var ctx = new SchemaContext
+            var ctx = EditContext | new SchemaContext
             {
                 Driver = $"{nameof(RenderExportOptions)}"
             };
@@ -752,7 +747,7 @@ namespace Schema.Unity.Editor
                 menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), (bool)false,
                     () =>
                     {
-                        LatestResponse = storageFormat.Export(scheme, new SchemaContext
+                        LatestResponse = storageFormat.Export(scheme, EditContext | new SchemaContext
                         {
                             Scheme = scheme,
                             Driver = "User_Export_Scheme",
@@ -825,7 +820,7 @@ namespace Schema.Unity.Editor
                             if (AddButton("Add Attribute"))
                             {
                                 LogDbgVerbose($"Added new attribute to '{scheme.SchemeName}'.`");
-                                var ctx = new SchemaContext
+                                var ctx = EditContext | new SchemaContext
                                 {
                                     Driver = "User_Add_Attribute",
                                     Scheme = scheme,
@@ -924,7 +919,7 @@ namespace Schema.Unity.Editor
             bool canMoveDown = sortOrder.HasValue && entryIdx != entryCount - 1;
             
             // TODO: Convert to command
-            var ctx = new SchemaContext
+            var ctx = EditContext | new SchemaContext
             {
                 Driver = "User_Move_Entry",
                 Scheme = scheme,
@@ -954,7 +949,7 @@ namespace Schema.Unity.Editor
             {
                 if (EditorUtility.DisplayDialog("Schema", "Are you sure you want to delete this entry?", "Yes, delete this entry", "No, cancel"))
                 {
-                    var ctx = new SchemaContext
+                    var ctx = EditContext | new SchemaContext
                     {
                         Driver = "User_Delete_Entry",
                         Scheme = scheme,
@@ -983,7 +978,7 @@ namespace Schema.Unity.Editor
         {
             var columnOptionsMenu = new GenericMenu();
 
-            var ctx = new SchemaContext
+            var ctx = EditContext | new SchemaContext
             {
                 Driver = "User_Attribute_Move",
                 Scheme = scheme,
@@ -1048,7 +1043,7 @@ namespace Schema.Unity.Editor
                     isMatchingType,
                     () =>
                     {
-                        var ctx = new SchemaContext
+                        var ctx = EditContext | new SchemaContext
                         {
                             Driver = "User_Convert_Attribute_Type",
                             Scheme = scheme,
@@ -1064,7 +1059,7 @@ namespace Schema.Unity.Editor
                     isMatchingType, // TODO: fix this matching type logic
                     () =>
                     {
-                        var ctx = new SchemaContext
+                        var ctx = EditContext | new SchemaContext
                         {
                             Driver = "User_Convert_Attribute_Type",
                             Scheme = scheme,
@@ -1090,18 +1085,25 @@ namespace Schema.Unity.Editor
                     if (GetScheme(ctx, schemeName).Try(out var dataSchema) 
                         && dataSchema.GetIdentifierAttribute().Try(out var identifierAttribute))
                     {
-                        var referenceDataType = new ReferenceDataType(schemeName, identifierAttribute.AttributeName);
+                        if (ReferenceDataTypeFactory
+                            .CreateReferenceDataType(ctx, schemeName, identifierAttribute.AttributeName)
+                            .TryErr(out var referenceDataType, out var refErr))
+                        {
+                            Logger.LogDbgWarning(refErr.Message, refErr.Context);
+                            continue;
+                        }
+                        
                         bool isMatchingType = referenceDataType.Equals(attribute.DataType);
                         columnOptionsMenu.AddItem(new GUIContent($"Convert Type/{referenceDataType.TypeName}"),
                             on: isMatchingType, 
                             () =>
                             {
-                                var ctx = new SchemaContext
+                                var ctx = SchemaContextFactory.CreateEditContext(EditContext | new SchemaContext
                                 {
                                     Driver = "User_Convert_Attribute",
                                     AttributeName = attribute.AttributeName,
                                     Scheme = scheme,
-                                };
+                                });
                                 LatestResponse =
                                     scheme.ConvertAttributeType(ctx, attributeName: attribute.AttributeName,
                                         newType: referenceDataType);
@@ -1112,7 +1114,7 @@ namespace Schema.Unity.Editor
                             on: isMatchingType, // TODO: fix this matching type logic
                             () =>
                             {
-                                var ctx = new SchemaContext
+                                var ctx = EditContext | new SchemaContext
                                 {
                                     Driver = "User_Convert_Attribute",
                                     AttributeName = attribute.AttributeName,
@@ -1133,7 +1135,7 @@ namespace Schema.Unity.Editor
             {
                 if (EditorUtility.DisplayDialog("Schema", $"Are you sure you want to delete this attribute: {attribute.AttributeName}?", "Yes, delete this attribute", "No, cancel"))
                 {
-                    LatestResponse = scheme.DeleteAttribute(new SchemaContext
+                    LatestResponse = scheme.DeleteAttribute(EditContext | new SchemaContext
                     {
                         Driver = "User_Delete_Attribute",
                         AttributeName = attribute.AttributeName,
@@ -1191,7 +1193,7 @@ namespace Schema.Unity.Editor
                 }
             }
 
-            var updateCtx = new SchemaContext
+            var updateCtx = EditContext | new SchemaContext
             {
                 Driver = "User_Update_Entry_Value",
                 Scheme = scheme,
@@ -1659,7 +1661,7 @@ namespace Schema.Unity.Editor
             
             if (GUI.Button(gotoRect, "O"))
             {
-                var ctx = new SchemaContext
+                var ctx = EditContext | new SchemaContext
                 {
                     Driver = "User_Focus_Object_Reference",
                     DataType = refDataType
@@ -1769,7 +1771,7 @@ namespace Schema.Unity.Editor
         {
             object entryValue = entry.GetDataDirect(attribute);
 
-            var ctx = new SchemaContext
+            var ctx = EditContext | new SchemaContext
             {
                 Driver = "Auto_Migrate_Entry",
                 Scheme = scheme

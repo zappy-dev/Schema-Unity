@@ -9,13 +9,13 @@ namespace Schema.Core.Serialization
         #region Static API
         public delegate string ResolveExportPath(ISchemeStorageFormat format, string exportFileName);
         
-        public static SchemaResult Export(this ISchemeStorageFormat format, DataScheme scheme, SchemaContext context, ResolveExportPath resolveExportPath)
+        public static SchemaResult Export(this ISchemeStorageFormat format, DataScheme scheme, SchemaContext ctx, ResolveExportPath resolveExportPath)
         {
             var sanitizedBaseFileName = scheme.SchemeName
                 .Replace(" ", string.Empty);
             var exportFileName = $"{sanitizedBaseFileName}Scheme.{format.Extension}";
             
-            if (!Schema.GetManifestEntryForScheme(scheme).Try(out var manifestEntry, out var manifestError))
+            if (!Schema.GetManifestEntryForScheme(ctx, scheme).Try(out var manifestEntry, out var manifestError))
             {
                 return manifestError.Cast();
             }
@@ -38,10 +38,10 @@ namespace Schema.Core.Serialization
             
             if (string.IsNullOrEmpty(outputFilePath))
             {
-                return SchemaResult.Fail(context, "Export canceled, no file path provided.");
+                return SchemaResult.Fail(ctx, "Export canceled, no file path provided.");
             }
             
-            var serializeRes = format.SerializeToFile(context, outputFilePath, scheme);
+            var serializeRes = format.SerializeToFile(ctx, outputFilePath, scheme);
             if (serializeRes.Failed)
             {
                 return serializeRes;

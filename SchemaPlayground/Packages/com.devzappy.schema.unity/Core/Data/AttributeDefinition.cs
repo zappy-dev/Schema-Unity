@@ -102,8 +102,8 @@ namespace Schema.Core.Data
                 return ownerErr.CastError<ReferenceDataType>();
             }
 
-            var refDataType = new ReferenceDataType(ownerScheme.SchemeName, AttributeName);
-            return Pass(refDataType);
+            var refDataType = ReferenceDataTypeFactory.CreateReferenceDataType(ctx, ownerScheme.SchemeName, AttributeName);
+            return refDataType;
         }
 
         #region Equality

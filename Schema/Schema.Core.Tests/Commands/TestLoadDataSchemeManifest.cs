@@ -25,15 +25,12 @@ public class TestLoadDataSchemeManifest
         return scheme;
     }
     
-    private IMock<IFileSystem> _mockFileSystem;
+    private Mock<IFileSystem> _mockFileSystem;
 
     [SetUp]
     public void Setup()
     {
-        Schema.Reset();
-        _mockFileSystem = new  Mock<IFileSystem>();
-        Schema.SetStorage(new Storage(_mockFileSystem.Object));
-        Schema.InitializeTemplateManifestScheme(Context);
+        TestFixtureSetup.Initialize(Context, out _mockFileSystem, out _);
     }
 
     [Test]
@@ -47,7 +44,7 @@ public class TestLoadDataSchemeManifest
         Assert.IsTrue(result.IsSuccess, result.Message);
 
         // Verify manifest entry added
-        var manifestEntryResult = Schema.GetManifestEntryForScheme(SchemeName);
+        var manifestEntryResult = Schema.GetManifestEntryForScheme(Context, SchemeName);
         Assert.IsTrue(manifestEntryResult.Passed, manifestEntryResult.Message);
         Assert.That(manifestEntryResult.Result.FilePath, Is.EqualTo(filePath));
     }
@@ -67,7 +64,7 @@ public class TestLoadDataSchemeManifest
         var cmd2 = new LoadDataSchemeCommand(Context, scheme2, overwriteExisting: true, importFilePath: filePath2);
         await cmd2.ExecuteAsync(CancellationToken.None);
 
-        var manifestEntryResult = Schema.GetManifestEntryForScheme(SchemeName);
+        var manifestEntryResult = Schema.GetManifestEntryForScheme(Context, SchemeName);
         manifestEntryResult.AssertPassed();
         Assert.That(manifestEntryResult.Result.FilePath, Is.EqualTo(filePath2));
     }

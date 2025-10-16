@@ -32,13 +32,7 @@ public class ChaosMonkeyTests
     {
         chaosRandom = new Random(12345);
         
-        
-        Schema.Reset();
-        _mockFileSystem = new Mock<IFileSystem>();
-        
-        Schema.SetStorage(new Storage(_mockFileSystem.Object));
-        
-        Schema.InitializeTemplateManifestScheme(testContext);
+        TestFixtureSetup.Initialize(testContext, out  _mockFileSystem, out _);
     }
 
     public DataScheme ChaosSchemeFactory()

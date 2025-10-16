@@ -75,9 +75,7 @@ namespace Schema.Core.Data
                         return SchemaResult.Fail(context, $"No matching attribute found for '{kvp.Key}'");
                     }
 
-                var entryValue = kvp.Value;
-                if (runDataValidation)
-                {
+                    var entryValue = kvp.Value;
                     var isValidRes = attribute.IsValidValue(context, entryValue);
                     if (isValidRes.Failed)
                     {

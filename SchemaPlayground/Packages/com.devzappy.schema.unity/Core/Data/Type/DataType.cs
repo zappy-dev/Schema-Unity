@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Newtonsoft.Json;
 using Schema.Core.Logging;
 
@@ -139,7 +140,7 @@ namespace Schema.Core.Data
         /// <returns>A string describing the data type.</returns>
         public override string ToString()
         {
-            return $"DataType: {TypeName}";
+            return $"DataType: {TypeName} ({RuntimeHelpers.GetHashCode(this)})";
         }
 
         private bool Equals(DataType other)

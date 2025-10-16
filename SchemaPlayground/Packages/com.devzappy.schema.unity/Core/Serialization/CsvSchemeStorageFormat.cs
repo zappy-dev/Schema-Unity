@@ -47,7 +47,7 @@ namespace Schema.Core.Serialization
             return LoadFromRows(context, schemeName: "unnamed", rows);
         }
 
-        private SchemaResult<DataScheme> LoadFromRows(SchemaContext context, string schemeName, string[] rows)
+        private SchemaResult<DataScheme> LoadFromRows(SchemaContext ctx, string schemeName, string[] rows)
         {
             if (rows.Length == 0)
             {
@@ -55,6 +55,8 @@ namespace Schema.Core.Serialization
             }
             
             var importedScheme = new DataScheme(schemeName);
+            using var _ = new SchemeContextScope(ref ctx, importedScheme);
+            
             var header = rows[0].Split(',');
             var attrCount = header.Length;
             
@@ -95,17 +97,17 @@ namespace Schema.Core.Serialization
             // determine the best data type for a column
             for (var attrIdx = 0; attrIdx < attrCount; attrIdx++)
             {
-                using var _ = new AttributeContextScope(ref context, attributes[attrIdx].AttributeName);
+                using var _2 = new AttributeContextScope(ref ctx, attributes[attrIdx].AttributeName);
 
                 var columnValues = rawDataEntries.Select(dataEntry => dataEntry[attrIdx]).ToArray();
-                if (!DataType.InferDataTypeForValues(context, columnValues)
+                if (!DataType.InferDataTypeForValues(ctx, columnValues)
                         .Try(out var finalDataType, out var inferError)) return inferError.CastError<DataScheme>();
 
                 attributes[attrIdx].DataType = finalDataType;
             }
             
             // add attributes after resolving data type
-            var failures = attributes.Select(a => importedScheme.AddAttribute(context, a))
+            var failures = attributes.Select(a => importedScheme.AddAttribute(ctx, a))
                 .Where(res => res.Failed);
 
             if (failures.Any())
@@ -121,29 +123,25 @@ namespace Schema.Core.Serialization
                 var entry = new DataEntry();
                 for (var attrIdx = 0; attrIdx < attrCount; attrIdx++)
                 {
-                    var attrCtx = new SchemaContext
-                    {
-                        Scheme = importedScheme,
-                        AttributeName = attributes[attrIdx].AttributeName,
-                    };
+                    using var _3 = new AttributeContextScope(ref ctx, attributes[attrIdx].AttributeName);
                     
                     var rawData = rawDataEntry[attrIdx];
                     var dataType = attributes[attrIdx].DataType;
                     var attributeName = attributes[attrIdx].AttributeName;
 
-                    if (!dataType.ConvertValue(attrCtx, rawData).Try(out var convertedData))
+                    if (!dataType.ConvertValue(ctx, rawData).Try(out var convertedData))
                     {
                         return SchemaResult<DataScheme>.Fail($"Could not convert entry {rawDataEntry} to type {dataType}", context: this);
                     }
 
-                    var setDataRes = entry.SetData(context, attributeName, convertedData);
+                    var setDataRes = entry.SetData(ctx, attributeName, convertedData);
                     if (setDataRes.Failed)
                     {
                         return SchemaResult<DataScheme>.Fail(setDataRes.Message, context: this);
                     }
                 }
                 
-                var addRes = importedScheme.AddEntry(context, entry);
+                var addRes = importedScheme.AddEntry(ctx, entry);
                 if (addRes.Failed)
                 {
                     return SchemaResult<DataScheme>.Fail(addRes.Message, context: this);

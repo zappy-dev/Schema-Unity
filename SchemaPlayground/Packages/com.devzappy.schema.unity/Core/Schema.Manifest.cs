@@ -12,7 +12,9 @@ namespace Schema.Core
     /// </summary>
     public partial class Schema
     {
+        [Obsolete("Subscribe to new ProjectLoaded event.")]
         public static event Action ManifestUpdated;
+        public static event Action ProjectLoaded;
         private static ManifestScheme nextManifestScheme;
 
         public static ManifestScheme LoadedManifestScheme
@@ -31,48 +33,31 @@ namespace Schema.Core
         }
         public static bool IsManifestLoadInProgress => nextManifestScheme != null;
 
-        private static string manifestImportPath;
-
-        /// <summary>
-        /// The absolute file path from where the Manifest scheme was loaded from.
-        /// This should only exist when a Manifest scheme was loaded into memory.
-        /// </summary>
-        public static string ManifestImportPath
-        {
-            get => manifestImportPath;
-            set
-            {
-                if (string.IsNullOrWhiteSpace(value))
-                {
-                    throw new InvalidOperationException("Manifest import path cannot be null or empty.");
-                }
-
-                // No-op
-                if (manifestImportPath == value)
-                {
-                    return;
-                }
-
-                if (!string.IsNullOrWhiteSpace(manifestImportPath))
-                {
-                    throw new InvalidOperationException($"Attempt to set Manifest import path is already set to {manifestImportPath}");
-                }
-                
-                manifestImportPath = value;
-            }
-        }
-
-        public static string ProjectPath { get; set; }
-        
-        public static string DefaultContentPath => Path.Combine(ProjectPath, DefaultContentDirectory);
+        // public static string ProjectPath
+        // {
+        //     get => LatestProject.ProjectPath;
+        //     set => LatestProject.ProjectPath = value;
+        // }
+        //
+        // public static string DefaultContentPath => Path.Combine(ProjectPath, DefaultContentDirectory);
         public static string DefaultContentDirectory = "Content";
+        
+        public static string GetDefaultContentPath(string projectPath, string schemeName)
+        {
+            return Path.Combine(projectPath, DefaultContentDirectory, schemeName);
+        }
+        
+        public static string GetDefaultContentPath(SchemaContext ctx, string schemeName)
+        {
+            return Path.Combine(ctx.Project.DefaultContentPath, schemeName);
+        }
 
         public static string GetContentPath(string schemeFileName)
         {
-            return Path.Combine(DefaultContentPath, schemeFileName);
+            return Path.Combine(LatestProject.DefaultContentPath, schemeFileName);
         }
         
-        public static string ContentLoadPath => DefaultContentPath;
+        public static string ContentLoadPath => LatestProject.DefaultContentPath;
         // private static DataScheme ManifestScheme
         // {
         //     get
@@ -129,7 +114,9 @@ namespace Schema.Core
         /// Initializes the template manifest scheme and loads it into the schema system.
         /// </summary>
         /// <returns>A <see cref="SchemaResult"/> indicating success or failure.</returns>
-        public static SchemaResult<SchemaProjectContainer> InitializeTemplateManifestScheme(SchemaContext context, string defaultScriptExportPath = "")
+        public static SchemaResult<SchemaProjectContainer> InitializeTemplateManifestScheme(SchemaContext context,
+            string projectPath,
+            string defaultScriptExportPath)
         {
             var res = SchemaResult<SchemaProjectContainer>.New(context);
             if (GetStorage(context).TryErr(out var storage, out var storageErr)) return storageErr.CastError(res);
@@ -154,8 +141,10 @@ namespace Schema.Core
                 // Prime the manifest as loaded before validation to avoid FS path checks requiring initialization
                 var manifestScheme = new ManifestScheme(templateManifestScheme._);
                 var emptyProjectContainer = new SchemaProjectContainer();
-                context.Project = emptyProjectContainer; // setting up empty project..
+                // context.Project = emptyProjectContainer; // setting up empty project..
+                using var _ = new ProjectContextScope(ref context, emptyProjectContainer);
                 emptyProjectContainer.Manifest = manifestScheme;
+                emptyProjectContainer.ProjectPath = projectPath;
                 var result = LoadDataScheme(context, templateManifestScheme._, overwriteExisting: true);
                 Logger.LogDbgVerbose(result.Message, result.Context);
                 if (result.Passed)
@@ -174,7 +163,7 @@ namespace Schema.Core
         /// Gets the manifest scheme if loaded and initialized.
         /// </summary>
         /// <returns>A <see cref="SchemaResult{DataScheme}"/> indicating success or failure, and the manifest scheme if successful.</returns>
-        public static SchemaResult<ManifestScheme> GetManifestScheme(SchemaContext context = default)
+        public static SchemaResult<ManifestScheme> GetManifestScheme(SchemaContext context)
         {
             var res = SchemaResult<ManifestScheme>.New(context);
             
@@ -211,9 +200,10 @@ namespace Schema.Core
         /// <summary>
         /// Gets the manifest entry for a given data scheme.
         /// </summary>
+        /// <param name="context"></param>
         /// <param name="scheme">The data scheme to look up in the manifest.</param>
         /// <returns>A <see cref="SchemaResult{DataEntry}"/> indicating success or failure, and the manifest entry if successful.</returns>
-        public static SchemaResult<ManifestEntry> GetManifestEntryForScheme(DataScheme scheme, SchemaContext context = default)
+        public static SchemaResult<ManifestEntry> GetManifestEntryForScheme(SchemaContext context, DataScheme scheme)
         {
             var res = SchemaResult<ManifestEntry>.New(context);
             
@@ -223,19 +213,21 @@ namespace Schema.Core
                 return isInitRes.CastError<ManifestEntry>();
             }
             
-            return GetManifestEntryForScheme(scheme.SchemeName, context);
+            return GetManifestEntryForScheme(context, scheme.SchemeName);
         }
-        
+
         /// <summary>
         /// Gets the manifest entry for a given scheme name.
         /// </summary>
+        /// <param name="context"></param>
         /// <param name="schemeName">The name of the scheme to look up in the manifest.</param>
         /// <returns>A <see cref="SchemaResult{DataEntry}"/> indicating success or failure, and the manifest entry if successful.</returns>
-        public static SchemaResult<ManifestEntry> GetManifestEntryForScheme(string schemeName, SchemaContext context = default)
+        public static SchemaResult<ManifestEntry> GetManifestEntryForScheme(SchemaContext ctx,
+            string schemeName)
         {
             var res = SchemaResult<ManifestEntry>.New(schemeName);
 
-            var isInitRes = IsInitialized(context);
+            var isInitRes = IsInitialized(ctx);
             if (isInitRes.Failed)
             {
                 return isInitRes.CastError<ManifestEntry>();
@@ -248,10 +240,10 @@ namespace Schema.Core
 
             lock (manifestOperationLock)
             {
-                if (!GetManifestScheme(context).Try(out var manifestScheme, out var manifestError))
+                if (!GetManifestScheme(ctx).Try(out var manifestScheme, out var manifestError))
                     return manifestError.CastError<ManifestEntry>();
                 
-                return manifestScheme.GetEntryForSchemeName(context, schemeName);
+                return manifestScheme.GetEntryForSchemeName(ctx, schemeName);
 
             }
         }

@@ -18,11 +18,7 @@ public class TestDataSchemeUtils
     [SetUp]
     public void OnTestSetup()
     {
-        Schema.Reset();
-        
-        var mockFS = new Mock<IFileSystem>();
-        Schema.SetStorage(new Storage(mockFS.Object));
-        Schema.InitializeTemplateManifestScheme(Context);
+        TestFixtureSetup.Initialize(Context, out _, out _);
     }
 
     [Test]
@@ -239,8 +235,8 @@ public class TestDataSchemeUtils
     public void Test_BuildAttributeDiffReport_ModifiedReferenceDataType_ReferenceSchemeName_ReturnsTrue()
     {
         // Arrange
-        var refType1 = new ReferenceDataType("RefScheme1", "ID");
-        var refType2 = new ReferenceDataType("RefScheme2", "ID");
+        var refType1 = ReferenceDataTypeFactory.CreateReferenceDataType(Context, "RefScheme1", "ID", validateSchemeLoaded: false).AssertPassed();
+        var refType2 = ReferenceDataTypeFactory.CreateReferenceDataType(Context, "RefScheme2", "ID", validateSchemeLoaded: false).AssertPassed();
 
         var schemeA = new DataScheme("TestScheme");
         schemeA.AddAttribute(Context, new AttributeDefinition(schemeA, "RefField", refType1)).AssertPassed();
@@ -264,8 +260,8 @@ public class TestDataSchemeUtils
     public void Test_BuildAttributeDiffReport_ModifiedReferenceDataType_ReferenceAttributeName_ReturnsTrue()
     {
         // Arrange
-        var refType1 = new ReferenceDataType("RefScheme", "ID1");
-        var refType2 = new ReferenceDataType("RefScheme", "ID2");
+        var refType1 = ReferenceDataTypeFactory.CreateReferenceDataType(Context, "RefScheme", "ID1", validateSchemeLoaded: false).AssertPassed();
+        var refType2 = ReferenceDataTypeFactory.CreateReferenceDataType(Context, "RefScheme", "ID2", validateSchemeLoaded: false).AssertPassed();
 
         var schemeA = new DataScheme("TestScheme");
         schemeA.AddAttribute(Context, new AttributeDefinition(schemeA, "RefField", refType1)).AssertPassed();
@@ -293,8 +289,8 @@ public class TestDataSchemeUtils
     // [Test]
     // public void Test_BuildAttributeDiffReport_ModifiedReferenceDataType_SupportsEmptyReferences_ReturnsTrue()
     // {
-    //     var refType1 = new ReferenceDataType("RefScheme", "ID") { SupportsEmptyReferences = false };
-    //     var refType2 = new ReferenceDataType("RefScheme", "ID") { SupportsEmptyReferences = true };
+    //     var refType1 = ReferenceDataTypeFactory.CreateReferenceDataType(Context, "RefScheme", "ID") { SupportsEmptyReferences = false };
+    //     var refType2 = ReferenceDataTypeFactory.CreateReferenceDataType(Context, "RefScheme", "ID") { SupportsEmptyReferences = true };
     //     // ... This will not be detected as a difference
     // }
 
@@ -477,12 +473,12 @@ public class TestDataSchemeUtils
         
         // add references
         // self reference
-        schemeA.AddAttribute(Context, "Field1", new ReferenceDataType(schemeA.SchemeName, schemeAID.AttributeName, validateSchemeLoaded: false)).AssertPassed();
+        schemeA.AddAttribute(Context, "Field1", ReferenceDataTypeFactory.CreateReferenceDataType(Context, schemeA.SchemeName, schemeAID.AttributeName, validateSchemeLoaded: false).AssertPassed()).AssertPassed();
         
         // external reference
-        schemeB.AddAttribute(Context, "Field1", new ReferenceDataType(schemeA.SchemeName, schemeAID.AttributeName, validateSchemeLoaded: false)).AssertPassed();
-        schemeC.AddAttribute(Context, "Field1", new ReferenceDataType(schemeA.SchemeName, schemeAID.AttributeName, validateSchemeLoaded: false)).AssertPassed();
-        schemeC.AddAttribute(Context, "Field2", new ReferenceDataType(schemeB.SchemeName, schemeBID.AttributeName, validateSchemeLoaded: false)).AssertPassed();
+        schemeB.AddAttribute(Context, "Field1", ReferenceDataTypeFactory.CreateReferenceDataType(Context, schemeA.SchemeName, schemeAID.AttributeName, validateSchemeLoaded: false).AssertPassed()).AssertPassed();
+        schemeC.AddAttribute(Context, "Field1", ReferenceDataTypeFactory.CreateReferenceDataType(Context, schemeA.SchemeName, schemeAID.AttributeName, validateSchemeLoaded: false).AssertPassed()).AssertPassed();
+        schemeC.AddAttribute(Context, "Field2", ReferenceDataTypeFactory.CreateReferenceDataType(Context, schemeB.SchemeName, schemeBID.AttributeName, validateSchemeLoaded: false).AssertPassed()).AssertPassed();
         
         var list = new List<DataScheme> { schemeA, schemeB, schemeC, schemeD };
 

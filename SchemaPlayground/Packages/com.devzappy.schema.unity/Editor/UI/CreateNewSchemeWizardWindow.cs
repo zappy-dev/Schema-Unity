@@ -32,10 +32,7 @@ namespace Schema.Unity.Editor
             {
                 if (GUILayout.Button("Create"))
                 {
-                    var createStartRes = CreateNewScheme(new SchemaContext
-                    {
-                        Driver = "User_Create_New_Schema"
-                    }, newSchemeName);
+                    var createStartRes = CreateNewScheme(SchemaContext.EditContext.WithDriver("User_Create_New_Schema"), newSchemeName);
 
                     if (createStartRes.Failed)
                     {

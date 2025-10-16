@@ -21,17 +21,13 @@ public class TestDataScheme
     [SetUp]
     public void OnTestSetup()
     {
-        Schema.Reset();
+        TestFixtureSetup.Initialize(Context, out _, out _);
 
         emptyScheme = new DataScheme();
         
         testScheme = new DataScheme("Test");
         testScheme.AddAttribute(Context, EXISTING_STRING_ATTRIBUTE_NAME, DataType.Text).AssertPassed();
         testScheme.AddAttribute(Context, EXISTING_INTEGER_ATTRIBUTE_NAME, DataType.Integer).AssertPassed();
-
-        var mockFS = new Mock<IFileSystem>();
-        Schema.SetStorage(new Storage(mockFS.Object));
-        Schema.InitializeTemplateManifestScheme(Context);
     }
     
 

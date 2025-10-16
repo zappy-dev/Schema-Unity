@@ -19,7 +19,8 @@ namespace Schema.Core.Tests.Commands
         [SetUp]
         public void Setup()
         { 
-            Schema.Reset();
+            TestFixtureSetup.Initialize(Context, out _, out _);
+            
             _scheme = new DataScheme("People");
             _scheme.AddAttribute(Context, AttributeName, DataType.Text, "")
                    .AssertPassed();

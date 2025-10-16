@@ -6,6 +6,7 @@ using Schema.Core.Data;
 using Schema.Core.IO;
 using Schema.Runtime.IO;
 using UnityEngine;
+using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Runtime
 {
@@ -14,29 +15,21 @@ namespace Schema.Runtime
     /// </summary>
     public static class SchemaRuntime
     {
-        private static SchemaContext Context = new SchemaContext
-        {
-            Driver = "Runtime",
-        };
-        
-        public static SchemaResult Initialize(Action onManifestUpdated = null)
+        public static SchemaResult Initialize(Action onProjectLoad = null)
         {
             // Call this method to initialize Schema
             Schema.Core.Schema.ManifestUpdated += () =>
             {
                 if (Application.isPlaying)
                 {
-                    onManifestUpdated?.Invoke();
+                    onProjectLoad?.Invoke();
                 }
             };
             
             // TODO: This sets the core storage interface, overriding the editor interface
             Core.Schema.SetStorage(new Storage(new TextAssetResourcesFileSystem()));
 
-            var ctx = new SchemaContext
-            {
-                Driver = "Runtime_Initialization"
-            };
+            var ctx = SchemaContextFactory.CreateRuntimeContext("Runtime_Initialization");
             return LoadFromResources(ctx);
         }
         
@@ -49,7 +42,7 @@ namespace Schema.Runtime
             var textAssets = Resources.FindObjectsOfTypeAll<TextAsset>();
 
             var debug = string.Join(",", textAssets.Select(a => a.name));
-            Debug.Log(debug);
+            Logger.Log(debug);
             try
             {
                 var manifestAsset = Resources.Load<TextAsset>(Manifest.MANIFEST_SCHEME_NAME);
@@ -68,7 +61,7 @@ namespace Schema.Runtime
 
                 var manifestScheme = manifestDeserializeRes.Result;
 
-                var manifestLoadRes = Core.Schema.LoadManifest(Context, manifestScheme);
+                var manifestLoadRes = Core.Schema.LoadManifest(context, manifestScheme, manifestImportPath: Manifest.MANIFEST_SCHEME_NAME, projectPath: string.Empty);
                 if (manifestLoadRes.Failed)
                 {
                     return  SchemaResult.Fail(context, manifestLoadRes.Message);
@@ -76,6 +69,7 @@ namespace Schema.Runtime
             }
             catch (Exception e)
             {
+                Logger.LogError(e.ToString());
                 return SchemaResult.Fail(context,$"Failed to load manifest file from Resources: {e.Message}");
             }
 

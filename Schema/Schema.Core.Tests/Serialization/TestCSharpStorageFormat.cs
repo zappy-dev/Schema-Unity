@@ -23,11 +23,7 @@ public class TestCSharpStorageFormat
     [SetUp]
     public void OnTestSetup()
     {
-        Schema.Reset();
-        
-        mockFileSystem = new Mock<IFileSystem>();
-        Schema.SetStorage(new Storage(mockFileSystem.Object));
-        Schema.InitializeTemplateManifestScheme(Context);
+        TestFixtureSetup.Initialize(Context, out mockFileSystem, out _);
         
         storageFormat = new CSharpSchemeStorageFormat(mockFileSystem.Object);
 

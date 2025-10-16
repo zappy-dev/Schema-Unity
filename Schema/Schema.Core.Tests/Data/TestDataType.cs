@@ -2,6 +2,7 @@ using System.Collections;
 using Moq;
 using Schema.Core.Data;
 using Schema.Core.IO;
+using Schema.Core.Logging;
 using Schema.Core.Serialization;
 using Schema.Core.Tests.Ext;
 
@@ -10,7 +11,7 @@ namespace Schema.Core.Tests.Data;
 [TestFixture]
 public class TestDataType
 {
-    private static SchemaContext Context = new SchemaContext
+    private static SchemaContext Context => new()
     {
         Driver = nameof(TestDataType)
     };
@@ -28,12 +29,14 @@ public class TestDataType
     [SetUp]
     public void OnTestSetup()
     {
-        Schema.Reset();
-        _mockFileSystem = new Mock<IFileSystem>();
-        
-        Schema.SetStorage(new Storage(_mockFileSystem.Object));
+        TestFixtureSetup.Initialize(Context, out _mockFileSystem, out _);
 
+        Logger.LogVerbose($"Adding mock for FileExists({Context}, {VALID_FILE_PATH}) => Pass");
+        Logger.LogVerbose($"Adding mock for FileExists({Context.WithDataType(DataType.FilePath_RelativePaths)}, {VALID_FILE_PATH}) => Pass");
         _mockFileSystem.Setup(m => m.FileExists(Context, VALID_FILE_PATH)).Returns(SchemaResult.Pass());
+        _mockFileSystem.Setup(m => m.FileExists(Context, Path.Combine(TestFixtureSetup.ProjectPath, VALID_FILE_PATH))).Returns(SchemaResult.Pass());
+        _mockFileSystem.Setup(m => m.FileExists(Context.WithDataType(DataType.FilePath_RelativePaths), VALID_FILE_PATH)).Returns(SchemaResult.Pass());
+        _mockFileSystem.Setup(m => m.FileExists(Context.WithDataType(DataType.FilePath_RelativePaths), Path.Combine(TestFixtureSetup.ProjectPath, VALID_FILE_PATH))).Returns(SchemaResult.Pass());
         _mockFileSystem.Setup(m => m.FileExists(Context, INVALID_FILE_PATH)).Returns(SchemaResult.Fail(Context, ""));
 
         // pre-load data schemes
@@ -90,17 +93,17 @@ public class TestDataType
             
             // Reference type conversions
             yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.Text, 
-                new ReferenceDataType(VALID_SCHEME_NAME, VALID_REFERENCE_ATTRIBUTE), true, VALID_REFERENCE_VALUE);
+                ReferenceDataTypeFactory.CreateReferenceDataType(Context, VALID_SCHEME_NAME, VALID_REFERENCE_ATTRIBUTE, validateSchemeLoaded: false).AssertPassed(), true, VALID_REFERENCE_VALUE);
             
             yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.Text, 
-                new ReferenceDataType(INVALID_SCHEME_NAME, VALID_REFERENCE_ATTRIBUTE), false, null);
+                ReferenceDataTypeFactory.CreateReferenceDataType(Context, INVALID_SCHEME_NAME, VALID_REFERENCE_ATTRIBUTE, validateSchemeLoaded: false).AssertPassed(), false, null);
             yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.Text, 
-                new ReferenceDataType(VALID_SCHEME_NAME, INVALID_REFERENCE_ATTRIBUTE), false, null);
+                ReferenceDataTypeFactory.CreateReferenceDataType(Context, VALID_SCHEME_NAME, INVALID_REFERENCE_ATTRIBUTE, validateSchemeLoaded: false).AssertPassed(), false, null);
             yield return new TestCaseData(INVALID_REFERENCE_VALUE, DataType.Text, 
-                new ReferenceDataType(VALID_SCHEME_NAME, VALID_REFERENCE_ATTRIBUTE), false, null);
+                ReferenceDataTypeFactory.CreateReferenceDataType(Context, VALID_SCHEME_NAME, VALID_REFERENCE_ATTRIBUTE, validateSchemeLoaded: false).AssertPassed(), false, null);
             
             yield return new TestCaseData(VALID_REFERENCE_VALUE, DataType.Text, 
-                new ReferenceDataType(VALID_SCHEME_NAME_NO_IDENTIFIER, VALID_REFERENCE_ATTRIBUTE), false, null);
+                ReferenceDataTypeFactory.CreateReferenceDataType(Context, VALID_SCHEME_NAME_NO_IDENTIFIER, VALID_REFERENCE_ATTRIBUTE, validateSchemeLoaded: false).AssertPassed(), false, null);
 
             // Boolean conversions
             yield return new TestCaseData(true, DataType.Boolean, DataType.Boolean, true, true);
@@ -132,10 +135,13 @@ public class TestDataType
             yield return new TestCaseData(DataType.Integer, new IntegerDataType(), true);
             yield return new TestCaseData(DataType.FilePath_RelativePaths, new FilePathDataType(), true);
             yield return new TestCaseData(DataType.Text, DataType.Integer, false);
-            yield return new TestCaseData(DataType.Text, new ReferenceDataType("Schema1", "Attribute1"), false);
-            yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema1", "Attribute1"), true);
-            yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema2", "Attribute1"), false);
-            yield return new TestCaseData(new ReferenceDataType("Schema1", "Attribute1"), new ReferenceDataType("Schema1", "Attribute2"), false);
+            yield return new TestCaseData(DataType.Text, ReferenceDataTypeFactory.CreateReferenceDataType(Context, "Schema1", "Attribute1", validateSchemeLoaded: false).AssertPassed(), false);
+            yield return new TestCaseData(ReferenceDataTypeFactory.CreateReferenceDataType(Context, "Schema1", "Attribute1", validateSchemeLoaded: false).AssertPassed(), 
+                ReferenceDataTypeFactory.CreateReferenceDataType(Context, "Schema1", "Attribute1", validateSchemeLoaded: false).AssertPassed(), true);
+            yield return new TestCaseData(ReferenceDataTypeFactory.CreateReferenceDataType(Context, "Schema1", "Attribute1", validateSchemeLoaded: false).AssertPassed(), 
+                ReferenceDataTypeFactory.CreateReferenceDataType(Context, "Schema2", "Attribute1", validateSchemeLoaded: false).AssertPassed(), false);
+            yield return new TestCaseData(ReferenceDataTypeFactory.CreateReferenceDataType(Context, "Schema1", "Attribute1", validateSchemeLoaded: false).AssertPassed(), 
+                ReferenceDataTypeFactory.CreateReferenceDataType(Context, "Schema1", "Attribute2", validateSchemeLoaded: false).AssertPassed(), false);
             yield return new TestCaseData(DataType.Boolean, new BooleanDataType(), true);
             yield return new TestCaseData(DataType.Boolean, DataType.Text, false);
         }

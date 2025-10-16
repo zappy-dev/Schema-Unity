@@ -21,13 +21,13 @@ public class Player2DController : MonoBehaviour
 
     private void InitializeConfigs()
     {
-        if (SchemaRuntime.Initialize(OnManifestUpdated).TryErr(out var initError))
+        if (SchemaRuntime.Initialize(OnProjectLoad).TryErr(out var initError))
         {
             Debug.LogError(initError.Message);
         }
     }
 
-    private void OnManifestUpdated()
+    private void OnProjectLoad()
     {
         if (!EntitiesScheme.GetEntry(EntitiesScheme.Ids.PLAYER).Try(out var player, 
                 out var playerError))
@@ -44,6 +44,7 @@ public class Player2DController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (playerEntry == null) return;
         var pos = transform.position;
 
         var moveDir = new Vector3(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"), 0);

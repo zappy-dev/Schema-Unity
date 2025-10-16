@@ -12,17 +12,11 @@ namespace Schema.Core
     {
         #region Static Fields and Constants
 
-        private static SchemaProjectContainer _latestProject = new SchemaProjectContainer();
+        private static SchemaProjectContainer _latestProject = null;
         internal static SchemaProjectContainer LatestProject
         {
-            get
-            {
-                return _latestProject;
-            }
-            set
-            {
-                _latestProject = value;
-            }
+            get => _latestProject;
+            set => _latestProject = value;
         }
         
         public static IReadOnlyDictionary<string, DataScheme> LoadedSchemes => LatestProject.Schemes;
@@ -82,24 +76,24 @@ namespace Schema.Core
         /// <summary>
         /// Schema is not initialized until the Storage system is set and a Manifest Scheme is laoded.
         /// </summary>
-        public static SchemaResult IsInitialized(SchemaContext context)
+        public static SchemaResult IsInitialized(SchemaContext ctx)
         {
-            if (!GetStorage(context).Try(out _, out var storageErr))
+            if (!GetStorage(ctx).Try(out _, out var storageErr))
             {
                 return storageErr.Cast();
             }
 
-            if (string.IsNullOrWhiteSpace(ProjectPath))
+            if (ctx == null)
             {
-                return Fail(context, "No project path specified.");
+                return Fail(ctx, "Context is required to check project initialization");
             }
 
-            if (LatestProject == null)
+            if (ctx.Project == null)
             {
-                return Fail(context, "No project loaded.");
+                return Fail(ctx, "No project loaded.");
             }
 
-            return CheckIf(context, LatestProject.Manifest != null, "No Manifest Scheme Loaded");
+            return ctx.Project.IsInitialized(ctx);
         }
         
         private static readonly object manifestOperationLock = new object();
@@ -118,7 +112,7 @@ namespace Schema.Core
         {
             Logger.LogDbgWarning("Schema: Resetting...");
             LatestProject?.Dispose();
-            manifestImportPath = String.Empty;
+            LatestProject = null;
             nextManifestScheme = null;
         }
         

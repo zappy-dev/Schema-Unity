@@ -10,6 +10,7 @@ using UnityEditor;
 using UnityEngine;
 using static Schema.Core.Logging.Logger;
 using static Schema.Core.Schema;
+using static Schema.Core.SchemaContext;
 using Logger = Schema.Core.Logging.Logger;
 
 namespace Schema.Unity.Editor
@@ -222,7 +223,7 @@ namespace Schema.Unity.Editor
                 {
                     if (result.IsSuccess)
                     {
-                        var ctx = new SchemaContext
+                        var ctx = EditContext | new SchemaContext
                         {
                             Scheme = newSchema,
                             Driver = "User_Add_New_Scheme"
