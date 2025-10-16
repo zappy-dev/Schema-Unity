@@ -50,7 +50,7 @@ namespace Schema.Core.Data
             return res.Pass(entry);
         }
 
-        public SchemaResult AddEntry(SchemaContext context, DataEntry newEntry, bool runDataValidation = true)
+        public SchemaResult AddEntry(SchemaContext context, DataEntry newEntry, bool runDataValidation = true, bool fillEmptyValues = true)
         {
             using var _ = new SchemeContextScope(ref context, this);
             Logger.LogDbgVerbose($"Adding {newEntry}...", context);
@@ -67,12 +67,13 @@ namespace Schema.Core.Data
                 string attributeName = kvp.Key;
                 // Don't need to validate invalid attribute names, since adding new entry data already does that.
 
-                if (!GetAttributeByName(attributeName, context: context).Try(out var attribute))
+                if (runDataValidation)
                 {
-                    // TODO: Figure out a better solution for adding entries that contain unknown attributes
-                    Logger.LogWarning($"Skipping validation for unknown attribute: {attributeName}");
-                    return SchemaResult.Fail(context, $"No matching attribute found for '{kvp.Key}'");
-                }
+                    if (!GetAttributeByName(attributeName, context: context).Try(out var attribute))
+                    {
+                        Logger.LogWarning($"Skipping validation for unknown attribute: {attributeName}");
+                        return SchemaResult.Fail(context, $"No matching attribute found for '{kvp.Key}'");
+                    }
 
                 var entryValue = kvp.Value;
                 if (runDataValidation)
@@ -85,14 +86,17 @@ namespace Schema.Core.Data
                 }
             }
 
-            foreach (var attribute in AllAttributes)
+            if (fillEmptyValues)
             {
-                if (newEntry.HasData(attribute))
+                foreach (var attribute in AllAttributes)
                 {
-                    continue;
-                }
+                    if (newEntry.HasData(attribute))
+                    {
+                        continue;
+                    }
 
-                newEntry.SetData(context, attribute.AttributeName, attribute.CloneDefaultValue());
+                    newEntry.SetData(context, attribute.AttributeName, attribute.CloneDefaultValue());
+                }
             }
             
             entries.Add(newEntry);

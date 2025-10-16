@@ -55,9 +55,16 @@ namespace Schema.Core.Data
         /// </summary>
         /// <param name="attribute">The attribute to get data for.</param>
         /// <returns>The value if found, null otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public object GetDataDirect(AttributeDefinition attribute)
         {
-            return entryData.TryGetValue(attribute.AttributeName, out var value) ? value : null;
+            return GetData(attribute.AttributeName);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public object GetDataDirect(string attributeName)
+        {
+            return entryData.TryGetValue(attributeName, out var value) ? value : null;
         }
 
         public SchemaResult<object> GetData(AttributeDefinition attribute)
@@ -68,7 +75,8 @@ namespace Schema.Core.Data
             return SchemaResult<object>.Pass(value, successMessage: "Found value for attribute", Context);
 
         }
-
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public string GetDataAsString(string attributeName)
         {
             // TODO: Should this default to the default value for the attribute?

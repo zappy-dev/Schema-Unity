@@ -307,7 +307,7 @@ namespace Schema.Core
         public static SchemaResult LoadDataScheme(SchemaContext ctx, 
             DataScheme scheme, 
             bool overwriteExisting, 
-            bool registerManifestEntry = true, 
+            bool registerManifestEntry = true,
             string importFilePath = null)
         {
             using var schemeScope = new SchemeContextScope(ref ctx, scheme);
