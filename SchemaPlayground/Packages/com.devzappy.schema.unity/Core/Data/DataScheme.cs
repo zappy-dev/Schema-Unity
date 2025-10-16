@@ -84,6 +84,13 @@ namespace Schema.Core.Data
             SchemeName = schemeName;
         }
 
+        public void Dispose()
+        {
+            attributes?.Clear();
+            entries?.Clear();
+        }
+
+        #region API
         /// <summary>
         /// Loads this DataScheme with the central service, without an import path
         /// </summary>
@@ -93,6 +100,8 @@ namespace Schema.Core.Data
         {
             return Schema.LoadDataScheme(context, this, overwriteExisting: overwriteExisting);
         }
+
+        #endregion
 
         #endregion
 

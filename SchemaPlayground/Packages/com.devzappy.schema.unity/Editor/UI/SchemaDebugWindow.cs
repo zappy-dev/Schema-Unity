@@ -47,8 +47,19 @@ namespace Schema.Unity.Editor
                     EditorGUILayout.TextField("Default Content", DefaultContentPath);
                     EditorGUILayout.Toggle("Is Load In Progress?", IsManifestLoadInProgress);
                 }
+                
+                EditorGUILayout.Separator();
+                EditorGUILayout.LabelField("Project Container");
 
-
+                var isLoaded = LatestProject != null;
+                EditorGUILayout.Toggle("Is Loaded?", isLoaded);
+                if (isLoaded)
+                {
+                    EditorGUILayout.TextField("Loaded Project", LatestProject.ToString());
+                }
+                
+                EditorGUILayout.Separator();
+                EditorGUILayout.LabelField("Schemes");
                 using (var guiEventScroll = new EditorGUILayout.ScrollViewScope(guiEventsScrollPos))
                 {
                     guiEventsScrollPos = guiEventScroll.scrollPosition;
@@ -78,9 +89,12 @@ namespace Schema.Unity.Editor
                                     }
                                 }
 
-                                foreach (var loadedScheme in LoadedSchemes)
+                                if (isLoaded)
                                 {
-                                    EditorGUILayout.TextField(loadedScheme.Value.ToString(false));
+                                    foreach (var loadedScheme in LatestProject.Schemes)
+                                    {
+                                        EditorGUILayout.TextField(loadedScheme.Value.ToString(false));
+                                    }
                                 }
                             }
                         }

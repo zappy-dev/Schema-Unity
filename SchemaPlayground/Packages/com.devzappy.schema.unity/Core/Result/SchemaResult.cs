@@ -120,6 +120,11 @@ namespace Schema.Core
         {
             return SchemaResult<TOut>.Fail(Message, Context);
         }
+
+        public SchemaResult<TOut> CastError<TOut>(SchemaResult<TOut> res)
+        {
+            return SchemaResult<TOut>.Fail(Message, Context);
+        }
         
         public bool Try(out SchemaResult err)
         {

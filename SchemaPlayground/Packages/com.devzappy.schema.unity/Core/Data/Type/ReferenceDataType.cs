@@ -240,7 +240,7 @@ namespace Schema.Core.Data
             }
 
             // Fallback: consult already loaded schemes without going through IsInitialized gate
-            if (Schema.LoadedSchemes.TryGetValue(ReferenceSchemeName, out var loaded))
+            if (Schema.GetScheme(context, ReferenceSchemeName).Try(out var loaded))
             {
                 return res.Pass(loaded);
             }

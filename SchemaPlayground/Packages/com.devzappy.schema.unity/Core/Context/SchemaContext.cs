@@ -6,6 +6,14 @@ namespace Schema.Core
 {
     public class SchemaContext : IEquatable<SchemaContext>, ICloneable
     {
+        private SchemaProjectContainer _project;
+
+        public SchemaProjectContainer Project
+        {
+            get => _project ?? Schema.LatestProject;
+            set => _project = value;
+        }
+
         public DataScheme Scheme { get; set; }
         public string AttributeName { get; set; }
         public DataType DataType { get; set; }
@@ -16,7 +24,8 @@ namespace Schema.Core
                                DataType == null && 
                                string.IsNullOrEmpty(Driver) && 
                                Scheme == null && 
-                               Entry == null;
+                               Entry == null &&
+                               Project == null;
 
         public override string ToString()
         {
@@ -26,6 +35,11 @@ namespace Schema.Core
             {
                 sb.Append($"- Driver:".PadRight(rightPad));
                 sb.AppendLine(Driver);
+            }
+            if (Project != null)
+            {
+                sb.Append($"- Project:".PadRight(rightPad));
+                sb.AppendLine(Project.ToString());
             }
             if (Scheme != null)
             {

@@ -104,6 +104,14 @@
       "CSharpExportPath": "Assets\\Scripts\\Schemes",
       "CSharpNamespace": "",
       "CSharpGenerateIds": true
+    },
+    {
+      "SchemeName": "TypeTest",
+      "PublishTarget": "DEFAULT",
+      "FilePath": "Content/TypeTest.json",
+      "CSharpExportPath": "Assets\\Scripts\\Schemes",
+      "CSharpNamespace": "",
+      "CSharpGenerateIds": true
     }
   ]
 }

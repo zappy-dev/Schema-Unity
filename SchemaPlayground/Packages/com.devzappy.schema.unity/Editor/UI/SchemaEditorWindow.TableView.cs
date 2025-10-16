@@ -240,9 +240,9 @@ namespace Schema.Unity.Editor
                 return;
             }
 
-            if (!GetScheme(renderCtx, selectedSchemeName).Try(out var scheme))
+            if (!GetScheme(renderCtx, selectedSchemeName).Try(out var scheme, out var error))
             {
-                EditorGUILayout.HelpBox("Schema does not exist.", MessageType.Warning);
+                EditorGUILayout.HelpBox($"Schema does not exist, {error.Message}", MessageType.Warning);
                 return;
             }
             
@@ -316,7 +316,7 @@ namespace Schema.Unity.Editor
                         {
                             Scheme = scheme,
                             Driver = "User_Request_Publish_Scheme",
-                        }, new [] { selectedSchemeName });
+                        }, UnityEditorPublishConfig, new [] { selectedSchemeName });
                     }
 
                     // TODO: Open raw schema files
@@ -750,14 +750,14 @@ namespace Schema.Unity.Editor
                     continue;
                 }
                 menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), (bool)false,
-                    (GenericMenu.MenuFunction)(() =>
+                    () =>
                     {
                         LatestResponse = storageFormat.Export(scheme, new SchemaContext
                         {
                             Scheme = scheme,
                             Driver = "User_Export_Scheme",
-                        });
-                    }));
+                        }, UnityEditorPublishConfig.ResolveExportPath);
+                    });
             }
 
             menu.ShowAsContext();

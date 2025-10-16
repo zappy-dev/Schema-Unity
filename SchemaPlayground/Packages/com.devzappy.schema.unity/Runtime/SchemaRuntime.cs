@@ -14,13 +14,6 @@ namespace Schema.Runtime
     /// </summary>
     public static class SchemaRuntime
     {
-        #region Constants
-        public static string DEFAULT_PUBLISH_PATH = Path.Combine("Assets", "Plugins", "Schema");
-        public static string DEFAULT_RESOURCE_PUBLISH_PATH = Path.Combine(DEFAULT_PUBLISH_PATH, "Resources");
-        public static string DEFAULT_SCRIPTS_PUBLISH_PATH = Path.Combine("Assets", "Scripts", "Schemes");
-        
-        #endregion
-
         private static SchemaContext Context = new SchemaContext
         {
             Driver = "Runtime",

@@ -41,6 +41,10 @@
     {
       "SchemeName": "Quests",
       "FilePath": "Content/Quests.json"
+    },
+    {
+      "SchemeName": "TypeTest",
+      "FilePath": "Content/TypeTest.json"
     }
   ]
 }

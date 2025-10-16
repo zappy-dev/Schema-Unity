@@ -50,11 +50,11 @@ namespace Schema.Core
         #region Load Operations
         
         
-        public static SchemaResult<ManifestLoadStatus> LoadManifestFromPath(SchemaContext context,
+        public static SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> LoadManifestFromPath(SchemaContext context,
             string manifestLoadPath,
             IProgress<(float, string)> progress = null)
         {
-            var res = SchemaResult<ManifestLoadStatus>.New(context);
+            SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> res = SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer container)>.New(context);
             if (string.IsNullOrWhiteSpace(manifestLoadPath))
             {
                 return res.Fail("Manifest path is invalid: " + manifestLoadPath);
@@ -68,7 +68,7 @@ namespace Schema.Core
 
             if (!GetStorage(context).Try(out var storage, out var storageErr))
             {
-                return storageErr.CastError<ManifestLoadStatus>();
+                return storageErr.CastError(res);
             }
 
             if (storage.FileSystem.FileExists(context, manifestLoadPath).Failed)
@@ -82,7 +82,7 @@ namespace Schema.Core
                 _storage.DefaultManifestStorageFormat.DeserializeFromFile(context, manifestLoadPath);
             if (!loadResult.Try( out var manifestDataScheme))
             {
-                return loadResult.CastError<ManifestLoadStatus>();
+                return loadResult.CastError(res);
             }
 
             manifestImportPath = manifestLoadPath;
@@ -100,15 +100,20 @@ namespace Schema.Core
             return loadManifestRes;
         }
         
-        public static SchemaResult<ManifestLoadStatus> LoadManifest(SchemaContext context,
+        public static SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> LoadManifest(SchemaContext context,
             DataScheme manifestDataScheme,
             IProgress<(float, string)> progress = null)
         {
+            SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> res = SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer container)>.New(context);
+            var newProjectContainer = new SchemaProjectContainer();
+            context.Project = newProjectContainer; // set up the project container in the context for future load operations to use.
+            
             lock (manifestOperationLock)
             {
                 // clear out previous data in case it is stagnant
                 Logger.LogDbgVerbose($"Schema: Unloading all schemes");
-                Schema.loadedSchemes.Clear();
+                // LastProjectContainer.Dispose();
+                // TODO: Ability to re-load previous project container? switch projects?
                 
                 var loadStopwatch = Stopwatch.StartNew();
                 int currentSchema = 0;
@@ -122,7 +127,7 @@ namespace Schema.Core
                 {
                     Logger.LogError(saveManifestResponse.Message, saveManifestResponse.Context);
                     nextManifestScheme = null;
-                    return SchemaResult<ManifestLoadStatus>.Fail(saveManifestResponse.Message, context: context);
+                    return res.Fail(saveManifestResponse.Message);
                 }
                 
                 Logger.LogDbgVerbose($"Loaded {manifestDataScheme}, scheme count: {schemeCount}", manifestDataScheme);
@@ -146,7 +151,7 @@ namespace Schema.Core
                 });
                 var loadedSchemes = new List<DataScheme>();
                 if (!nextManifestScheme.GetEntries(context).Try(out var entries, out var error))
-                    return error.CastError<ManifestLoadStatus>();
+                    return error.CastError(res);
                 
                 foreach (var manifestEntry in entries)
                 {
@@ -194,7 +199,7 @@ namespace Schema.Core
                 }
                 
                 if (!DataScheme.TopologicalSortByReferences(context, loadedSchemes).Try(out var schemeLoadOrder, out var sortErr)) 
-                    return sortErr.CastError<ManifestLoadStatus>();
+                    return sortErr.CastError(res);
 
                 var schemeLoadOrderList = schemeLoadOrder.ToList();
                 progress?.Report((0.1f, "Loading..."));
@@ -218,19 +223,20 @@ namespace Schema.Core
                     Logger.LogDbgVerbose(loadRes.Message, loadRes.Context);
                 }
                 
+                LatestProject = newProjectContainer;
                 if (!success)
                 {
-                    LoadedManifestScheme = nextManifestScheme;
+                    context.Project.Manifest = nextManifestScheme;
                     nextManifestScheme = null;
-                    return SchemaResult<ManifestLoadStatus>.Pass(ManifestLoadStatus.FAILED_TO_LOAD_ENTRIES, $"Failed to load all schemes found in manifest, errors: {sb}", context: "Manifest");
+                    return res.Pass((ManifestLoadStatus.FAILED_TO_LOAD_ENTRIES, newProjectContainer), $"Failed to load all schemes found in manifest, errors: {sb}");
                 }
                 
                 // overwrite existing manifest
                 loadStopwatch.Stop();
 
-                LoadedManifestScheme = nextManifestScheme;
+                context.Project.Manifest = nextManifestScheme;
                 nextManifestScheme = null;
-                return SchemaResult<ManifestLoadStatus>.Pass(ManifestLoadStatus.FULLY_LOADED, $"Loaded {schemeCount} schemes from manifest in {loadStopwatch.ElapsedMilliseconds:N0} ms", context: "Manifest");
+                return res.Pass((ManifestLoadStatus.FULLY_LOADED, newProjectContainer), $"Loaded {schemeCount} schemes from manifest in {loadStopwatch.ElapsedMilliseconds:N0} ms");
             }
         }
         
@@ -298,20 +304,24 @@ namespace Schema.Core
         /// <param name="registerManifestEntry">If true, registers a new manifest entry in the currently loaded manifest for the given scheme if loaded.</param>
         /// <param name="importFilePath">File path from where this scheme was imported, if imported</param>
         /// <returns></returns>
-        public static SchemaResult LoadDataScheme(SchemaContext context, DataScheme scheme, bool overwriteExisting, bool registerManifestEntry = true, string importFilePath = null)
+        public static SchemaResult LoadDataScheme(SchemaContext ctx, 
+            DataScheme scheme, 
+            bool overwriteExisting, 
+            bool registerManifestEntry = true, 
+            string importFilePath = null)
         {
-            using var schemeScope = new SchemeContextScope(ref context, scheme);
+            using var schemeScope = new SchemeContextScope(ref ctx, scheme);
             string schemeName = scheme.SchemeName;
             
             // input validation
             if (string.IsNullOrWhiteSpace(schemeName))
             {
-                return Fail(context, errorMessage: "Schema name is invalid: " + schemeName);
+                return Fail(ctx, errorMessage: "Schema name is invalid: " + schemeName);
             }
             
-            if (loadedSchemes.ContainsKey(schemeName) && !overwriteExisting)
+            if (ctx.Project.HasScheme(schemeName) && !overwriteExisting)
             {
-                return Fail(context, errorMessage: "Schema already exists: " + schemeName);
+                return Fail(ctx, errorMessage: "Schema already exists: " + schemeName);
             }
 
             var schemeAttributes = scheme.GetAttributes().ToList();
@@ -319,7 +329,7 @@ namespace Schema.Core
             // process all incoming entry data and make sure it is in a valid formats 
             foreach (var entry in scheme.AllEntries)
             {
-                using var entryScope = new EntryContextScope(ref context, entry);
+                using var entryScope = new EntryContextScope(ref ctx, entry);
                 var attributesToRemove = new List<string>();
                 // prune unknown attributes
                 using var entryEnumerator = entry.GetEnumerator();
@@ -338,8 +348,8 @@ namespace Schema.Core
 
                 foreach (var attrName in attributesToRemove)
                 {
-                    using var _ = new AttributeContextScope(ref context, attrName);
-                    var removeRes = entry.RemoveData(context, attrName);
+                    using var _ = new AttributeContextScope(ref ctx, attrName);
+                    var removeRes = entry.RemoveData(ctx, attrName);
                     if (removeRes.Failed)
                     {
                         return removeRes;
@@ -350,20 +360,20 @@ namespace Schema.Core
                 // Number of hours spent on this code: 10
                 foreach (var attribute in schemeAttributes)
                 {
-                    using var attrScope =  new AttributeContextScope(ref context, attribute);
+                    using var attrScope =  new AttributeContextScope(ref ctx, attribute);
                     attribute._scheme = scheme;
                     
                     var entryData = entry.GetData(attribute);
                     if (entryData.Failed)
                     {
                         // Don't have the data for this attribute, set to default value
-                        scheme.SetDataOnEntry(context: context, entry: entry, attributeName: attribute.AttributeName, value: attribute.CloneDefaultValue(), shouldDirtyScheme: true);
+                        scheme.SetDataOnEntry(context: ctx, entry: entry, attributeName: attribute.AttributeName, value: attribute.CloneDefaultValue(), shouldDirtyScheme: true);
                         continue;
                     }
                     
                     // Prompt users that there's an issue, maybe cause a failure in downstream publishing, but allow for editor fixes
                     var fieldData = entryData.Result;
-                    var validateData = attribute.IsValidValue(context, fieldData);
+                    var validateData = attribute.IsValidValue(ctx, fieldData);
                     if (validateData.Failed) // Try to force the manifest to be loaded
                     {
                         //for manifest, handle partial load failures, if a manifest entry refers to a file that doesn't exist
@@ -380,7 +390,7 @@ namespace Schema.Core
                             continue;
                         }
                             
-                        var conversion = attribute.ConvertValue(context, fieldData);
+                        var conversion = attribute.ConvertValue(ctx, fieldData);
                         if (conversion.Failed)
                         {
                             // TODO: What should the user flow be here? Auto-convert? Prompt for user feedback?
@@ -401,17 +411,17 @@ namespace Schema.Core
                             continue;
                         }
 
-                        var updateData = scheme.SetDataOnEntry(context: context, entry: entry, attributeName: attribute.AttributeName, value: conversion.Result, allowIdentifierUpdate: true, shouldDirtyScheme: false);
+                        var updateData = scheme.SetDataOnEntry(context: ctx, entry: entry, attributeName: attribute.AttributeName, value: conversion.Result, allowIdentifierUpdate: true, shouldDirtyScheme: false);
                         if (updateData.Failed)
                         {
-                            return Fail(context, updateData.Message);
+                            return Fail(ctx, updateData.Message);
                         }
                     }
                 }
             }
         
             Logger.LogDbgVerbose($"Loading scheme {scheme}");
-            loadedSchemes[schemeName] = scheme;
+            ctx.Project.AddScheme(scheme);
             if (scheme.IsManifest)
             {
                 IsTemplateManifestLoaded = false;
@@ -420,36 +430,36 @@ namespace Schema.Core
             if (registerManifestEntry)
             {
                 // add new manifest entry if not existing. Only do this for non-manifest schemes, else this could end up in an stack overflow
-                if (scheme.IsManifest || GetManifestEntryForScheme(schemeName, context).Try(out _)) 
-                    return Pass("Schema added", context);
+                if (scheme.IsManifest || GetManifestEntryForScheme(schemeName, ctx).Try(out _)) 
+                    return Pass("Schema added", ctx);
                 
                 // Add a new entry to the manifest for this loaded scheme
                 lock (manifestOperationLock)
                 {
-                    if (!GetManifestEntryForScheme(schemeName, context).Try(out _))
+                    if (!GetManifestEntryForScheme(schemeName, ctx).Try(out _))
                     {
                         // add manifest record for new scheme
                     
-                        Logger.LogDbgVerbose($"Adding manifest entry for {schemeName} with import path: {importFilePath}...", context);
+                        Logger.LogDbgVerbose($"Adding manifest entry for {schemeName} with import path: {importFilePath}...", ctx);
                         var manifest = GetManifestScheme();
                         if (!manifest.Try(out var manifestScheme))
                         {
-                            return Fail(context, manifest.Message);
+                            return Fail(ctx, manifest.Message);
                         }
 
-                        return manifestScheme.AddManifestEntry(context, schemeName, ManifestScheme.PublishTarget.DEFAULT,
+                        return manifestScheme.AddManifestEntry(ctx, schemeName, ManifestScheme.PublishTarget.DEFAULT,
                             importFilePath).Cast();
                     }
                 }
             }
 
-            return Pass("Schema added", context);
+            return Pass("Schema added", ctx);
         }
 
         public static SchemaResult UnloadScheme(SchemaContext context, string schemeName)
         {
             Logger.LogDbgWarning($"Unloading Scheme: {schemeName}");
-            bool wasRemoved = loadedSchemes.Remove(schemeName);
+            bool wasRemoved = context.Project.RemoveScheme(schemeName);
 
             return CheckIf(context: context, conditional: wasRemoved, errorMessage: "Scheme was not unloaded", successMessage: "Scheme was unloaded.");
         }

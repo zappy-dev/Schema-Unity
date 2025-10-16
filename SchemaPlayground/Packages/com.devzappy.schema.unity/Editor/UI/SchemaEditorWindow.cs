@@ -48,7 +48,7 @@ namespace Schema.Unity.Editor
         private bool isInitialized;
         private bool showDebugView;
         
-        public SchemaResult<ManifestLoadStatus> LatestManifestLoadResponse { get; set; }
+        public SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> LatestManifestLoadResponse { get; set; }
         private List<SchemaResult> responseHistory = new List<SchemaResult>();
         private DateTime latestResponseTime;
         
@@ -380,7 +380,7 @@ namespace Schema.Unity.Editor
             };
             // validate manifest is up-to-date with latest template
             var templateManifest = ManifestDataSchemeFactory.BuildTemplateManifestSchema(context, 
-                SchemaRuntime.DEFAULT_SCRIPTS_PUBLISH_PATH, 
+                DEFAULT_SCRIPTS_PUBLISH_PATH, 
                 Path.Combine(DefaultContentDirectory, "Manifest.json"));
 
             context.Scheme = templateManifest._;
@@ -622,10 +622,10 @@ namespace Schema.Unity.Editor
                     {
                         Driver = "User_Create_New_Project"
                     };
-                    InitializeTemplateManifestScheme(ctx, SchemaRuntime.DEFAULT_SCRIPTS_PUBLISH_PATH);
+                    var initRes = InitializeTemplateManifestScheme(ctx, DEFAULT_SCRIPTS_PUBLISH_PATH);
                     LatestResponse = SaveManifest(ctx);
-                    LatestManifestLoadResponse = SchemaResult<ManifestLoadStatus>.CheckIf(LatestResponse.Passed, 
-                        ManifestLoadStatus.FULLY_LOADED, 
+                    LatestManifestLoadResponse = SchemaResult<(ManifestLoadStatus, SchemaProjectContainer)>.CheckIf(LatestResponse.Passed && initRes.Passed, 
+                        (ManifestLoadStatus.FULLY_LOADED, initRes.Result), 
                         LatestResponse.Message,
                         "Loaded template manifest", ctx);
                 }
@@ -692,10 +692,13 @@ namespace Schema.Unity.Editor
                 
                 if (GUILayout.Button("Publish All", DoNotExpandWidthOptions))
                 {
+                    using var progressReporter = new EditorProgressReporter("Schema - Publish All");
                     LatestResponse = PublishAllSchemes(new SchemaContext
                     {
                         Driver = "User_Request_Publish_All"
-                    });
+                    }, UnityEditorPublishConfig, progressReporter);
+                    
+                    EditorUtility.DisplayDialog("Schema", (LatestResponse.Passed) ? "Successfully published all Schemes!" : LatestResponse.Message, "Ok");
                 }
             }
 

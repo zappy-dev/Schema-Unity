@@ -12,8 +12,20 @@ namespace Schema.Core
     {
         #region Static Fields and Constants
 
-        private static readonly Dictionary<string, DataScheme> loadedSchemes = new Dictionary<string, DataScheme>();
-        public static IReadOnlyDictionary<string, DataScheme> LoadedSchemes => loadedSchemes;
+        private static SchemaProjectContainer _latestProject = new SchemaProjectContainer();
+        internal static SchemaProjectContainer LatestProject
+        {
+            get
+            {
+                return _latestProject;
+            }
+            set
+            {
+                _latestProject = value;
+            }
+        }
+        
+        public static IReadOnlyDictionary<string, DataScheme> LoadedSchemes => LatestProject.Schemes;
         
         /// <summary>
         /// Returns all the available valid scheme names.
@@ -31,7 +43,7 @@ namespace Schema.Core
 
             lock (manifestOperationLock)
             {
-                if (!GetManifestScheme().Try(out var manifestScheme, out var manifestError))
+                if (!GetManifestScheme(context).Try(out var manifestScheme, out var manifestError))
                 {
                     return manifestError.CastError<IEnumerable<string>>();
                 }
@@ -82,7 +94,12 @@ namespace Schema.Core
                 return Fail(context, "No project path specified.");
             }
 
-            return CheckIf(context, _loadedManifestScheme != null, "No Manifest Scheme Loaded");
+            if (LatestProject == null)
+            {
+                return Fail(context, "No project loaded.");
+            }
+
+            return CheckIf(context, LatestProject.Manifest != null, "No Manifest Scheme Loaded");
         }
         
         private static readonly object manifestOperationLock = new object();
@@ -100,10 +117,9 @@ namespace Schema.Core
         public static void Reset()
         {
             Logger.LogDbgWarning("Schema: Resetting...");
-            loadedSchemes.Clear();
+            LatestProject?.Dispose();
             manifestImportPath = String.Empty;
             nextManifestScheme = null;
-            _loadedManifestScheme = null;
         }
         
         #endregion
@@ -124,11 +140,11 @@ namespace Schema.Core
                 return res.Fail("Scheme name is empty");
             }
             
-            return res.Pass(loadedSchemes.ContainsKey(schemeName));
+            return res.Pass(ctx.Project.HasScheme(schemeName));
         }
 
         // TODO support async
-        public static SchemaResult<DataScheme> GetScheme(SchemaContext context, string schemeName)
+        public static SchemaResult<DataScheme> GetScheme(SchemaContext ctx, string schemeName)
         {
             // var isInitRes = IsInitialized(context);
             // if (isInitRes.Failed)
@@ -136,7 +152,7 @@ namespace Schema.Core
             //     return isInitRes.CastError<DataScheme>();
             // }
             
-            var success = loadedSchemes.TryGetValue(schemeName, out var scheme);
+            var success = ctx.Project.Schemes.TryGetValue(schemeName, out var scheme);
             var errorMessage = $"No Scheme '{schemeName}' loaded.";
             if (schemeName == Manifest.MANIFEST_SCHEME_NAME)
             {
@@ -146,20 +162,20 @@ namespace Schema.Core
             }
             return SchemaResult<DataScheme>.CheckIf(success, scheme, 
                 errorMessage: errorMessage,
-                successMessage: $"Scheme '{schemeName}' is loaded.", context);
+                successMessage: $"Scheme '{schemeName}' is loaded.", ctx);
         }
 
-        public static SchemaResult<DataScheme> GetOwnerSchemeForAttribute(SchemaContext context, string searchAttr)
+        public static SchemaResult<DataScheme> GetOwnerSchemeForAttribute(SchemaContext ctx, string searchAttr)
         {
-            var res = SchemaResult<DataScheme>.New(context);
-                      var isInitRes = IsInitialized(context);
+            var res = SchemaResult<DataScheme>.New(ctx);
+                      var isInitRes = IsInitialized(ctx);
             if (isInitRes.Failed)
             {
                 return isInitRes.CastError<DataScheme>();
             }
             
             // TODO: What if multiple schemes have an attribute with the same name (i.e. ID)?
-            var ownerScheme = loadedSchemes.Values.FirstOrDefault(scheme =>
+            var ownerScheme = ctx.Project.FindScheme(scheme =>
             {
                 return scheme.GetAttribute(attr => attr.AttributeName.Equals(searchAttr)).Try(out _);
             });
@@ -167,16 +183,16 @@ namespace Schema.Core
             return res.CheckIf(ownerScheme != null, ownerScheme, $"No owner scheme found for attribute: {searchAttr}");
         }
 
-        public static SchemaResult<DataScheme> GetOwnerSchemeForAttribute(SchemaContext context, AttributeDefinition searchAttr)
+        public static SchemaResult<DataScheme> GetOwnerSchemeForAttribute(SchemaContext ctx, AttributeDefinition searchAttr)
         {
-            var res = SchemaResult<DataScheme>.New(context);
-                      var isInitRes = IsInitialized(context);
+            var res = SchemaResult<DataScheme>.New(ctx);
+                      var isInitRes = IsInitialized(ctx);
             if (isInitRes.Failed)
             {
                 return isInitRes.CastError<DataScheme>();
             }
             
-            var ownerScheme = loadedSchemes.Values.FirstOrDefault(scheme =>
+            var ownerScheme = ctx.Project.FindScheme(scheme =>
             {
                 return scheme.GetAttribute(attr => attr.Equals(searchAttr)).Try(out _);
             });
