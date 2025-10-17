@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using Schema.Core.Data;
 
 namespace Schema.Core.Serialization
@@ -33,8 +35,9 @@ namespace Schema.Core.Serialization
         /// </summary>
         /// <param name="context">Serialization context used to resolve types and options.</param>
         /// <param name="filePath">Path to the input file to read.</param>
+        /// <param name="cancellationToken"></param>
         /// <returns>A <see cref="SchemaResult{T}"/> containing the <see cref="DataScheme"/> or errors.</returns>
-        SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath);
+        Task<SchemaResult<DataScheme>> DeserializeFromFile(SchemaContext context, string filePath, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Deserializes a <see cref="DataScheme"/> from a string payload.
@@ -50,8 +53,9 @@ namespace Schema.Core.Serialization
         /// <param name="context">Serialization context providing options and environment.</param>
         /// <param name="filePath">Destination file path to write.</param>
         /// <param name="data">The <see cref="DataScheme"/> to serialize.</param>
+        /// <param name="cancellationToken"></param>
         /// <returns>A <see cref="SchemaResult"/> indicating success or failure.</returns>
-        SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme data);
+        Task<SchemaResult> SerializeToFile(SchemaContext context, string filePath, DataScheme data, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Serializes a <see cref="DataScheme"/> into a string payload.

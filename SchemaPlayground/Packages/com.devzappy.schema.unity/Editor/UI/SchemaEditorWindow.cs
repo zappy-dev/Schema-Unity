@@ -5,6 +5,8 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.IO;
@@ -111,6 +113,7 @@ namespace Schema.Unity.Editor
         // Virtual scrolling support
         private VirtualTableView _virtualTableView;
         private Rect lastScrollViewRect = Rect.zero;
+        private CancellationTokenSource _cts;
 
         #endregion
 
@@ -118,6 +121,7 @@ namespace Schema.Unity.Editor
 
         private void OnEnable()
         {
+            _cts = new CancellationTokenSource();
             Instance = this;
             _defaultUnityProjectPath = Path.GetFullPath(Application.dataPath + "/..");
             LogDbgVerbose("Schema Editor enabled", this);
@@ -146,6 +150,8 @@ namespace Schema.Unity.Editor
 
         private void OnDisable()
         {
+            _cts.Cancel();
+            _cts.Dispose();
             // Clean up event handlers to prevent memory leaks
             EditorApplication.delayCall -= InitializeSafely;
             manifestWatcher?.Dispose();
@@ -159,7 +165,11 @@ namespace Schema.Unity.Editor
             // Only unsubscribe if initialized failed? also prevent attempting to initialize more than once?
             EditorApplication.update -= InitializeSafely;
             LogDbgVerbose("InitializeSafely", this);
-            
+            _ = InitializeAsync(_cts.Token);
+        }
+
+        private async Task InitializeAsync(CancellationToken token = default)
+        {
             selectedSchemaIndex = -1;
             SelectedSchemeName = string.Empty;
             newAttributeName = string.Empty;
@@ -167,7 +177,7 @@ namespace Schema.Unity.Editor
             SetStorage(StorageFactory.GetEditorStorage());
             
             var ctx = EditContext.WithDriver("Editor_Initialization");
-            LatestResponse = OnLoadManifest(ctx);
+            LatestResponse = await OnLoadManifest(ctx, token);
             
             if (LatestResponse.Passed)
             {
@@ -183,7 +193,7 @@ namespace Schema.Unity.Editor
             if (!string.IsNullOrEmpty(storedSelectedSchema))
             {
                 LogDbgVerbose($"Selected schema found: {storedSelectedSchema}", this);
-                OnSelectScheme(storedSelectedSchema, ctx);
+                await OnSelectScheme(storedSelectedSchema, ctx, token);
             }
 
             isInitialized = true;
@@ -237,98 +247,6 @@ namespace Schema.Unity.Editor
         
         #region UI Command Handling
 
-        private bool OnSelectScheme(string schemeName, SchemaContext context)
-        {
-            // Check if any schemes have unsaved changes (excluding the manifest)
-            if (!string.IsNullOrEmpty(SelectedSchemeName) && SelectedSchemeName != schemeName)
-            {
-                var dirtySchemes = GetSchemes(context)
-                    .Where(s => s.IsDirty && !s.IsManifest)
-                    .ToList();
-
-                if (dirtySchemes.Any())
-                {
-                    // Build a message listing all dirty schemes
-                    var messageBuilder = new StringBuilder();
-                    messageBuilder.AppendLine("The following schemes have unsaved changes:");
-                    messageBuilder.AppendLine();
-                    foreach (var dirtyScheme in dirtySchemes)
-                    {
-                        messageBuilder.AppendLine($"  • {dirtyScheme.SchemeName}");
-                    }
-                    messageBuilder.AppendLine();
-                    messageBuilder.Append("Do you want to save all changes?");
-
-                    int choice = EditorUtility.DisplayDialogComplex(
-                        "Unsaved Changes",
-                        messageBuilder.ToString(),
-                        "Save All",
-                        "Cancel",
-                        "Don't Save");
-
-                    if (choice == 0) // Save All
-                    {
-                        // Save all dirty schemes
-                        foreach (var dirtyScheme in dirtySchemes)
-                        {
-                            var saveResult = SaveDataScheme(context, dirtyScheme, alsoSaveManifest: false);
-                            if (saveResult.Failed)
-                            {
-                                EditorUtility.DisplayDialog(
-                                    "Save Failed",
-                                    $"Failed to save scheme '{dirtyScheme.SchemeName}': {saveResult.Message}",
-                                    "OK");
-                                return false; // Don't switch schemes if any save failed
-                            }
-                        }
-                    }
-                    else if (choice == 1) // Cancel
-                    {
-                        return false; // Don't switch schemes
-                    }
-                    // choice == 2 means "Don't Save", so we continue without saving
-                }
-            }
-
-            // Unfocus any selected control fields when selecting a new scheme
-            ReleaseControlFocus();
-
-            if (GetAllSchemes(context).Try(out var allSchemes))
-            {
-                var schemeNames = allSchemes.ToArray();
-                var prevSelectedIndex = Array.IndexOf(schemeNames, schemeName);
-                if (prevSelectedIndex == -1)
-                {
-                    return false;
-                }
-                selectedSchemaIndex = prevSelectedIndex;
-            }
-            
-            LogDbgVerbose($"Opening Schema '{schemeName}' for editing, {context}...");
-            SelectedSchemeName = schemeName;
-            EditorPrefs.SetString(EDITORPREFS_KEY_SELECTEDSCHEME, schemeName);
-            newAttributeName = string.Empty;
-            
-            // Clear virtual scrolling cache when switching schemes
-            _virtualTableView?.ClearCache();
-            
-            return true;
-        }
-
-        private SchemaResult OnLoadManifest(SchemaContext context)
-        {
-            using var reporter = new EditorProgressReporter("Schema - Manifest Load");
-            LogDbgVerbose($"Loading Manifest", context);
-            LatestManifestLoadResponse = LoadManifestFromPath(context, _defaultManifestLoadPath, _defaultUnityProjectPath, reporter);
-            LatestResponse = LatestManifestLoadResponse.Cast();
-
-            if (LatestManifestLoadResponse.Passed)
-            {
-                RunManifestMigrationWizard();
-            }
-            return LatestResponse;
-        }
-
         class ManifestAttributeEqualityComparer : IEqualityComparer<AttributeDefinition>
         {
             internal static ManifestAttributeEqualityComparer Instance = new ManifestAttributeEqualityComparer();
@@ -360,7 +278,7 @@ namespace Schema.Unity.Editor
             }
         }
 
-        private SchemaResult RunManifestMigrationWizard()
+        private async Task<SchemaResult> RunManifestMigrationWizard(CancellationToken cancellationToken)
         {
             var context = EditContext.WithDriver("Manifest Migration Wizard");
             // validate manifest is up-to-date with latest template
@@ -470,7 +388,11 @@ namespace Schema.Unity.Editor
                 return migrateRes;
             }
 
-            LatestManifestLoadResponse = LoadManifest(context, templateManifest._, manifestImportPath: _defaultManifestLoadPath, projectPath: _defaultUnityProjectPath);
+            LatestManifestLoadResponse = await LoadManifest(context, 
+                templateManifest._, 
+                manifestImportPath: _defaultManifestLoadPath, 
+                projectPath: _defaultUnityProjectPath,
+                cancellationToken: cancellationToken);
             LatestResponse = CheckIf(context, LatestManifestLoadResponse.Passed, LatestManifestLoadResponse.Message);
             return Pass();
         }
@@ -599,15 +521,7 @@ namespace Schema.Unity.Editor
                 EditorGUILayout.HelpBox("Welcome to Schema! Would you like to Create an Empty Project or Load an Existing Project Manifest", MessageType.Info);
                 if (GUILayout.Button("Create Empty Project"))
                 {
-                    // TODO: Handle this better? move to Schema Core?
-                    var ctx = EditContext.WithDriver("User_Create_New_Project");
-                    
-                    var initRes = InitializeTemplateManifestScheme(ctx, projectPath: _defaultUnityProjectPath, defaultScriptExportPath: DEFAULT_SCRIPTS_PUBLISH_PATH);
-                    LatestResponse = SaveManifest(ctx);
-                    LatestManifestLoadResponse = SchemaResult<(ManifestLoadStatus, SchemaProjectContainer)>.CheckIf(LatestResponse.Passed && initRes.Passed, 
-                        (ManifestLoadStatus.FULLY_LOADED, initRes.Result), 
-                        LatestResponse.Message,
-                        "Loaded template manifest", ctx);
+                    _ = CreateEmptyProjectAsync(_cts.Token);
                 }
             }
             
@@ -661,15 +575,12 @@ namespace Schema.Unity.Editor
 
                 if (GUILayout.Button("Save All", DoNotExpandWidthOptions))
                 {
-                    LatestResponse = Save(EditContext.WithDriver("User_Request_Save_All"), saveManifest: true);
+                    _ = SaveAllAsync(_cts.Token);
                 }
                 
                 if (GUILayout.Button("Publish All", DoNotExpandWidthOptions))
                 {
-                    using var progressReporter = new EditorProgressReporter("Schema - Publish All");
-                    LatestResponse = PublishAllSchemes(EditContext.WithDriver("User_Request_Publish_All"), UnityEditorPublishConfig, progressReporter);
-                    
-                    EditorUtility.DisplayDialog("Schema", (LatestResponse.Passed) ? "Successfully published all Schemes!" : LatestResponse.Message, "Ok");
+                    _ = PublishAllAsync(_cts.Token);
                 }
             }
 
@@ -687,6 +598,8 @@ namespace Schema.Unity.Editor
             EditorGUILayout.TextField("Current Event", Event.current.ToString());
             EditorGUILayout.Vector2Field("Mouse Pos", Event.current.mousePosition);
             EditorGUILayout.TextField("Last Entry Value", lastEntryValue?.ToString());
+            EditorGUILayout.IntField("Keyboard Control", GUIUtility.keyboardControl);
+            EditorGUILayout.TextField("Last Focused Cell", lastFocusedCell.ToString());
 #endif
 
             // Do not render more until we have valid manifest loaded
@@ -732,6 +645,35 @@ namespace Schema.Unity.Editor
                 GUI.FocusControl(nextControlToFocus);
                 releaseControl = false;
             }
+        }
+
+        private async Task PublishAllAsync(CancellationToken cancellationToken)
+        {
+            using var progressReporter = new EditorProgressReporter("Schema - Publish All");
+            LatestResponse = await PublishAllSchemes(EditContext.WithDriver("User_Request_Publish_All"), UnityEditorPublishConfig, progressReporter, cancellationToken: cancellationToken);
+                    
+            EditorUtility.DisplayDialog("Schema", (LatestResponse.Passed) ? "Successfully published all Schemes!" : LatestResponse.Message, "Ok");
+        }
+
+        private async Task SaveAllAsync(CancellationToken cancellationToken = default)
+        {
+            LatestResponse = await Save(EditContext.WithDriver("User_Request_Save_All"), saveManifest: true, cancellationToken: cancellationToken);
+        }
+
+        private async Task CreateEmptyProjectAsync(CancellationToken cancellationToken = default)
+        {
+            var ctx = EditContext.WithDriver("User_Create_New_Project");
+                    
+            var initRes = await InitializeTemplateManifestScheme(ctx, 
+                projectPath: _defaultUnityProjectPath, 
+                defaultScriptExportPath: DEFAULT_SCRIPTS_PUBLISH_PATH,
+                cancellationToken: cancellationToken);
+            
+            LatestResponse = await SaveManifest(ctx, cancellationToken: cancellationToken);
+            LatestManifestLoadResponse = SchemaResult<(ManifestLoadStatus, SchemaProjectContainer)>.CheckIf(LatestResponse.Passed && initRes.Passed, 
+                (ManifestLoadStatus.FULLY_LOADED, initRes.Result), 
+                LatestResponse.Message,
+                "Loaded template manifest", ctx);
         }
 
         /// <summary>
@@ -800,11 +742,7 @@ namespace Schema.Unity.Editor
                             {
                                 menu.AddItem(new GUIContent(storageFormat.DisplayName), false, () =>
                                 {
-                                    var ctx = EditContext.WithDriver("User_Import_Schema");
-                                    if (storageFormat.TryImport(ctx, out var importedSchema, out var importFilePath))
-                                    {
-                                        SubmitAddSchemeRequest(ctx, importedSchema, importFilePath: importFilePath).FireAndForget();
-                                    }
+                                    _ = OnImportScheme(storageFormat, _cts.Token);
                                 });
                             }
                         }
@@ -852,14 +790,7 @@ namespace Schema.Unity.Editor
 
                         if (schemeChange.changed)
                         {
-                            var nextSelectedSchema = schemeNames[selectedSchemaIndex];
-                            bool switchSucceeded = OnSelectScheme(nextSelectedSchema.SchemeName, ctx);
-                            
-                            // If the switch was canceled, restore the previous selection
-                            if (!switchSucceeded)
-                            {
-                                selectedSchemaIndex = previousIndex;
-                            }
+                            _ = OnSchemeChange(ctx, schemeNames, previousIndex, _cts.Token);
                         }
                     }
                 }

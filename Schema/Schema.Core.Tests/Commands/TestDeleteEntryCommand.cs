@@ -19,9 +19,9 @@ namespace Schema.Core.Tests.Commands
         private Mock<IFileSystem> _mockFileSystem;
 
         [SetUp]
-        public void Setup()
+        public async Task Setup()
         {
-            TestFixtureSetup.Initialize(Context, out _mockFileSystem, out _);
+            (_mockFileSystem, _) = await TestFixtureSetup.Initialize(Context);
             
             _scheme = new DataScheme("TestScheme");
             _scheme.AddAttribute(Context, "Name", DataType.Text).AssertPassed();

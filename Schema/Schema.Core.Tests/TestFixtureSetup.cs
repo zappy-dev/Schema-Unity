@@ -57,15 +57,17 @@ public class TestFixtureSetup
         }
     }
     
-    internal static void Initialize(SchemaContext context, out Mock<IFileSystem> mockFileSystem, out Storage storage)
+    internal static async Task<(Mock<IFileSystem> mockFileSystem, Storage storage)> Initialize(SchemaContext context, CancellationToken cancellationToken = default)
     {
         Schema.Reset();
-        mockFileSystem = new Mock<IFileSystem>();
-        storage = new Storage(mockFileSystem.Object);
+        var mockFileSystem = new Mock<IFileSystem>();
+        var storage = new Storage(mockFileSystem.Object);
         Schema.SetStorage(storage);
         
-        Schema.InitializeTemplateManifestScheme(context, projectPath: ProjectPath, string.Empty).AssertPassed();
+        (await Schema.InitializeTemplateManifestScheme(context, projectPath: ProjectPath, string.Empty, cancellationToken)).AssertPassed();
         
         Assert.That(Schema.LatestProject, Is.Not.Null);
+        
+        return (mockFileSystem, storage);
     }
 }

@@ -9,6 +9,7 @@ using Schema.Core.Data;
 using Schema.Core.DataStructures;
 using Schema.Core.IO;
 using Schema.Core.Serialization;
+using Schema.Runtime;
 using Schema.Runtime.Type;
 using Schema.Unity.Editor.Ext;
 using Unity.Profiling;
@@ -301,11 +302,7 @@ namespace Schema.Unity.Editor
 
                     if (GUILayout.Button(saveButtonText, ExpandWidthOptions))
                     {
-                        LatestResponse = SaveDataScheme(EditContext | new SchemaContext
-                        {
-                            Scheme = scheme,
-                            Driver = "User_Save_Scheme",
-                        }, scheme, alsoSaveManifest: false);
+                        _ = OnSaveScheme(scheme, _cts.Token);
                     }
 
                     if (GUILayout.Button("Publish", ExpandWidthOptions))
@@ -747,11 +744,7 @@ namespace Schema.Unity.Editor
                 menu.AddItem(new GUIContent(storageFormat.Extension.ToUpper()), (bool)false,
                     () =>
                     {
-                        LatestResponse = storageFormat.Export(scheme, EditContext | new SchemaContext
-                        {
-                            Scheme = scheme,
-                            Driver = "User_Export_Scheme",
-                        }, UnityEditorPublishConfig.ResolveExportPath);
+                        _ = OnExportScheme(scheme, storageFormat, _cts.Token);
                     });
             }
 

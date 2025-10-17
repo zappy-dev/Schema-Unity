@@ -1,4 +1,7 @@
-﻿using Newtonsoft.Json;
+﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
 using Schema.Core.IO;
 using Schema.Core.Logging;
 
@@ -50,11 +53,18 @@ namespace Schema.Core.Data
                 return storageErr.Cast();
             }
 
-            bool directoryExists = storage.FileSystem.DirectoryExists(context, resolvedPath);
+            Task<bool> dirExistTask = storage.FileSystem.DirectoryExists(context, resolvedPath);
+            dirExistTask.Wait();
+            bool directoryExists = dirExistTask.Result;
             return CheckIf(directoryExists, $"Directory '{resolvedPath}' do not exist", "Directory exists", context);
         }
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
+        {
+            return ConvertValue(context, value, CancellationToken.None);
+        }
+
+        public SchemaResult<object> ConvertValue(SchemaContext context, object value, CancellationToken cancellationToken = default)
         {
             using var _ = new DataTypeContextScope(ref context, this);
             if (!(value is string filePath))
@@ -75,7 +85,9 @@ namespace Schema.Core.Data
                 return storageErr.CastError<object>();
             }
             
-            bool directoryExists = storage.FileSystem.DirectoryExists(context, resolvedPath);
+            Task<bool> dirExistTask = storage.FileSystem.DirectoryExists(context, resolvedPath, cancellationToken);
+            dirExistTask.Wait(TimeSpan.FromSeconds(5)); //TODO: Figure out a better solution..
+            bool directoryExists = dirExistTask.Result;
             
             return CheckIf<object>(
                 directoryExists || allowEmptyPath && string.IsNullOrEmpty(resolvedPath), 

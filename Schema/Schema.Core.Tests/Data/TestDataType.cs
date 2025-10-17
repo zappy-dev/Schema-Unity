@@ -5,6 +5,8 @@ using Schema.Core.IO;
 using Schema.Core.Logging;
 using Schema.Core.Serialization;
 using Schema.Core.Tests.Ext;
+using static System.Threading.Tasks.Task;
+using static Schema.Core.SchemaResult;
 
 namespace Schema.Core.Tests.Data;
 
@@ -26,18 +28,23 @@ public class TestDataType
     private const string VALID_REFERENCE_VALUE = "valid";
     private const string INVALID_REFERENCE_VALUE = "invalid";
     
+    private CancellationTokenSource cts = new();
+    
     [SetUp]
-    public void OnTestSetup()
+    public async Task OnTestSetup()
     {
-        TestFixtureSetup.Initialize(Context, out _mockFileSystem, out _);
+        (_mockFileSystem, _) = await TestFixtureSetup.Initialize(Context);
 
         Logger.LogVerbose($"Adding mock for FileExists({Context}, {VALID_FILE_PATH}) => Pass");
         Logger.LogVerbose($"Adding mock for FileExists({Context.WithDataType(DataType.FilePath_RelativePaths)}, {VALID_FILE_PATH}) => Pass");
-        _mockFileSystem.Setup(m => m.FileExists(Context, VALID_FILE_PATH)).Returns(SchemaResult.Pass());
-        _mockFileSystem.Setup(m => m.FileExists(Context, Path.Combine(TestFixtureSetup.ProjectPath, VALID_FILE_PATH))).Returns(SchemaResult.Pass());
-        _mockFileSystem.Setup(m => m.FileExists(Context.WithDataType(DataType.FilePath_RelativePaths), VALID_FILE_PATH)).Returns(SchemaResult.Pass());
-        _mockFileSystem.Setup(m => m.FileExists(Context.WithDataType(DataType.FilePath_RelativePaths), Path.Combine(TestFixtureSetup.ProjectPath, VALID_FILE_PATH))).Returns(SchemaResult.Pass());
-        _mockFileSystem.Setup(m => m.FileExists(Context, INVALID_FILE_PATH)).Returns(SchemaResult.Fail(Context, ""));
+        _mockFileSystem.Setup(m => m.FileExists(Context, VALID_FILE_PATH, cts.Token)).Returns(FromResult(Pass()));
+        _mockFileSystem.Setup(m => m.FileExists(Context, Path.Combine(TestFixtureSetup.ProjectPath, VALID_FILE_PATH), cts.Token)).Returns(FromResult(Pass()));
+        _mockFileSystem.Setup(m => m.FileExists(Context.WithDataType(DataType.FilePath_RelativePaths), VALID_FILE_PATH, cts.Token)).Returns(FromResult(Pass()));
+        _mockFileSystem.Setup(m => m.FileExists(Context, Path.Combine(TestFixtureSetup.ProjectPath, VALID_FILE_PATH), CancellationToken.None)).Returns(FromResult(Pass()));
+        _mockFileSystem.Setup(m => m.FileExists(Context.WithDataType(DataType.FilePath_RelativePaths), VALID_FILE_PATH, CancellationToken.None)).Returns(FromResult(Pass()));
+        _mockFileSystem.Setup(m => m.FileExists(Context.WithDataType(DataType.FilePath_RelativePaths), Path.Combine(TestFixtureSetup.ProjectPath, VALID_FILE_PATH), cts.Token)).Returns(FromResult(Pass()));
+        _mockFileSystem.Setup(m => m.FileExists(Context.WithDataType(DataType.FilePath_RelativePaths), Path.Combine(TestFixtureSetup.ProjectPath, VALID_FILE_PATH), CancellationToken.None)).Returns(FromResult(Pass()));
+        _mockFileSystem.Setup(m => m.FileExists(Context, INVALID_FILE_PATH, cts.Token)).Returns(FromResult(Fail(Context, "")));
 
         // pre-load data schemes
         var validScheme = new DataScheme(VALID_SCHEME_NAME);
@@ -56,6 +63,13 @@ public class TestDataType
             { VALID_REFERENCE_ATTRIBUTE, VALID_REFERENCE_VALUE }
         }));
         Schema.LoadDataScheme(Context, validSchemaNoIdentifier, true);
+    }
+
+    [OneTimeTearDown]
+    public void OnTestTearDown()
+    {
+        cts.Cancel();
+        cts.Dispose();
     }
     
     [Test, TestCaseSource(nameof(ConversionTestCases))]

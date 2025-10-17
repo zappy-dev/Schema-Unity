@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Schema.Core;
 using Unity.EditorCoroutines.Editor;
 using UnityEditor;
@@ -166,7 +167,7 @@ namespace Schema.Unity.Editor
 
                 if (GUILayout.Button("Fix Duplicate Entries"))
                 {
-                    FixDuplicateEntries();
+                    _ = FixDuplicateEntries();
                 }
 
                 showGUIEvents = EditorGUILayout.Toggle("Show GUI Events", showGUIEvents);
@@ -177,11 +178,12 @@ namespace Schema.Unity.Editor
             }
         }
 
-        private static SchemaResult FixDuplicateEntries()
+        private static async Task<SchemaResult> FixDuplicateEntries()
         {
             var ctx = EditContext.WithDriver("Debug_User_Fix_Duplicate_Entries");
             
-            if (!GetAllSchemes(ctx).Try(out var allSchemes, out var allSchemesError)) return allSchemesError.Cast();
+            if (!GetAllSchemes(ctx).Try(out var allSchemes, out var allSchemesError)) 
+                return allSchemesError.Cast();
 
             foreach (var schemeName in allSchemes)
             {
@@ -218,7 +220,7 @@ namespace Schema.Unity.Editor
                 if (numDeleted > 0)
                 {
                     LogWarning($"Scheme '{schemeName}' has deleted {numDeleted} entries.");
-                    if (!SaveDataScheme(ctx, scheme, false).Try(out var err)) return err;
+                    if (!(await SaveDataScheme(ctx, scheme, false)).Try(out var err)) return err;
                 }
             }
             

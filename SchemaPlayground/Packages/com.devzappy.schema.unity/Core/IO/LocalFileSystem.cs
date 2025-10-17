@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Schema.Core.Logging;
 using static Schema.Core.SchemaResult;
 
@@ -8,25 +10,25 @@ namespace Schema.Core.IO
     public class LocalFileSystem : IFileSystem
     {
         #region File Operations
-        public SchemaResult<string> ReadAllText(SchemaContext context, string filePath)
+        public Task<SchemaResult<string>> ReadAllText(SchemaContext context, string filePath, CancellationToken cancellationToken = default)
         {
             var res = SchemaResult<string>.New(context);
             var sanitizedPath = PathUtility.SanitizePath(filePath);
             if (!File.Exists(sanitizedPath))
             {
-                return res.Fail("File not found: " + sanitizedPath);
+                return Task.FromResult(res.Fail("File not found: " + sanitizedPath));
             }
             
-            return res.Pass(File.ReadAllText(sanitizedPath));
+            return Task.FromResult(res.Pass(File.ReadAllText(sanitizedPath)));
         }
 
-        public SchemaResult<string[]> ReadAllLines(SchemaContext context, string filePath)
+        public Task<SchemaResult<string[]>> ReadAllLines(SchemaContext context, string filePath, CancellationToken cancellationToken = default)
         {
             var sanitizedPath = PathUtility.SanitizePath(filePath);
-            return SchemaResult<string[]>.Pass(File.ReadAllLines(sanitizedPath));
+            return Task.FromResult(SchemaResult<string[]>.Pass(File.ReadAllLines(sanitizedPath)));
         }
 
-        public SchemaResult WriteAllText(SchemaContext context, string filePath, string fileContent)
+        public async Task<SchemaResult> WriteAllText(SchemaContext context, string filePath, string fileContent, CancellationToken cancellationToken = default)
         {
             var sanitizedPath = PathUtility.SanitizePath(filePath);
             Logger.LogDbgVerbose($"Writing file {sanitizedPath}, size: {fileContent.Length}");
@@ -35,10 +37,10 @@ namespace Schema.Core.IO
             var directoryPath = Path.GetDirectoryName(sanitizedPath);
 
             // Check if the directory exists, and if not, create it
-            var dirExists = DirectoryExists(context, directoryPath);
+            var dirExists = await DirectoryExists(context, directoryPath, cancellationToken);
             if (!dirExists)
             {
-                var createDirRes = CreateDirectory(context, directoryPath);
+                var createDirRes = await CreateDirectory(context, directoryPath, cancellationToken);
 
                 if (createDirRes.Failed)
                 {
@@ -49,29 +51,29 @@ namespace Schema.Core.IO
             return Pass();
         }
 
-        public SchemaResult FileExists(SchemaContext context, string filePath)
+        public Task<SchemaResult> FileExists(SchemaContext context, string filePath, CancellationToken cancellationToken = default)
         {
             var sanitizedPath = PathUtility.SanitizePath(filePath);
             
-            return CheckIf(context, File.Exists(sanitizedPath), $"File '{sanitizedPath}' does not exist");
+            return Task.FromResult(CheckIf(context, File.Exists(sanitizedPath), $"File '{sanitizedPath}' does not exist"));
         }
         
         #endregion
         
         #region Directory Operations
         
-        public bool DirectoryExists(SchemaContext context, string directoryPath)
+        public Task<bool> DirectoryExists(SchemaContext context, string directoryPath, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(directoryPath))
             {
-                return false;
+                return Task.FromResult(false);
             }
             var sanitizedPath = PathUtility.SanitizePath(directoryPath);
             
-            return Directory.Exists(sanitizedPath);
+            return Task.FromResult(Directory.Exists(sanitizedPath));
         }
 
-        public SchemaResult CreateDirectory(SchemaContext context, string directoryPath)
+        public async Task<SchemaResult> CreateDirectory(SchemaContext context, string directoryPath, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(directoryPath))
             {
@@ -80,7 +82,8 @@ namespace Schema.Core.IO
             var sanitizedPath = PathUtility.SanitizePath(directoryPath);
 
             // Directory already exists, move on
-            if (DirectoryExists(context, sanitizedPath))
+            bool doesExist = await DirectoryExists(context, sanitizedPath, cancellationToken);
+            if (doesExist)
             {
                 return Pass("Directory already exists");
             }

@@ -14,9 +14,9 @@ public class TestDataSchemeEquality
     };
 
     [SetUp]
-    public void OnTestSetup()
+    public async Task OnTestSetup()
     {
-        TestFixtureSetup.Initialize(Context, out _, out _);
+        _ = await TestFixtureSetup.Initialize(Context);
     }
 
     #region Basic Equals Tests

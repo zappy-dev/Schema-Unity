@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Schema.Core.Data;
 using Schema.Core.IO;
 using Schema.Core.Logging;
@@ -50,10 +52,11 @@ namespace Schema.Core
         #region Load Operations
         
         
-        public static SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> LoadManifestFromPath(SchemaContext ctx,
+        public static async Task<SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)>> LoadManifestFromPath(SchemaContext ctx,
             string manifestLoadPath,
             string projectPath,
-            IProgress<(float, string)> progress = null)
+            IProgress<(float, string)> progress = null,
+            CancellationToken cancellationToken = default)
         {
             SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> res = SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer container)>.New(ctx);
             if (string.IsNullOrWhiteSpace(manifestLoadPath))
@@ -72,7 +75,8 @@ namespace Schema.Core
                 return storageErr.CastError(res);
             }
 
-            if (storage.FileSystem.FileExists(ctx, manifestLoadPath).Failed)
+            var fileRes = await storage.FileSystem.FileExists(ctx, manifestLoadPath, cancellationToken);
+            if (fileRes.Failed)
             {
                 return res.Fail($"No Manifest scheme found.\nSearched the following path: {manifestLoadPath}\nLoad an existing manifest scheme or save the empty template.");
             }
@@ -80,14 +84,14 @@ namespace Schema.Core
             progress?.Report((0f, $"Loading: {manifestLoadPath}..."));
             Logger.LogDbgVerbose($"Loading manifest from file: {manifestLoadPath}...", "Manifest");
             var loadResult =
-                _storage.DefaultManifestStorageFormat.DeserializeFromFile(ctx, manifestLoadPath);
+                await _storage.DefaultManifestStorageFormat.DeserializeFromFile(ctx, manifestLoadPath, cancellationToken);
             if (!loadResult.Try( out var manifestDataScheme))
             {
                 return loadResult.CastError(res);
             }
 
-            var loadManifestRes = LoadManifest(ctx, manifestDataScheme, manifestImportPath: manifestLoadPath,
-                projectPath, progress);
+            var loadManifestRes = await LoadManifest(ctx, manifestDataScheme, manifestImportPath: manifestLoadPath,
+                projectPath, progress, cancellationToken);
 
             // WARNING
             // Time lost debugging this code: 10 hours
@@ -101,11 +105,12 @@ namespace Schema.Core
             return loadManifestRes;
         }
         
-        public static SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> LoadManifest(SchemaContext ctx,
+        public static async Task<SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)>> LoadManifest(SchemaContext ctx,
             DataScheme manifestDataScheme,
             string manifestImportPath,
             string projectPath,
-            IProgress<(float, string)> progress = null)
+            IProgress<(float, string)> progress = null,
+            CancellationToken cancellationToken = default)
         {
             SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> res = SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer container)>.New(ctx);
             
@@ -115,143 +120,141 @@ namespace Schema.Core
             newProjectContainer.ProjectPath = projectPath;
             ctx.Project = newProjectContainer; // set up the project container in the context for future load operations to use.
             
-            lock (manifestOperationLock)
+            // clear out previous data in case it is stagnant
+            Logger.LogDbgVerbose($"Schema: Unloading all schemes");
+            // LastProjectContainer.Dispose();
+            // TODO: Ability to re-load previous project container? switch projects?
+            
+            var loadStopwatch = Stopwatch.StartNew();
+            int currentSchema = 0;
+            int schemeCount = manifestDataScheme.EntryCount;
+
+            nextManifestScheme = new ManifestScheme(manifestDataScheme);
+            var saveManifestResponse = LoadDataScheme(ctx, manifestDataScheme, overwriteExisting: true,
+                registerManifestEntry: false);
+            Logger.LogDbgVerbose(saveManifestResponse.Message, saveManifestResponse.Context);
+            if (!saveManifestResponse.Passed)
             {
-                // clear out previous data in case it is stagnant
-                Logger.LogDbgVerbose($"Schema: Unloading all schemes");
-                // LastProjectContainer.Dispose();
-                // TODO: Ability to re-load previous project container? switch projects?
-                
-                var loadStopwatch = Stopwatch.StartNew();
-                int currentSchema = 0;
-                int schemeCount = manifestDataScheme.EntryCount;
+                Logger.LogError(saveManifestResponse.Message, saveManifestResponse.Context);
+                nextManifestScheme = null;
+                return res.Fail(saveManifestResponse.Message);
+            }
+            
+            Logger.LogDbgVerbose($"Loaded {manifestDataScheme}, scheme count: {schemeCount}", manifestDataScheme);
 
-                nextManifestScheme = new ManifestScheme(manifestDataScheme);
-                var saveManifestResponse = LoadDataScheme(ctx, manifestDataScheme, overwriteExisting: true,
+            var sb = new StringBuilder();
+            bool success = true;
+            // sanitize data
+            var schemaGroups = manifestDataScheme.AllEntries.GroupBy(e => e.GetData(nameof(ManifestEntry.SchemeName)));
+            var schemaGroupsArray = schemaGroups as IGrouping<object, DataEntry>[] ?? schemaGroups.ToArray();
+            foreach (var duplicateEntriesGroup in schemaGroupsArray.Where(g => g.Count() > 1))
+            {
+                sb.AppendLine($"Found {duplicateEntriesGroup.Count()} manifest entries for scheme '{duplicateEntriesGroup.Key}'");
+            }
+            
+            // 1. Load schemes into memory
+            var progressWrapper = new ProgressWrapper<string>(schemeFilePath =>
+            {
+                Logger.LogVerbose($"Loading scheme from file: {schemeFilePath}");
+                progress?.Report((currentSchema * 1.0f / schemeCount,
+                    $"Loading ({currentSchema}/{schemeCount}): {schemeFilePath}"));
+            });
+            var loadedSchemes = new List<DataScheme>();
+            if (!nextManifestScheme.GetEntries(ctx).Try(out var entries, out var error))
+                return error.CastError(res);
+            
+            foreach (var manifestEntry in entries)
+            {
+                currentSchema++;
+                Logger.LogDbgVerbose($"Loading manifest entry {manifestEntry._}...", manifestDataScheme);
+
+                if (manifestEntry.SchemeName.Equals(Manifest.MANIFEST_SCHEME_NAME))
+                {
+                    var manifestFilePath = manifestEntry.FilePath;
+                    if (string.IsNullOrWhiteSpace(manifestFilePath))
+                    {
+                        // skip empty manifest self entry, this is allowed, especially for empty / not-yet persisted projects.
+                        continue;
+                    }
+                }
+                
+                var loadSchemeRes = await LoadSchemeFromManifestEntry(ctx, manifestEntry,
+                    progress: progressWrapper, cancellationToken);
+                if (!loadSchemeRes.Try(out var loadedScheme))
+                {
+                    success = false;
+                    Logger.LogError(loadSchemeRes.Message, loadSchemeRes.Context);
+                    sb.AppendLine(loadSchemeRes.Message);
+                    continue;
+                }
+
+                // allow loaded manifest to overwrite in-memory manifest
+                bool isSelfEntry = loadedScheme.IsManifest;
+                loadedScheme.SetDirty(ctx, false); // is the loaded scheme dirty? type conversions?
+                if (isSelfEntry)
+                {
+                    // if (!manifestDataScheme.Equals(loadedScheme))
+                    // {
+                    //     // TODO: Clarify this message better
+                    //     Logger.LogError($"Mismatch between loaded manifest scheme and manifest scheme referenced by loaded manifest.", context: manifestDataScheme);
+                    // }
+
+                    continue;
+                    // TODO: How best to handle loading the manifest schema while already loading the manifest schema?
+                    // Add validation to make sure it is the same file path?
+                    // continue;
+                }
+                
+                loadedSchemes.Add(loadedScheme);
+            }
+            
+            if (!DataScheme.TopologicalSortByReferences(ctx, loadedSchemes).Try(out var schemeLoadOrder, out var sortErr)) 
+                return sortErr.CastError(res);
+
+            var schemeLoadOrderList = schemeLoadOrder.ToList();
+            progress?.Report((0.1f, "Loading..."));
+            int numLoaded = 0;
+            int numSchemes = schemeLoadOrderList.Count;
+            foreach (var scheme in schemeLoadOrderList)
+            {
+                numLoaded++;
+                progress?.Report((0.1f, $"Loading '{scheme.ToString(false)}' into Schema ({numLoaded} / {numSchemes})"));
+                Logger.LogDbgVerbose($"Loading scheme from manifest: {scheme}", context: manifestDataScheme);
+                var loadRes = LoadDataScheme(ctx, scheme,
+                    overwriteExisting: false,
                     registerManifestEntry: false);
-                Logger.LogDbgVerbose(saveManifestResponse.Message, saveManifestResponse.Context);
-                if (!saveManifestResponse.Passed)
+                if (loadRes.Failed)
                 {
-                    Logger.LogError(saveManifestResponse.Message, saveManifestResponse.Context);
-                    nextManifestScheme = null;
-                    return res.Fail(saveManifestResponse.Message);
+                    success = false;
+                    Logger.LogError(loadRes.Message, loadRes.Context);
+                    sb.AppendLine(loadRes.Message);
                 }
                 
-                Logger.LogDbgVerbose($"Loaded {manifestDataScheme}, scheme count: {schemeCount}", manifestDataScheme);
-
-                var sb = new StringBuilder();
-                bool success = true;
-                // sanitize data
-                var schemaGroups = manifestDataScheme.AllEntries.GroupBy(e => e.GetData(nameof(ManifestEntry.SchemeName)));
-                var schemaGroupsArray = schemaGroups as IGrouping<object, DataEntry>[] ?? schemaGroups.ToArray();
-                foreach (var duplicateEntriesGroup in schemaGroupsArray.Where(g => g.Count() > 1))
-                {
-                    sb.AppendLine($"Found {duplicateEntriesGroup.Count()} manifest entries for scheme '{duplicateEntriesGroup.Key}'");
-                }
-                
-                // 1. Load schemes into memory
-                var progressWrapper = new ProgressWrapper<string>(schemeFilePath =>
-                {
-                    Logger.LogVerbose($"Loading scheme from file: {schemeFilePath}");
-                    progress?.Report((currentSchema * 1.0f / schemeCount,
-                        $"Loading ({currentSchema}/{schemeCount}): {schemeFilePath}"));
-                });
-                var loadedSchemes = new List<DataScheme>();
-                if (!nextManifestScheme.GetEntries(ctx).Try(out var entries, out var error))
-                    return error.CastError(res);
-                
-                foreach (var manifestEntry in entries)
-                {
-                    currentSchema++;
-                    Logger.LogDbgVerbose($"Loading manifest entry {manifestEntry._}...", manifestDataScheme);
-
-                    if (manifestEntry.SchemeName.Equals(Manifest.MANIFEST_SCHEME_NAME))
-                    {
-                        var manifestFilePath = manifestEntry.FilePath;
-                        if (string.IsNullOrWhiteSpace(manifestFilePath))
-                        {
-                            // skip empty manifest self entry, this is allowed, especially for empty / not-yet persisted projects.
-                            continue;
-                        }
-                    }
-                    
-                    var loadSchemeRes = LoadSchemeFromManifestEntry(ctx, manifestEntry,
-                        progress: progressWrapper);
-                    if (!loadSchemeRes.Try(out var loadedScheme))
-                    {
-                        success = false;
-                        Logger.LogError(loadSchemeRes.Message, loadSchemeRes.Context);
-                        sb.AppendLine(loadSchemeRes.Message);
-                        continue;
-                    }
-
-                    // allow loaded manifest to overwrite in-memory manifest
-                    bool isSelfEntry = loadedScheme.IsManifest;
-                    loadedScheme.SetDirty(ctx, false); // is the loaded scheme dirty? type conversions?
-                    if (isSelfEntry)
-                    {
-                        // if (!manifestDataScheme.Equals(loadedScheme))
-                        // {
-                        //     // TODO: Clarify this message better
-                        //     Logger.LogError($"Mismatch between loaded manifest scheme and manifest scheme referenced by loaded manifest.", context: manifestDataScheme);
-                        // }
-
-                        continue;
-                        // TODO: How best to handle loading the manifest schema while already loading the manifest schema?
-                        // Add validation to make sure it is the same file path?
-                        // continue;
-                    }
-                    
-                    loadedSchemes.Add(loadedScheme);
-                }
-                
-                if (!DataScheme.TopologicalSortByReferences(ctx, loadedSchemes).Try(out var schemeLoadOrder, out var sortErr)) 
-                    return sortErr.CastError(res);
-
-                var schemeLoadOrderList = schemeLoadOrder.ToList();
-                progress?.Report((0.1f, "Loading..."));
-                int numLoaded = 0;
-                int numSchemes = schemeLoadOrderList.Count;
-                foreach (var scheme in schemeLoadOrderList)
-                {
-                    numLoaded++;
-                    progress?.Report((0.1f, $"Loading '{scheme.ToString(false)}' into Schema ({numLoaded} / {numSchemes})"));
-                    Logger.LogDbgVerbose($"Loading scheme from manifest: {scheme}", context: manifestDataScheme);
-                    var loadRes = LoadDataScheme(ctx, scheme,
-                        overwriteExisting: false,
-                        registerManifestEntry: false);
-                    if (loadRes.Failed)
-                    {
-                        success = false;
-                        Logger.LogError(loadRes.Message, loadRes.Context);
-                        sb.AppendLine(loadRes.Message);
-                    }
-                    
-                    Logger.LogDbgVerbose(loadRes.Message, loadRes.Context);
-                }
-                
-                LatestProject = newProjectContainer;
-                
-                ManifestUpdated?.Invoke();
-                ProjectLoaded?.Invoke();
-                if (!success)
-                {
-                    ctx.Project.Manifest = nextManifestScheme;
-                    nextManifestScheme = null;
-                    return res.Pass((ManifestLoadStatus.FAILED_TO_LOAD_ENTRIES, newProjectContainer), $"Failed to load all schemes found in manifest, errors: {sb}");
-                }
-                
-                // overwrite existing manifest
-                loadStopwatch.Stop();
-
+                Logger.LogDbgVerbose(loadRes.Message, loadRes.Context);
+            }
+            
+            LatestProject = newProjectContainer;
+            
+            ManifestUpdated?.Invoke();
+            ProjectLoaded?.Invoke();
+            if (!success)
+            {
                 ctx.Project.Manifest = nextManifestScheme;
                 nextManifestScheme = null;
-                return res.Pass((ManifestLoadStatus.FULLY_LOADED, newProjectContainer), $"Loaded {schemeCount} schemes from manifest in {loadStopwatch.ElapsedMilliseconds:N0} ms");
+                return res.Pass((ManifestLoadStatus.FAILED_TO_LOAD_ENTRIES, newProjectContainer), $"Failed to load all schemes found in manifest, errors: {sb}");
             }
+            
+            // overwrite existing manifest
+            loadStopwatch.Stop();
+
+            ctx.Project.Manifest = nextManifestScheme;
+            nextManifestScheme = null;
+            return res.Pass((ManifestLoadStatus.FULLY_LOADED, newProjectContainer), $"Loaded {schemeCount} schemes from manifest in {loadStopwatch.ElapsedMilliseconds:N0} ms");
         }
         
-        internal static SchemaResult<DataScheme> LoadSchemeFromManifestEntry(SchemaContext ctx, ManifestEntry manifestEntry,
-            IProgress<string> progress = null)
+        internal static async Task<SchemaResult<DataScheme>> LoadSchemeFromManifestEntry(SchemaContext ctx, ManifestEntry manifestEntry,
+            IProgress<string> progress = null,
+            CancellationToken cancellationToken = default)
         {
             var res = SchemaResult<DataScheme>.New(ctx);
             if (manifestEntry == null)
@@ -286,7 +289,7 @@ namespace Schema.Core
             }
             Logger.LogDbgVerbose("Fina ResolvedPath: " + resolvedPath);
 
-            var fileExistRes = _storage.FileSystem.FileExists(ctx, resolvedPath);
+            var fileExistRes = await _storage.FileSystem.FileExists(ctx, resolvedPath, cancellationToken);
             if (fileExistRes.Failed)
             {
                 return fileExistRes.CastError<DataScheme>();
@@ -295,7 +298,7 @@ namespace Schema.Core
             progress?.Report(resolvedPath);
                 
             // TODO support async loading
-            if (!_storage.DefaultSchemeStorageFormat.DeserializeFromFile(ctx, resolvedPath)
+            if (!(await _storage.DefaultSchemeStorageFormat.DeserializeFromFile(ctx, resolvedPath, cancellationToken))
                     .Try(out var loadedSchema, out var loadErr))
             {
                 return res.Fail($"Failed to load scheme from file: {resolvedPath}, reason: {loadErr.Message}");
@@ -444,22 +447,19 @@ namespace Schema.Core
                     return Pass("Schema added", ctx);
                 
                 // Add a new entry to the manifest for this loaded scheme
-                lock (manifestOperationLock)
+                if (!GetManifestEntryForScheme(ctx, schemeName).Try(out _))
                 {
-                    if (!GetManifestEntryForScheme(ctx, schemeName).Try(out _))
-                    {
-                        // add manifest record for new scheme
+                    // add manifest record for new scheme
                     
-                        Logger.LogDbgVerbose($"Adding manifest entry for {schemeName} with import path: {importFilePath}...", ctx);
-                        var manifest = GetManifestScheme(ctx);
-                        if (!manifest.Try(out var manifestScheme))
-                        {
-                            return Fail(ctx, manifest.Message);
-                        }
-
-                        return manifestScheme.AddManifestEntry(ctx, schemeName, ManifestScheme.PublishTarget.DEFAULT,
-                            importFilePath).Cast();
+                    Logger.LogDbgVerbose($"Adding manifest entry for {schemeName} with import path: {importFilePath}...", ctx);
+                    var manifest = GetManifestScheme(ctx);
+                    if (!manifest.Try(out var manifestScheme))
+                    {
+                        return Fail(ctx, manifest.Message);
                     }
+
+                    return manifestScheme.AddManifestEntry(ctx, schemeName, ManifestScheme.PublishTarget.DEFAULT,
+                        importFilePath).Cast();
                 }
             }
 
@@ -476,7 +476,7 @@ namespace Schema.Core
         #endregion
 
         #region Save Operations
-        public static SchemaResult SaveManifest(SchemaContext ctx, IProgress<float> progress = null)
+        public static async Task<SchemaResult> SaveManifest(SchemaContext ctx, IProgress<float> progress = null, CancellationToken cancellationToken = default)
         {
             Logger.LogDbgVerbose($"Saving manifest to file: {ctx.Project.ManifestImportPath}...", "Manifest");
             if (string.IsNullOrWhiteSpace(ctx.Project.ManifestImportPath))
@@ -490,40 +490,37 @@ namespace Schema.Core
             }
             
             progress?.Report(0f);
-            lock (manifestOperationLock)
+            if (!GetManifestSelfEntry(ctx).Try(out var manifestSelfEntry, out var manifestError))
             {
-                if (!GetManifestSelfEntry(ctx).Try(out var manifestSelfEntry, out var manifestError))
-                {
-                    return manifestError.Cast();
-                }
+                return manifestError.Cast();
+            }
                 
-                var previousManifestPath = manifestSelfEntry.FilePath;
-                try
-                {
-                    // TODO: Unify with FS Data Type
-                    var manifestRelativeLoadPath = ctx.Project.ProjectRelativeManifestLoadPath;
-                    manifestSelfEntry.FilePath = manifestRelativeLoadPath;
+            var previousManifestPath = manifestSelfEntry.FilePath;
+            try
+            {
+                // TODO: Unify with FS Data Type
+                var manifestRelativeLoadPath = ctx.Project.ProjectRelativeManifestLoadPath;
+                manifestSelfEntry.FilePath = manifestRelativeLoadPath;
 
-                    if (GetManifestScheme(ctx).TryErr(out var manifestScheme, out var err)) return err.Cast();
+                if (GetManifestScheme(ctx).TryErr(out var manifestScheme, out var err)) return err.Cast();
 
-                    if (_storage.DefaultManifestStorageFormat.SerializeToFile(ctx, ctx.Project.ManifestImportPath, manifestScheme._).Passed)
-                    {
-                        manifestScheme.SetDirty(ctx, false);
-                    }
-                }
-                catch (Exception ex)
+                if ((await _storage.DefaultManifestStorageFormat.SerializeToFile(ctx, ctx.Project.ManifestImportPath, manifestScheme._, cancellationToken)).Passed)
                 {
-                    // rollback bad path
-                    manifestSelfEntry.FilePath = previousManifestPath;
-                    Logger.LogError(ex.ToString());
-                    return Fail(ctx,$"Failed to save manifest to {ctx.Project.ManifestImportPath}\n{ex.Message}");
+                    manifestScheme.SetDirty(ctx, false);
                 }
+            }
+            catch (Exception ex)
+            {
+                // rollback bad path
+                manifestSelfEntry.FilePath = previousManifestPath;
+                Logger.LogError(ex.ToString());
+                return Fail(ctx,$"Failed to save manifest to {ctx.Project.ManifestImportPath}\n{ex.Message}");
             }
             
             return Pass($"Saved manifest to path: {ctx.Project.ManifestImportPath}");
         }
 
-        public static SchemaResult Save(SchemaContext ctx, bool saveManifest = false)
+        public static async Task<SchemaResult> Save(SchemaContext ctx, bool saveManifest = false, CancellationToken cancellationToken = default)
         {
             if (ctx.Project == null)
             {
@@ -551,7 +548,7 @@ namespace Schema.Core
                         continue;
                     }
                     
-                    var result = SaveDataScheme(ctx, scheme, saveManifest);
+                    var result = await SaveDataScheme(ctx, scheme, saveManifest, cancellationToken);
                     if (result.Failed)
                     {
                         return result;
@@ -562,7 +559,7 @@ namespace Schema.Core
             return Pass("Saved all dirty schemes");
         }
 
-        public static SchemaResult SaveDataScheme(SchemaContext ctx, DataScheme scheme, bool alsoSaveManifest)
+        public static async Task<SchemaResult> SaveDataScheme(SchemaContext ctx, DataScheme schemeToSave, bool alsoSaveManifest, CancellationToken cancellationToken = default)
         {
             var isInitRes = IsInitialized(ctx);
             if (isInitRes.Failed)
@@ -570,20 +567,20 @@ namespace Schema.Core
                 return isInitRes;
             }
             
-            Logger.LogDbgVerbose($"Saving {scheme} to file...", "Storage");
-            if (scheme == null)
+            Logger.LogDbgVerbose($"Saving {schemeToSave} to file...", "Storage");
+            if (schemeToSave == null)
             {
                 return Fail(ctx, "Attempted to save an invalid Data scheme");
             }
             
             var saveStopwatch = Stopwatch.StartNew();
-            if (!GetManifestEntryForScheme(ctx, scheme.SchemeName).Try(out var schemeManifestEntry))
+            if (!GetManifestEntryForScheme(ctx, schemeToSave.SchemeName).Try(out var schemeManifestEntry))
             {
-                return Fail(ctx, "Could not find manifest entry for scheme name: " + scheme.SchemeName);
+                return Fail(ctx, "Could not find manifest entry for scheme name: " + schemeToSave.SchemeName);
             }
             
-            if (scheme.IsManifest && GetManifestScheme(ctx).Try(out var loadedManifestScheme) &&
-                !loadedManifestScheme._.Equals(scheme))
+            if (schemeToSave.IsManifest && GetManifestScheme(ctx).Try(out var loadedManifestScheme) &&
+                !loadedManifestScheme._.Equals(schemeToSave))
             {
                 var sb = new StringBuilder();
                 sb.Append(
@@ -592,7 +589,7 @@ namespace Schema.Core
                 sb.AppendLine("Loaded Manifest Scheme");
                 loadedManifestScheme._.Write(sb, true);
                 sb.AppendLine("Saving Manifest Scheme");
-                scheme.Write(sb, true);
+                schemeToSave.Write(sb, true);
                 #endif
                 return Fail(ctx, sb.ToString());
             }
@@ -600,7 +597,7 @@ namespace Schema.Core
             // Only serialize the manifest to disk once
             string savePath = ""; 
             SchemaResult result = NoOp;
-            if (!scheme.IsManifest)
+            if (!schemeToSave.IsManifest)
             {
                 // Get the file path from the manifest entry
                 savePath = schemeManifestEntry.FilePath;
@@ -614,17 +611,17 @@ namespace Schema.Core
                     
                     // Ensure the directory exists
                     string directory = Path.GetDirectoryName(resolvedPath);
-                    if (!_storage.FileSystem.DirectoryExists(ctx, directory))
+                    if (!(await _storage.FileSystem.DirectoryExists(ctx, directory, cancellationToken)))
                     {
                         _storage.FileSystem.CreateDirectory(ctx, directory);
                     }
                 }
                 
-                Logger.LogDbgVerbose($"Saving {scheme} to file {resolvedPath} (from path {savePath})", "Storage");
-                result = _storage.DefaultSchemeStorageFormat.SerializeToFile(ctx, resolvedPath, scheme);
+                Logger.LogDbgVerbose($"Saving {schemeToSave} to file {resolvedPath} (from path {savePath})", "Storage");
+                result = await _storage.DefaultSchemeStorageFormat.SerializeToFile(ctx, resolvedPath, schemeToSave, cancellationToken);
             }
 
-            if (scheme.IsManifest || alsoSaveManifest)
+            if (schemeToSave.IsManifest || alsoSaveManifest)
             {
                 ManifestScheme manifestScheme;
                 if (alsoSaveManifest)
@@ -639,7 +636,7 @@ namespace Schema.Core
                 else
                 {
                     // Try given scheme as a manifest to update self entry
-                    manifestScheme = new ManifestScheme(scheme);
+                    manifestScheme = new ManifestScheme(schemeToSave);
                 }
 
                 if (!manifestScheme.GetSelfEntry(ctx).Try(out var manifestSelfEntry, out var manifestError))
@@ -653,15 +650,15 @@ namespace Schema.Core
                 }
                 
                 savePath = ctx.Project.ManifestImportPath;
-                Logger.LogDbgVerbose($"Saving manifest {scheme} to file {ctx.Project.ManifestImportPath}", "Storage");
-                result = SaveManifest(ctx);
+                Logger.LogDbgVerbose($"Saving manifest {schemeToSave} to file {ctx.Project.ManifestImportPath}", "Storage");
+                result = await SaveManifest(ctx, cancellationToken: cancellationToken);
             }
             saveStopwatch.Stop();
 
             if (result.Passed)
             {
-                Logger.LogDbgVerbose($"Saved {scheme} to file {savePath} in {saveStopwatch.ElapsedMilliseconds:N0} ms", context: "Storage");
-                scheme.SetDirty(ctx, false);
+                Logger.LogDbgVerbose($"Saved {schemeToSave} to file {savePath} in {saveStopwatch.ElapsedMilliseconds:N0} ms", context: "Storage");
+                schemeToSave.SetDirty(ctx, false);
             }
             return result;
         }

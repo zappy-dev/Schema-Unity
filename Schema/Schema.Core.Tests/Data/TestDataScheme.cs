@@ -19,9 +19,9 @@ public class TestDataScheme
     private const string EXISTING_INTEGER_ATTRIBUTE_NAME = "ExistingIntegerField";
 
     [SetUp]
-    public void OnTestSetup()
+    public async Task OnTestSetup()
     {
-        TestFixtureSetup.Initialize(Context, out _, out _);
+        _ = await TestFixtureSetup.Initialize(Context);
 
         emptyScheme = new DataScheme();
         

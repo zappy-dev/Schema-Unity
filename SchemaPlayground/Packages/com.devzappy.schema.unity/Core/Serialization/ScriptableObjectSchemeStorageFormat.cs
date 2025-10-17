@@ -1,4 +1,6 @@
-﻿using Schema.Core.Data;
+﻿using System.Threading;
+using System.Threading.Tasks;
+using Schema.Core.Data;
 
 namespace Schema.Core.Serialization
 {
@@ -9,7 +11,8 @@ namespace Schema.Core.Serialization
         public bool IsImportSupported => true;
         public bool IsExportSupported => false;
     
-        public SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath)
+        public Task<SchemaResult<DataScheme>> DeserializeFromFile(SchemaContext context, string filePath,
+            CancellationToken cancellationToken = default)
         {
             throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(DeserializeFromFile)}");
         }
@@ -19,7 +22,8 @@ namespace Schema.Core.Serialization
             throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(Deserialize)}");
         }
 
-        public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme data)
+        public Task<SchemaResult> SerializeToFile(SchemaContext context, string filePath, DataScheme data,
+            CancellationToken cancellationToken = default)
         {
             throw new System.NotImplementedException($"{nameof(DataTypeJsonConverter)}.{nameof(SerializeToFile)}");
         }

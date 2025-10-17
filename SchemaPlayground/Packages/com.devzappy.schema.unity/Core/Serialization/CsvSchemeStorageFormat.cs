@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Schema.Core.Data;
 using Schema.Core.IO;
 using static Schema.Core.SchemaResult;
@@ -23,10 +25,11 @@ namespace Schema.Core.Serialization
             this.fileSystem = fileSystem;
         }
         
-        public SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath)
+        public async Task<SchemaResult<DataScheme>> DeserializeFromFile(SchemaContext context, string filePath,
+            CancellationToken cancellationToken = default)
         {
             var schemeName = Path.GetFileNameWithoutExtension(filePath);
-            var readLinesRes = fileSystem.ReadAllLines(context, filePath);
+            var readLinesRes = await fileSystem.ReadAllLines(context, filePath, cancellationToken);
             if (!readLinesRes.Try(out var rows))
             {
                 return readLinesRes.CastError<DataScheme>();
@@ -153,7 +156,8 @@ namespace Schema.Core.Serialization
                 context: this);
         }
 
-        public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme scheme)
+        public async Task<SchemaResult> SerializeToFile(SchemaContext context, string filePath, DataScheme scheme,
+            CancellationToken cancellationToken = default)
         {
             if (scheme == null)
             {
@@ -166,7 +170,7 @@ namespace Schema.Core.Serialization
             }
 
             // Write to file
-            fileSystem.WriteAllText(context, filePath, csvContent);
+            await fileSystem.WriteAllText(context, filePath, csvContent, cancellationToken);
             
             return Pass($"Wrote {scheme} to file: {filePath}");
         }

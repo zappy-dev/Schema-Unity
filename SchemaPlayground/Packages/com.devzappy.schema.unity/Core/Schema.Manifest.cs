@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Schema.Core.Data;
 using Schema.Core.Logging;
 using Schema.Core.Schemes;
@@ -114,48 +116,46 @@ namespace Schema.Core
         /// Initializes the template manifest scheme and loads it into the schema system.
         /// </summary>
         /// <returns>A <see cref="SchemaResult"/> indicating success or failure.</returns>
-        public static SchemaResult<SchemaProjectContainer> InitializeTemplateManifestScheme(SchemaContext context,
+        public static async Task<SchemaResult<SchemaProjectContainer>> InitializeTemplateManifestScheme(SchemaContext context,
             string projectPath,
-            string defaultScriptExportPath)
+            string defaultScriptExportPath,
+            CancellationToken cancellationToken = default)
         {
             var res = SchemaResult<SchemaProjectContainer>.New(context);
             if (GetStorage(context).TryErr(out var storage, out var storageErr)) return storageErr.CastError(res);
             
-            lock (manifestOperationLock)
+            // Only attempt to create the directory if a non-empty path is provided
+            if (!string.IsNullOrWhiteSpace(defaultScriptExportPath))
             {
-                // build template
-                var templateManifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(context, 
-                    defaultScriptExportPath,
-                    Path.Combine(DefaultContentDirectory, "Manifest.json"));
-                
-                // Only attempt to create the directory if a non-empty path is provided
-                if (!string.IsNullOrWhiteSpace(defaultScriptExportPath))
+                var createRes = await storage.FileSystem.CreateDirectory(context, defaultScriptExportPath, cancellationToken);
+                if (createRes.Failed)
                 {
-                    var createRes = storage.FileSystem.CreateDirectory(context, defaultScriptExportPath);
-                    if (createRes.Failed)
-                    {
-                        return createRes.CastError(res);
-                    }
+                    return createRes.CastError(res);
                 }
-                
-                // Prime the manifest as loaded before validation to avoid FS path checks requiring initialization
-                var manifestScheme = new ManifestScheme(templateManifestScheme._);
-                var emptyProjectContainer = new SchemaProjectContainer();
-                // context.Project = emptyProjectContainer; // setting up empty project..
-                using var _ = new ProjectContextScope(ref context, emptyProjectContainer);
-                emptyProjectContainer.Manifest = manifestScheme;
-                emptyProjectContainer.ProjectPath = projectPath;
-                var result = LoadDataScheme(context, templateManifestScheme._, overwriteExisting: true);
-                Logger.LogDbgVerbose(result.Message, result.Context);
-                if (result.Passed)
-                {
-                    IsTemplateManifestLoaded = true;
-                    LatestProject = emptyProjectContainer;
-                    return res.Pass(emptyProjectContainer, "Loaded Template Manifest");
-                }
-
-                return result.CastError(res);
             }
+            
+            // build template
+            var templateManifestScheme = ManifestDataSchemeFactory.BuildTemplateManifestSchema(context, 
+                defaultScriptExportPath,
+                Path.Combine(DefaultContentDirectory, "Manifest.json"));
+                
+            // Prime the manifest as loaded before validation to avoid FS path checks requiring initialization
+            var manifestScheme = new ManifestScheme(templateManifestScheme._);
+            var emptyProjectContainer = new SchemaProjectContainer();
+            // context.Project = emptyProjectContainer; // setting up empty project..
+            using var _ = new ProjectContextScope(ref context, emptyProjectContainer);
+            emptyProjectContainer.Manifest = manifestScheme;
+            emptyProjectContainer.ProjectPath = projectPath;
+            var result = LoadDataScheme(context, templateManifestScheme._, overwriteExisting: true);
+            Logger.LogDbgVerbose(result.Message, result.Context);
+            if (result.Passed)
+            {
+                IsTemplateManifestLoaded = true;
+                LatestProject = emptyProjectContainer;
+                return res.Pass(emptyProjectContainer, "Loaded Template Manifest");
+            }
+
+            return result.CastError(res);
         }
         #endregion
 
@@ -238,14 +238,10 @@ namespace Schema.Core
                 return res.Fail("Invalid scheme name");
             }
 
-            lock (manifestOperationLock)
-            {
-                if (!GetManifestScheme(ctx).Try(out var manifestScheme, out var manifestError))
-                    return manifestError.CastError<ManifestEntry>();
+            if (!GetManifestScheme(ctx).Try(out var manifestScheme, out var manifestError))
+                return manifestError.CastError<ManifestEntry>();
                 
-                return manifestScheme.GetEntryForSchemeName(ctx, schemeName);
-
-            }
+            return manifestScheme.GetEntryForSchemeName(ctx, schemeName);
         }
     }
 }

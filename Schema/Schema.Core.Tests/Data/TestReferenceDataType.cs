@@ -24,9 +24,9 @@ public class TestReferenceDataType
     private Mock<IFileSystem> _mockFileSystem;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
-        TestFixtureSetup.Initialize(Context, out _mockFileSystem, out _);
+        (_mockFileSystem, _) = await TestFixtureSetup.Initialize(Context);
 
         // Create a test scheme with string identifiers
         _testScheme = new DataScheme(REFERENCE_SCHEME_NAME);

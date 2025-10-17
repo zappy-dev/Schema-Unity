@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Tasks;
 using Schema.Core.Logging;
 
 namespace Schema.Core
@@ -36,6 +37,29 @@ namespace Schema.Core
             foreach (var entry in entries)
             {
                 var res = operation(entry);
+                success &= res.Passed;
+                if (res.Failed)
+                {
+                    Logger.LogError(res.Message, res.Context);
+                    if (haltOnError)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            return CheckIf(context, success, errorMessage);
+        }
+        public static async Task<SchemaResult> BulkResult<T>(IEnumerable<T> entries, 
+            Func<T, Task<SchemaResult>> operation, 
+            string errorMessage = "Failed Bulk Operation",
+            bool haltOnError = false,
+            SchemaContext context = default)
+        {
+            bool success = true;
+            foreach (var entry in entries)
+            {
+                var res = await operation(entry);
                 success &= res.Passed;
                 if (res.Failed)
                 {

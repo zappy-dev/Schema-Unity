@@ -19,6 +19,7 @@ public class TestCSVStorageFormat
     private Mock<IFileSystem> mockFileSystem;
     private ISchemeStorageFormat storageFormat;
     private DataScheme testScheme;
+    private CancellationTokenSource cts = new();
 
     [SetUp]
     public void OnTestSetup()
@@ -36,11 +37,18 @@ public class TestCSVStorageFormat
         });
     }
 
+    [OneTimeTearDown]
+    public void OneTimeTearDown()
+    {
+        cts.Cancel();
+        cts.Dispose();
+    }
+
     [Test]
     [TestCaseSource(nameof(BadSchemeTestCases))]
-    public void Test_SerializeToFile_BadCase(DataScheme scheme)
+    public async Task Test_SerializeToFile_BadCase(DataScheme scheme)
     {
-        storageFormat.SerializeToFile(Context, "test.csv", scheme).AssertFailed();
+        (await storageFormat.SerializeToFile(Context, "test.csv", scheme, cts.Token)).AssertFailed();
     }
 
     private static IEnumerable BadSchemeTestCases
@@ -58,10 +66,10 @@ public class TestCSVStorageFormat
     }
 
     [Test]
-    public void Test_SerializeToFile_Small()
+    public async Task Test_SerializeToFile_Small()
     {
         var schemeFilePath = "Test.csv";
-        storageFormat.SerializeToFile(Context, schemeFilePath, testScheme);
+        (await storageFormat.SerializeToFile(Context, schemeFilePath, testScheme, cts.Token)).AssertPassed();
 
         var expectedCsvString = """
         StringField,IntField
@@ -69,23 +77,24 @@ public class TestCSVStorageFormat
         
         """;
         
-        mockFileSystem.Verify(fs => fs.WriteAllText(Context, schemeFilePath, expectedCsvString), Times.Once);
+        mockFileSystem.Verify(fs => fs.WriteAllText(Context, schemeFilePath, expectedCsvString, cts.Token), Times.Once);
         mockFileSystem.VerifyAll();
         mockFileSystem.VerifyNoOtherCalls();
     }
 
     [Test]
-    public void Test_LoadFromRows()
+    public async Task Test_LoadFromRows()
     {
         var schemeFilePath = "Test.csv";
 
         var csvContent = storageFormat.Serialize(Context, testScheme).AssertPassed();
         Logger.Log(csvContent);
         var csvLines = CsvSchemeStorageFormat.SplitToRows(csvContent);
-        mockFileSystem.Setup(fs => fs.ReadAllLines(Context, schemeFilePath))
-            .Returns(SchemaResult<string[]>.Pass(csvLines)).Verifiable();
+        mockFileSystem.Setup(fs => fs.ReadAllLines(Context, schemeFilePath, cts.Token))
+            .Returns(Task.FromResult(SchemaResult<string[]>.Pass(csvLines))).Verifiable();
 
-        storageFormat.DeserializeFromFile(Context, schemeFilePath).TryAssert(out DataScheme loadedScheme);
+        (await storageFormat.DeserializeFromFile(Context, schemeFilePath, cts.Token))
+            .TryAssert(out DataScheme loadedScheme);
         
         Assert.That(loadedScheme, Is.EqualTo(testScheme), () =>
         {

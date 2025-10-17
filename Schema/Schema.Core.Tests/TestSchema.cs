@@ -31,15 +31,17 @@ public class TestSchema
         Driver = nameof(TestSchema),
     };
 
+    private CancellationTokenSource cts = new();
+
     [OneTimeSetUp]
     public void OneTimeSetUp()
     {
     }
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
-        TestFixtureSetup.Initialize(Context, out _mockFileSystem, out _storage);
+        (_mockFileSystem, _storage) = await TestFixtureSetup.Initialize(Context);
         Logger.LogVerbose($"{nameof(ManifestAbsFilePath)}: {ManifestAbsFilePath}");
         Logger.LogVerbose($"{nameof(ManifestRelPath)}: {ManifestRelPath}");
         
@@ -51,6 +53,13 @@ public class TestSchema
             loadedManifest.GetSelfEntry(Context).TryAssert(out var selfEntry);
             selfEntry.FilePath = System.IO.Path.Combine("Content", $"{Manifest.MANIFEST_SCHEME_NAME}.json");
         }
+    }
+
+    [OneTimeTearDown]
+    public void OneTimeTearDown()
+    {
+        cts.Cancel();
+        cts.Dispose();
     }
 
     [Test]
@@ -126,31 +135,31 @@ public class TestSchema
     [TestCase("")]
     [TestCase(null)]
     [TestCase("missing.json")]
-    public void Test_LoadManifest_BadPath(string? badManifestPath)
+    public async Task Test_LoadManifest_BadPath(string? badManifestPath)
     {
-        Schema.LoadManifestFromPath(Context, badManifestPath, projectPath: TestFixtureSetup.ProjectPath).AssertFailed();
+        (await Schema.LoadManifestFromPath(Context, badManifestPath, projectPath: TestFixtureSetup.ProjectPath)).AssertFailed();
     }
     
     [Test]
-    public void Test_LoadManifest_MalformedFile()
+    public async Task Test_LoadManifest_MalformedFile()
     {
         string malformedFilePath = "malformed.json";
         
         // Arrange
-        _mockFileSystem.Setup(fs => fs.FileExists(Context, malformedFilePath))
-            .Returns(SchemaResult.Pass());
-        _mockFileSystem.Setup(fs => fs.ReadAllText(Context, malformedFilePath))
-            .Returns(SchemaResult<string>.Pass("malformedContent"));
+        _mockFileSystem.Setup(fs => fs.FileExists(Context, malformedFilePath, cts.Token))
+            .Returns(Task.FromResult(SchemaResult.Pass()));
+        _mockFileSystem.Setup(fs => fs.ReadAllText(Context, malformedFilePath, cts.Token))
+            .Returns(Task.FromResult(SchemaResult<string>.Pass("malformedContent")));
         
         // Act
-        var loadResponse = Schema.LoadManifestFromPath(Context, malformedFilePath, projectPath: TestFixtureSetup.ProjectPath);
+        var loadResponse = await Schema.LoadManifestFromPath(Context, malformedFilePath, projectPath: TestFixtureSetup.ProjectPath);
         
         // Assert
         Assert.IsFalse(loadResponse.Passed);
     }
     
     [Test]
-    public void Test_LoadManifest_InvalidPathToEntry()
+    public async Task Test_LoadManifest_InvalidPathToEntry()
     {
         Logger.Level = Logger.LogLevel.VERBOSE;
         // Arrange
@@ -162,7 +171,10 @@ public class TestSchema
         MockPersistScheme(ManifestAbsFilePath, manifestScheme);
         
         // Act
-        var loadResponse = Schema.LoadManifestFromPath(Context, ManifestAbsFilePath, projectPath: TestFixtureSetup.ProjectPath);
+        var loadResponse = await Schema.LoadManifestFromPath(Context, 
+            ManifestAbsFilePath, 
+            projectPath: TestFixtureSetup.ProjectPath,
+            cancellationToken: cts.Token);
         
         // Assert
         Assert.IsTrue(loadResponse.Passed);
@@ -190,29 +202,29 @@ public class TestSchema
         Logger.LogVerbose($"Mock FS Setup: FileExists({Context},\"{filePath}\")");
         Logger.LogVerbose($"Mock FS Setup: FileExists({Context},\"{absPath}\")");
         
-        _mockFileSystem.Setup(m => m.FileExists(Context, relPath)).Returns(SchemaResult.Pass()).Verifiable();
-        _mockFileSystem.Setup(m => m.FileExists(Context, absPath)).Returns(SchemaResult.Pass()).Verifiable();
+        _mockFileSystem.Setup(m => m.FileExists(Context, relPath, cts.Token)).Returns(Task.FromResult(SchemaResult.Pass())).Verifiable();
+        _mockFileSystem.Setup(m => m.FileExists(Context, absPath, cts.Token)).Returns(Task.FromResult(SchemaResult.Pass())).Verifiable();
 
         if (mockRead)
         {
             var serialized = _storage.DefaultManifestStorageFormat.Serialize(Context, scheme).AssertPassed();
-            _mockFileSystem.Setup(m => m.ReadAllText(Context, relPath))
-                .Returns(SchemaResult<string>.Pass(serialized)).Verifiable();
-            _mockFileSystem.Setup(m => m.ReadAllText(Context, absPath))
-                .Returns(SchemaResult<string>.Pass(serialized)).Verifiable();
+            _mockFileSystem.Setup(m => m.ReadAllText(Context, relPath, cts.Token))
+                .Returns(Task.FromResult(SchemaResult<string>.Pass(serialized))).Verifiable();
+            _mockFileSystem.Setup(m => m.ReadAllText(Context, absPath, cts.Token))
+                .Returns(Task.FromResult(SchemaResult<string>.Pass(serialized))).Verifiable();
         }
         
         if (mockWrite)
         {
             var serialized = _storage.DefaultManifestStorageFormat.Serialize(Context, scheme).AssertPassed(null);
-            _mockFileSystem.Setup(m => m.DirectoryExists(Context, It.IsAny<string>())).Returns(true).Verifiable();
-            _mockFileSystem.Setup(m => m.WriteAllText(Context, relPath, serialized)).Verifiable();
-            _mockFileSystem.Setup(m => m.WriteAllText(Context, absPath, serialized)).Verifiable();
+            _mockFileSystem.Setup(m => m.DirectoryExists(Context, It.IsAny<string>(), cts.Token)).Returns(Task.FromResult(true)).Verifiable();
+            _mockFileSystem.Setup(m => m.WriteAllText(Context, relPath, serialized, cts.Token)).Verifiable();
+            _mockFileSystem.Setup(m => m.WriteAllText(Context, absPath, serialized, cts.Token)).Verifiable();
         }
     }
 
     [Test]
-    public void Test_LoadManifest_SmallManifest()
+    public async Task Test_LoadManifest_SmallManifest()
     {
         Logger.Level = Logger.LogLevel.VERBOSE;
         // Arrange
@@ -240,7 +252,7 @@ public class TestSchema
         MockPersistScheme(testSchemeAbsFilePath, testDataScheme);
 
         // Act
-        Schema.LoadManifestFromPath(Context, ManifestAbsFilePath, TestFixtureSetup.ProjectPath).AssertPassed();
+        (await Schema.LoadManifestFromPath(Context, ManifestAbsFilePath, TestFixtureSetup.ProjectPath, cancellationToken: cts.Token)).AssertPassed();
         Schema.GetManifestEntryForScheme(Context, testDataScheme).TryAssert(out var testDataEntry);
         
         // Assert
@@ -260,9 +272,9 @@ public class TestSchema
     }
 
     [Test, TestCaseSource(nameof(BadManifestEntryTestCases))]
-    public void Test_LoadSchemeFromManifestEntry_BadEntry(ManifestEntry? manifestEntry)
+    public async Task Test_LoadSchemeFromManifestEntry_BadEntry(ManifestEntry? manifestEntry)
     {
-        var res = Schema.LoadSchemeFromManifestEntry(Context, manifestEntry);
+        var res = await Schema.LoadSchemeFromManifestEntry(Context, manifestEntry);
         res.AssertFailed();
     }
 
@@ -285,14 +297,14 @@ public class TestSchema
     }
 
     [Test, TestCaseSource(nameof(BadSchemeTestCases))]
-    public bool Test_SaveDataScheme_BadScheme(DataScheme scheme)
+    public async Task<bool> Test_SaveDataScheme_BadScheme(DataScheme scheme)
     {
-        var saveResponse = Schema.SaveDataScheme(Context, scheme, true);
+        var saveResponse = await Schema.SaveDataScheme(Context, scheme, true);
         return saveResponse.Passed;
     }
 
     [Test]
-    public void Test_SaveDataScheme_ValidScheme()
+    public async Task Test_SaveDataScheme_ValidScheme()
     {
         // Arrange
         var newScheme = new DataScheme("Foo");
@@ -301,11 +313,11 @@ public class TestSchema
         Schema.LoadDataScheme(Context, newScheme, true, importFilePath: newSchemeFilePath).AssertPassed();
         
         // Act
-        Schema.SaveDataScheme(Context, newScheme, false).AssertPassed();
+        (await Schema.SaveDataScheme(Context, newScheme, false)).AssertPassed();
     }
     
     [Test]
-    public void Test_SaveDataScheme_Manifest_BeforeLoading()
+    public async Task Test_SaveDataScheme_Manifest_BeforeLoading()
     {
         Logger.Level = Logger.LogLevel.VERBOSE;
         var manifestSavePath = $"{Manifest.MANIFEST_SCHEME_NAME}.json";
@@ -314,31 +326,31 @@ public class TestSchema
 
         manifestSelfEntry.FilePath = manifestSavePath;
         
-        Schema.SaveDataScheme(Context, manifestScheme._, true).AssertFailed();
+        (await Schema.SaveDataScheme(Context, manifestScheme._, true)).AssertFailed();
     }
     
     [Test]
-    public void Test_SaveDataScheme_UnregisteredScheme_Fails()
+    public async Task Test_SaveDataScheme_UnregisteredScheme_Fails()
     {
         Logger.Level = Logger.LogLevel.VERBOSE;
         var dataScheme = new DataScheme("Foo");
         
-        Schema.SaveDataScheme(Context, dataScheme, true).AssertFailed();
+        (await Schema.SaveDataScheme(Context, dataScheme, true)).AssertFailed();
     }
     
     [Test]
-    public void Test_SaveManifest_BeforeInitialized_Fails()
+    public async Task  Test_SaveManifest_BeforeInitialized_Fails()
     {
         
         Logger.Level = Logger.LogLevel.VERBOSE;
         
         Schema.Reset();
-        Schema.Save(Context, saveManifest: true).AssertFailed("No project specified");
+        (await Schema.Save(Context, saveManifest: true)).AssertFailed("No project specified");
 
     }
     
     [Test]
-    public void Test_SaveDataScheme_Manifest_AfterLoading()
+    public async Task Test_SaveDataScheme_Manifest_AfterLoading()
     {
         Logger.Level = Logger.LogLevel.VERBOSE;
         
@@ -352,7 +364,7 @@ public class TestSchema
         var loadRes = Schema.LoadDataScheme(Context, manifestScheme._, true);
         loadRes.AssertPassed();
         
-        var saveRes = Schema.SaveDataScheme(Context, manifestScheme._, true);
+        var saveRes = await Schema.SaveDataScheme(Context, manifestScheme._, true);
         saveRes.AssertPassed();
     }
 
@@ -373,7 +385,7 @@ public class TestSchema
     }
 
     [Test]
-    public void Test_Save_NoDirtySchemes_ReturnsSuccess()
+    public async Task Test_Save_NoDirtySchemes_ReturnsSuccess()
     {
         // Arrange: No schemes are dirty
         var scheme = new DataScheme("Clean");
@@ -382,7 +394,7 @@ public class TestSchema
         
         // Act
         Logger.Level = Logger.LogLevel.VERBOSE;
-        var result = Schema.Save(Context, saveManifest: false);
+        var result = await Schema.Save(Context, saveManifest: false);
         
         // Assert
         result.AssertPassed();
@@ -391,18 +403,19 @@ public class TestSchema
     }
 
     [Test]
-    public void Test_Save_OneDirtyScheme_SavesAndClearsDirtyFlag()
+    public async Task Test_Save_OneDirtyScheme_SavesAndClearsDirtyFlag()
     {
         
         // Arrange
         var scheme = new DataScheme("Dirty");
-        _mockFileSystem.Setup(fs => fs.WriteAllText(Context, It.IsAny<string>(), _storage.DefaultManifestStorageFormat.Serialize(Context, scheme).AssertPassed(null))).Verifiable();
+        _mockFileSystem.Setup(fs => fs.WriteAllText(Context, It.IsAny<string>(), 
+            _storage.DefaultManifestStorageFormat.Serialize(Context, scheme).AssertPassed(null), cts.Token)).Verifiable();
         
         Schema.LoadDataScheme(Context, scheme, true, importFilePath: "Dirty.json");
         scheme.SetDirty(Context, true);
         
         // Act
-        var result = Schema.Save(Context, saveManifest: false);
+        var result = await Schema.Save(Context, saveManifest: false, cts.Token);
         
         // Assert
         result.AssertPassed();

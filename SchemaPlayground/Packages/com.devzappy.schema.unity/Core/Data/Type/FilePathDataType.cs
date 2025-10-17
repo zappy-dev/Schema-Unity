@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Schema.Core.IO;
 using Schema.Core.Logging;
 
@@ -49,11 +51,19 @@ namespace Schema.Core.Data
             {
                 return storageErr.Cast();
             }
+
+            Task<SchemaResult> fileExistsTask = storage.FileSystem.FileExists(context, resolvedPath);
+            fileExistsTask.Wait(TimeSpan.FromSeconds(5)); // TODO: figure out timeouts in this context..
             
-            return storage.FileSystem.FileExists(context, resolvedPath);
+            return fileExistsTask.Result;
         }
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
+        {
+            return ConvertValue(context, value, CancellationToken.None);
+        }
+
+        public SchemaResult<object> ConvertValue(SchemaContext context, object value, CancellationToken token = default)
         {
             using var _ = new DataTypeContextScope(ref context, this);
             if (!(value is string filePath))
@@ -73,9 +83,12 @@ namespace Schema.Core.Data
             {
                 return storageErr.CastError<object>();
             }
+
+            Task<SchemaResult> doesFileExistTask = storage.FileSystem.FileExists(context, resolvedPath, token);
+            doesFileExistTask.Wait(TimeSpan.FromSeconds(5)); // TODO: figure out timeouts in this context..
             
             bool fileExists = !string.IsNullOrWhiteSpace(resolvedPath) && 
-                              storage.FileSystem.FileExists(context, resolvedPath).Passed;
+                              doesFileExistTask.Result.Passed;
             
             return CheckIf<object>(
                 fileExists || allowEmptyPath && string.IsNullOrEmpty(resolvedPath), 

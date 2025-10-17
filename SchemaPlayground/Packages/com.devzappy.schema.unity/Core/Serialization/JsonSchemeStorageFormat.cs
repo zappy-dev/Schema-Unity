@@ -1,6 +1,8 @@
 // using System.IO;
 
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Schema.Core.Data;
 using Schema.Core.IO;
@@ -22,9 +24,10 @@ namespace Schema.Core.Serialization
             this.fileSystem = fileSystem;
         }
         
-        public SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath)
+        public async Task<SchemaResult<DataScheme>> DeserializeFromFile(SchemaContext context, string filePath,
+            CancellationToken cancellationToken = default)
         {
-            var readRes = fileSystem.ReadAllText(context, filePath);
+            var readRes = await fileSystem.ReadAllText(context, filePath, cancellationToken);
             
             if (!readRes.Try(out string jsonData))
             {
@@ -48,14 +51,15 @@ namespace Schema.Core.Serialization
             }
         }
 
-        public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme data)
+        public async Task<SchemaResult> SerializeToFile(SchemaContext context, string filePath, DataScheme data,
+            CancellationToken cancellationToken = default)
         {
             if (!Serialize(context, data).Try(out var jsonData))
             {
                 return Fail(context, "Failed to deserialize JSON");
             }
             
-            fileSystem.WriteAllText(context, filePath, jsonData);
+            await fileSystem.WriteAllText(context, filePath, jsonData, cancellationToken);
             return Pass($"Wrote {data} to file {filePath}", context);
         }
 

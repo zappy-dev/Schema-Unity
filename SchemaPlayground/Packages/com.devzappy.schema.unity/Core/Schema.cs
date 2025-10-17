@@ -33,17 +33,12 @@ namespace Schema.Core
                 return isInitRes.CastError<IEnumerable<string>>();
             }
 
-            // return dataSchemes.Keys;
-
-            lock (manifestOperationLock)
+            if (!GetManifestScheme(context).Try(out var manifestScheme, out var manifestError))
             {
-                if (!GetManifestScheme(context).Try(out var manifestScheme, out var manifestError))
-                {
-                    return manifestError.CastError<IEnumerable<string>>();
-                }
-
-                return res.Pass(manifestScheme.GetAllSchemeNames());
+                return manifestError.CastError<IEnumerable<string>>();
             }
+
+            return res.Pass(manifestScheme.GetAllSchemeNames());
         }
 
         public static SchemaResult<int> GetNumAvailableSchemes(SchemaContext context)
@@ -95,8 +90,6 @@ namespace Schema.Core
 
             return ctx.Project.IsInitialized(ctx);
         }
-        
-        private static readonly object manifestOperationLock = new object();
 
         #endregion
         

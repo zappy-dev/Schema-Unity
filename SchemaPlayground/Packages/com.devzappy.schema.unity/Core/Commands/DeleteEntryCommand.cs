@@ -50,23 +50,23 @@ namespace Schema.Core.Commands
             return Task.FromResult(Pass(Unit.Value, "Successfully deleted entry from scheme"));
         }
 
-        protected override Task<CommandResult> UndoInternalAsync(CancellationToken cancellationToken)
+        protected override async Task<CommandResult> UndoInternalAsync(CancellationToken cancellationToken)
         {
             var addEntryRes = _scheme.AddEntry(Context, _entry);
 
             if (addEntryRes.Failed)
             {
-                return Task.FromResult(Fail(addEntryRes.Message));
+                return Fail(addEntryRes.Message);
             }
 
             if (_scheme.IsManifest)
             {
                 var manifestEntry = new ManifestEntry(_scheme, _entry);
 
-                var reloadSchemaRes = Schema.LoadSchemeFromManifestEntry(Context, manifestEntry);
+                var reloadSchemaRes = await Schema.LoadSchemeFromManifestEntry(Context, manifestEntry, cancellationToken: cancellationToken);
                 if (reloadSchemaRes.Failed)
                 {
-                    return Task.FromResult(Fail(reloadSchemaRes.Message));
+                    return Fail(reloadSchemaRes.Message);
                 }
             }
 
@@ -76,7 +76,7 @@ namespace Schema.Core.Commands
                 ? Pass(moveRes)
                 : Fail(moveRes.Message);
 
-            return Task.FromResult(cmdResult);
+            return cmdResult;
         }
     }
 }

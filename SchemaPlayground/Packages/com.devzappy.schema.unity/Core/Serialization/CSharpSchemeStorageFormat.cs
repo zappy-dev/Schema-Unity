@@ -3,6 +3,8 @@ using Schema.Core.Data;
 using Schema.Core.IO;
 using static Schema.Core.SchemaResult;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Schema.Core.Ext;
 using Schema.Core.Schemes;
 
@@ -22,7 +24,8 @@ namespace Schema.Core.Serialization
             this.fileSystem = fileSystem;
         }
 
-        public SchemaResult<DataScheme> DeserializeFromFile(SchemaContext context, string filePath)
+        public Task<SchemaResult<DataScheme>> DeserializeFromFile(SchemaContext context, string filePath,
+            CancellationToken cancellationToken = default)
         {
             throw new System.NotImplementedException($"{nameof(CSharpSchemeStorageFormat)}.{nameof(DeserializeFromFile)}");
         }
@@ -95,11 +98,12 @@ namespace Schema.Core.Serialization
             return entryClassName;
         }
         
-        public SchemaResult SerializeToFile(SchemaContext context, string filePath, DataScheme scheme)
+        public async Task<SchemaResult> SerializeToFile(SchemaContext context, string filePath, DataScheme scheme,
+            CancellationToken cancellationToken = default)
         {
             if (!Serialize(context, scheme).Try(out var code, out var codeErr)) return codeErr.Cast();
             
-            fileSystem.WriteAllText(context, filePath, code);
+            await fileSystem.WriteAllText(context, filePath, code, cancellationToken);
             return Pass($"Wrote {scheme} to file: {filePath}", context);
         }
 

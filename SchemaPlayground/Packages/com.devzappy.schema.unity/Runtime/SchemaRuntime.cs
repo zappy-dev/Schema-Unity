@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.IO;
@@ -30,14 +31,16 @@ namespace Schema.Runtime
             Core.Schema.SetStorage(new Storage(new TextAssetResourcesFileSystem()));
 
             var ctx = SchemaContextFactory.CreateRuntimeContext("Runtime_Initialization");
-            return LoadFromResources(ctx);
+            var loadTask = LoadFromResources(ctx);
+            loadTask.Wait(TimeSpan.FromSeconds(10)); // TODO: Figure out a better API for async loading
+            return loadTask.Result;
         }
         
         /// <summary>
         /// Loads the runtime Schema data from Unity's Resources
         /// </summary>
         /// <returns></returns>
-        private static SchemaResult LoadFromResources(SchemaContext context)
+        private static async Task<SchemaResult> LoadFromResources(SchemaContext context)
         {
             var textAssets = Resources.FindObjectsOfTypeAll<TextAsset>();
 
@@ -61,10 +64,10 @@ namespace Schema.Runtime
 
                 var manifestScheme = manifestDeserializeRes.Result;
 
-                var manifestLoadRes = Core.Schema.LoadManifest(context, manifestScheme, manifestImportPath: Manifest.MANIFEST_SCHEME_NAME, projectPath: string.Empty);
+                var manifestLoadRes = await Core.Schema.LoadManifest(context, manifestScheme, manifestImportPath: Manifest.MANIFEST_SCHEME_NAME, projectPath: string.Empty);
                 if (manifestLoadRes.Failed)
                 {
-                    return  SchemaResult.Fail(context, manifestLoadRes.Message);
+                    return SchemaResult.Fail(context, manifestLoadRes.Message);
                 }
             }
             catch (Exception e)

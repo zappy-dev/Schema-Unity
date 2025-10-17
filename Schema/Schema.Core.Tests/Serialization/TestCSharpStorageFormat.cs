@@ -15,17 +15,18 @@ public class TestCSharpStorageFormat
     {
         Driver = nameof(TestCSharpStorageFormat)
     };
-    private Mock<IFileSystem> mockFileSystem;
+    private Mock<IFileSystem> _mockFileSystem;
     private CSharpSchemeStorageFormat storageFormat;
     private DataScheme testScheme;
     private ManifestEntry testManifestEntry;
+    private CancellationTokenSource cts = new();
 
     [SetUp]
-    public void OnTestSetup()
+    public async Task OnTestSetup()
     {
-        TestFixtureSetup.Initialize(Context, out mockFileSystem, out _);
+        (_mockFileSystem, _) = await TestFixtureSetup.Initialize(Context);
         
-        storageFormat = new CSharpSchemeStorageFormat(mockFileSystem.Object);
+        storageFormat = new CSharpSchemeStorageFormat(_mockFileSystem.Object);
 
         // Create a basic test scheme
         testScheme = new DataScheme("TestScheme");
@@ -42,6 +43,13 @@ public class TestCSharpStorageFormat
         testManifestEntry = new ManifestEntry(manifestScheme._, manifestDataEntry);
         
         storageFormat.ManifestEntry = testManifestEntry;
+    }
+
+    [OneTimeTearDown]
+    public void OneTimeTearDown()
+    {
+        cts.Cancel();
+        cts.Dispose();
     }
 
     [Test]
@@ -433,26 +441,27 @@ public class TestCSharpStorageFormat
     }
 
     [Test]
-    public void Test_SerializeToFile_WritesToFileSystem()
+    public async Task Test_SerializeToFile_WritesToFileSystem()
     {
         // Arrange
         var filePath = "TestScheme.g.cs";
         
-        mockFileSystem.Setup(fs => fs.WriteAllText(
+        _mockFileSystem.Setup(fs => fs.WriteAllText(
             It.IsAny<SchemaContext>(), 
             It.IsAny<string>(), 
-            It.IsAny<string>()))
+            It.IsAny<string>(),
+            cts.Token))
             .Verifiable();
 
         // Act
-        var result = storageFormat.SerializeToFile(Context, filePath, testScheme);
+        var result = await storageFormat.SerializeToFile(Context, filePath, testScheme, cts.Token);
 
         // Assert
         result.AssertPassed();
-        mockFileSystem.Verify(fs => fs.WriteAllText(
+        _mockFileSystem.Verify(fs => fs.WriteAllText(
             It.IsAny<SchemaContext>(), 
             filePath, 
-            It.IsAny<string>()), Times.Once);
+            It.IsAny<string>(), cts.Token), Times.Once);
     }
 
     [Test]
@@ -520,7 +529,7 @@ public class TestCSharpStorageFormat
     public void Test_DeserializeFromFile_ThrowsNotImplementedException()
     {
         Assert.Throws<System.NotImplementedException>(() => 
-            storageFormat.DeserializeFromFile(Context, "some_file.cs"));
+            storageFormat.DeserializeFromFile(Context, "some_file.cs", cts.Token));
     }
 }
 

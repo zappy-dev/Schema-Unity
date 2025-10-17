@@ -17,9 +17,9 @@ namespace Schema.Core.Tests.Commands
         private const string AttributeName = "Name";
 
         [SetUp]
-        public void Setup()
+        public async Task Setup()
         { 
-            TestFixtureSetup.Initialize(Context, out _, out _);
+            await TestFixtureSetup.Initialize(Context);
             
             _scheme = new DataScheme("People");
             _scheme.AddAttribute(Context, AttributeName, DataType.Text, "")

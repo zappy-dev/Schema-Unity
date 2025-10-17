@@ -1,4 +1,6 @@
 ﻿using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Schema.Core.Data;
 using Schema.Core.Logging;
 
@@ -9,7 +11,7 @@ namespace Schema.Core.Serialization
         #region Static API
         public delegate string ResolveExportPath(ISchemeStorageFormat format, string exportFileName);
         
-        public static SchemaResult Export(this ISchemeStorageFormat format, DataScheme scheme, SchemaContext ctx, ResolveExportPath resolveExportPath)
+        public static async Task<SchemaResult> Export(this ISchemeStorageFormat format, DataScheme scheme, SchemaContext ctx, ResolveExportPath resolveExportPath, CancellationToken cancellationToken = default)
         {
             var sanitizedBaseFileName = scheme.SchemeName
                 .Replace(" ", string.Empty);
@@ -41,7 +43,7 @@ namespace Schema.Core.Serialization
                 return SchemaResult.Fail(ctx, "Export canceled, no file path provided.");
             }
             
-            var serializeRes = format.SerializeToFile(ctx, outputFilePath, scheme);
+            var serializeRes = await format.SerializeToFile(ctx, outputFilePath, scheme, cancellationToken);
             if (serializeRes.Failed)
             {
                 return serializeRes;

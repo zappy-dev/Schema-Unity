@@ -28,9 +28,9 @@ public class TestLoadDataSchemeManifest
     private Mock<IFileSystem> _mockFileSystem;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
-        TestFixtureSetup.Initialize(Context, out _mockFileSystem, out _);
+        (_mockFileSystem, _) = await TestFixtureSetup.Initialize(Context);
     }
 
     [Test]

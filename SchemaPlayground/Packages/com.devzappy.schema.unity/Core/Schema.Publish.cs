@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Schema.Core.Data;
 using Schema.Core.Logging;
 using Schema.Core.Schemes;
@@ -28,7 +30,10 @@ namespace Schema.Core
             public StorageFormatExt.ResolveExportPath ResolveExportPath;
         }
         
-        public static SchemaResult PublishAllSchemes(SchemaContext ctx, PublishConfig publishConfig, IProgress<(float, string)> progress = null)
+        public static async Task<SchemaResult> PublishAllSchemes(SchemaContext ctx, 
+            PublishConfig publishConfig, 
+            IProgress<(float, string)> progress = null,
+            CancellationToken cancellationToken = default)
         {
             // get all loaded schemes and publish in topological order.
             if (!DataScheme.TopologicalSortByReferences(ctx, ctx.Project.Schemes.Values)
@@ -37,10 +42,14 @@ namespace Schema.Core
                 return sortErr.Cast();
             }
             
-            return BulkPublishSchemes(ctx, publishConfig, schemesToPublish.Select(s => s.SchemeName).ToList(), progress);
+            return await BulkPublishSchemes(ctx, publishConfig, schemesToPublish.Select(s => s.SchemeName).ToList(), progress, cancellationToken);
         }
         
-        public static SchemaResult BulkPublishSchemes(SchemaContext context, PublishConfig publishConfig, IReadOnlyList<string> schemeNames, IProgress<(float, string)> progress = null)
+        public static async Task<SchemaResult> BulkPublishSchemes(SchemaContext context, 
+            PublishConfig publishConfig, 
+            IReadOnlyList<string> schemeNames, 
+            IProgress<(float, string)> progress = null,
+            CancellationToken cancellationToken = default)
         {
             // using var progressScope = new ProgressScope("Schema - Publish All");
             // TODO: need a way of generating an aggregate schema result
@@ -48,14 +57,14 @@ namespace Schema.Core
             
             int total = schemeNames.Count;
 
-            var bulkRes = BulkResult(
+            var bulkRes = await BulkResult(
                 entries: schemeNames,
                 haltOnError: true, // Avoid publishing bad code if a Scheme fails to publish
-                operation: (schemeName) =>
+                operation: async (schemeName) =>
                 {
                     progress?.Report((numPublished * 1.0f / total, $"Publishing Scheme '{schemeName}' ({numPublished} / {total})"));
                     numPublished++;
-                    return PublishScheme(context, publishConfig, schemeName);
+                    return await PublishScheme(context, publishConfig, schemeName, cancellationToken);
                 },
                 errorMessage: "Failed to publish all schemes. Check console logs for more details.");
             
@@ -63,7 +72,7 @@ namespace Schema.Core
         }
         
         
-        public static SchemaResult PublishScheme(SchemaContext ctx, PublishConfig publishConfig, string schemeName)
+        public static async Task<SchemaResult> PublishScheme(SchemaContext ctx, PublishConfig publishConfig, string schemeName, CancellationToken cancellationToken = default)
         {
             Logger.LogDbgVerbose($"Publishing {schemeName}");
             var schemeEntry = GetManifestEntryForScheme(ctx, schemeName);
@@ -113,7 +122,7 @@ namespace Schema.Core
                 // }
                 case ManifestScheme.PublishTarget.RESOURCES:
                 {
-                    var publishRes = PublishToResources(schemeToPublish, ctx);
+                    var publishRes = await PublishToResources(schemeToPublish, ctx, cancellationToken);
                     isSuccess = publishRes.Passed;
                 } 
                     break;
@@ -122,7 +131,7 @@ namespace Schema.Core
             if (!GetStorage(ctx).Try(out var storage, out var storageError)) return storageError.Cast();
             
             // Publish code
-            var exportRes = storage.CSharpSchemeStorageFormat.Export(schemeToPublish, ctx, publishConfig.ResolveExportPath);
+            var exportRes = await storage.CSharpSchemeStorageFormat.Export(schemeToPublish, ctx, publishConfig.ResolveExportPath);
             if (exportRes.Failed)
             {
                 return exportRes;
@@ -139,7 +148,7 @@ namespace Schema.Core
         /// </summary>
         /// <param name="originalSchemeToPublish"></param>
         /// <returns></returns>
-        private static SchemaResult PublishToResources(DataScheme originalSchemeToPublish, SchemaContext context)
+        private static async Task<SchemaResult> PublishToResources(DataScheme originalSchemeToPublish, SchemaContext context, CancellationToken cancellationToken)
         {
             if (!GetStorage(context).Try(out var storage, out var storageError)) return storageError.Cast();
 
@@ -178,7 +187,7 @@ namespace Schema.Core
                 publishScheme.AddEntry(context, publishedEntry);
             }
             
-            var publishRes = storageFormat.SerializeToFile(context, schemaPublishPath, publishScheme);
+            var publishRes = await storageFormat.SerializeToFile(context, schemaPublishPath, publishScheme, cancellationToken);
 
             return publishRes;
         }

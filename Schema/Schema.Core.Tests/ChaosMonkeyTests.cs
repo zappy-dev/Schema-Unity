@@ -28,11 +28,11 @@ public class ChaosMonkeyTests
     private Mock<IFileSystem> _mockFileSystem;
 
     [SetUp]
-    public void OnTestSetup()
+    public async Task OnTestSetup()
     {
         chaosRandom = new Random(12345);
         
-        TestFixtureSetup.Initialize(testContext, out  _mockFileSystem, out _);
+        (_mockFileSystem, _) = await TestFixtureSetup.Initialize(testContext);
     }
 
     public DataScheme ChaosSchemeFactory()

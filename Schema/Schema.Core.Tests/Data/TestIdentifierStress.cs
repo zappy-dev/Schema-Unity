@@ -17,15 +17,15 @@ namespace Schema.Core.Tests.Data;
 [TestFixture]
 public class TestIdentifierStress
 {
-    private static readonly SchemaContext Context = new SchemaContext
+    private static readonly SchemaContext Context = new()
     {
         Driver = nameof(TestIdentifierStress)
     };
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
-        TestFixtureSetup.Initialize(Context, out _, out _);
+        _ = await TestFixtureSetup.Initialize(Context);
     }
 
     #region Changing Identifier Values

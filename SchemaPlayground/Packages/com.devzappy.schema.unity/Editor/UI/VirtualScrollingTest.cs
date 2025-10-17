@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 using Schema.Core;
@@ -11,7 +13,7 @@ namespace Schema.Unity.Editor
     /// </summary>
     internal static class VirtualScrollingTest
     {
-        internal static SchemaResult GenerateTestData(int entryCount)
+        internal static async Task<SchemaResult> GenerateTestData(int entryCount, CancellationToken cancellationToken = default)
         {
             using var reporter = new EditorProgressReporter("Schema - Generate Test Data", "Generating test data...");
             // Create a test scheme with multiple data types
@@ -62,7 +64,7 @@ namespace Schema.Unity.Editor
             
             reporter.Report((0.9f, "Saving Test Scheme..."));
             // Should we save the manifest?
-            var result = SaveDataScheme(ctx, testScheme, alsoSaveManifest: false);
+            var result = await SaveDataScheme(ctx, testScheme, alsoSaveManifest: false, cancellationToken);
 
             if (result.Passed)
             {
