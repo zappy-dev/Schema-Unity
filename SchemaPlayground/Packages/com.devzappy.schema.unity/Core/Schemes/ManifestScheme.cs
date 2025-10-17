@@ -9,6 +9,7 @@ namespace Schema.Core.Schemes
         public enum PublishTarget
         {
             RESOURCES,
+            S3_BUCKET,
             SCRIPTABLE_OBJECT,
             
             DEFAULT = RESOURCES,

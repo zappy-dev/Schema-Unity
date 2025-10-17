@@ -98,7 +98,11 @@ namespace Schema.Core.Data
         /// <returns></returns>
         public SchemaResult Load(SchemaContext context, bool overwriteExisting = false)
         {
-            return Schema.LoadDataScheme(context, this, overwriteExisting: overwriteExisting);
+            var loadConfig = new Schema.SchemeLoadConfig()
+            {
+                overwriteExisting = overwriteExisting,
+            };
+            return Schema.LoadDataScheme(context, this, loadConfig);
         }
 
         #endregion

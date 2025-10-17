@@ -146,7 +146,10 @@ namespace Schema.Core
             using var _ = new ProjectContextScope(ref context, emptyProjectContainer);
             emptyProjectContainer.Manifest = manifestScheme;
             emptyProjectContainer.ProjectPath = projectPath;
-            var result = LoadDataScheme(context, templateManifestScheme._, overwriteExisting: true);
+
+            var templateLoadConfig = new SchemeLoadConfig();
+            templateLoadConfig.overwriteExisting = true;
+            var result = LoadDataScheme(context, templateManifestScheme._, templateLoadConfig);
             Logger.LogDbgVerbose(result.Message, result.Context);
             if (result.Passed)
             {

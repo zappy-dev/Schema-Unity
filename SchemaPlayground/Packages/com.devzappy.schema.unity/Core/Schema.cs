@@ -73,6 +73,7 @@ namespace Schema.Core
         /// </summary>
         public static SchemaResult IsInitialized(SchemaContext ctx)
         {
+            // TODO: Figure out setting the Storage interface for Editor vs Runtime vs Publish...
             if (!GetStorage(ctx).Try(out _, out var storageErr))
             {
                 return storageErr.Cast();

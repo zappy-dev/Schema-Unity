@@ -9,6 +9,17 @@ namespace Schema.Core.Serialization
     public static class StorageFormatExt
     {
         #region Static API
+
+        public static string ResolveFileName(this ISchemeStorageFormat storageFormat, string schemeName)
+        {
+            return $"{schemeName}.{storageFormat.Extension}";
+        }
+
+        public static string ResolvePublishPath(this ISchemeStorageFormat storageFormat, string schemeName)
+        {
+            return $"{Schema.DEFAULT_RESOURCE_PUBLISH_PATH}/{storageFormat.ResolveFileName(schemeName)}";
+        }
+        
         public delegate string ResolveExportPath(ISchemeStorageFormat format, string exportFileName);
         
         public static async Task<SchemaResult> Export(this ISchemeStorageFormat format, DataScheme scheme, SchemaContext ctx, ResolveExportPath resolveExportPath, CancellationToken cancellationToken = default)

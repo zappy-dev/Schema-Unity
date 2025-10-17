@@ -1176,13 +1176,15 @@ namespace Schema.Unity.Editor
             int localEntryIdx = _virtualTableView.IsVirtualScrollingActive
                 ? entryIdx - visibleRangeStart
                 : entryIdx;
-            
+
+            TableCell currentCell = default;
             if (localEntryIdx >= 0 && localEntryIdx < visibleEntryCount)
             {
                 int controlIdIndex = localEntryIdx * attributeCount + attributeIdx;
                 if (controlIdIndex >= 0 && controlIdIndex < table.NumCells)
                 {
-                    table[controlIdIndex] = new TableCell(GUIUtility.GetControlID(FocusType.Passive));
+                    currentCell = new TableCell(GUIUtility.GetControlID(FocusType.Passive));
+                    table[controlIdIndex] = currentCell;
                 }
             }
 
@@ -1223,7 +1225,7 @@ namespace Schema.Unity.Editor
                         UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case ReferenceDataType refDataType:
-                    RenderReferenceCell(renderCtx, cellRect, entryValue, refDataType, cellStyle, value => 
+                    RenderReferenceCell(renderCtx, currentCell, cellRect, entryValue, refDataType, cellStyle, value => 
                         UpdateEntryValue(updateCtx, entry, attribute, value, scheme));
                     break;
                 case DateTimeDataType _:
@@ -1625,7 +1627,7 @@ namespace Schema.Unity.Editor
         /// <summary>
         /// Renders a reference data type cell
         /// </summary>
-        private void RenderReferenceCell(SchemaContext context, Rect cellRect, object value, ReferenceDataType refDataType, CellStyle cellStyle, Action<object> onValueChanged)
+        private void RenderReferenceCell(SchemaContext context, TableCell cell, Rect cellRect, object value, ReferenceDataType refDataType, CellStyle cellStyle, Action<object> onValueChanged)
         {
             var gotoButtonWidth = 20f;
             var refDropdownWidth = cellRect.width - gotoButtonWidth;
@@ -1633,9 +1635,23 @@ namespace Schema.Unity.Editor
             
             var dropdownRect = new Rect(cellRect.x, cellRect.y, refDropdownWidth, cellRect.height);
             var gotoRect = new Rect(cellRect.x + refDropdownWidth, cellRect.y, gotoButtonWidth, cellRect.height);
+
+            // TODO: Set this background color based on the attribute, refererneced or direct
+            GetScheme(context, refDataType.ReferenceSchemeName).Try(out var refScheme2);
+            refScheme2.GetAttributeByName("CellColor").Try(out var colorAttr);
+            refScheme2.GetEntry(e => e.GetDataAsString("ID") == value?.ToString()).Try(out var id);
+
+            id.GetDataAsColor(colorAttr.AttributeName).Try(out var cellColor);
             
+            var prevBackgroundColor = cellStyle.BackgroundColor;
+            cellStyle.SetBackgroundColor(cellColor);
+            Color oldColor = GUI.backgroundColor;
+            GUI.backgroundColor = cellColor;
             if (GUI.Button(dropdownRect, currentValue, cellStyle.DropdownStyle))
             {
+                GUIUtility.keyboardControl = cell.ControlId;
+                // lastFocusedCell
+                // GUI.FocusControl();
                 var referenceEntryOptions = new GenericMenu();
                 
                 if (GetScheme(context, refDataType.ReferenceSchemeName).Try(out var refSchema))
@@ -1651,6 +1667,8 @@ namespace Schema.Unity.Editor
                 
                 referenceEntryOptions.ShowAsContext();
             }
+            cellStyle.SetBackgroundColor(prevBackgroundColor);
+            GUI.backgroundColor = oldColor;
             
             if (GUI.Button(gotoRect, "O"))
             {

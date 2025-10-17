@@ -12,6 +12,7 @@ namespace Schema.Runtime.IO
     {
         public async Task<SchemaResult<string>> ReadAllText(SchemaContext context, string filePath, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!(await LoadTextAsset(context, filePath, cancellationToken)).Try(out var textAsset, out var error))
             {
                 return error.CastError<string>();

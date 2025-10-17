@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +11,7 @@ namespace Schema.Core.IO
         #region File Operations
         public Task<SchemaResult<string>> ReadAllText(SchemaContext context, string filePath, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var res = SchemaResult<string>.New(context);
             var sanitizedPath = PathUtility.SanitizePath(filePath);
             if (!File.Exists(sanitizedPath))

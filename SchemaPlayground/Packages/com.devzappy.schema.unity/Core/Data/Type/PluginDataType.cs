@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Schema.Core.Logging;
 
 namespace Schema.Core.Data
 {
@@ -29,7 +30,8 @@ namespace Schema.Core.Data
         public override SchemaResult IsValidValue(SchemaContext context, object value)
         {
             using var _ = new DataTypeContextScope(ref context, this);
-            return Fail("Unable to validate value as Plugin Data Type", context);
+            Logger.LogWarning("Unable to validate value as Plugin Data Type", context);
+            return Pass();
         }
 
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)

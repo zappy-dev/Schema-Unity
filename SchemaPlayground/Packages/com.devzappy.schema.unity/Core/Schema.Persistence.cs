@@ -55,6 +55,7 @@ namespace Schema.Core
         public static async Task<SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)>> LoadManifestFromPath(SchemaContext ctx,
             string manifestLoadPath,
             string projectPath,
+            SchemeLoadConfig loadConfig,
             IProgress<(float, string)> progress = null,
             CancellationToken cancellationToken = default)
         {
@@ -91,7 +92,7 @@ namespace Schema.Core
             }
 
             var loadManifestRes = await LoadManifest(ctx, manifestDataScheme, manifestImportPath: manifestLoadPath,
-                projectPath, progress, cancellationToken);
+                projectPath, loadConfig, progress, cancellationToken);
 
             // WARNING
             // Time lost debugging this code: 10 hours
@@ -109,9 +110,11 @@ namespace Schema.Core
             DataScheme manifestDataScheme,
             string manifestImportPath,
             string projectPath,
+            SchemeLoadConfig loadConfig,
             IProgress<(float, string)> progress = null,
             CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer project)> res = SchemaResult<(ManifestLoadStatus status, SchemaProjectContainer container)>.New(ctx);
             
             // initial new project container
@@ -130,8 +133,10 @@ namespace Schema.Core
             int schemeCount = manifestDataScheme.EntryCount;
 
             nextManifestScheme = new ManifestScheme(manifestDataScheme);
-            var saveManifestResponse = LoadDataScheme(ctx, manifestDataScheme, overwriteExisting: true,
-                registerManifestEntry: false);
+            var manifestLoadConfig = loadConfig.Clone() as SchemeLoadConfig;
+            manifestLoadConfig.overwriteExisting = true;
+            manifestLoadConfig.registerManifestEntry = false;
+            var saveManifestResponse = LoadDataScheme(ctx, manifestDataScheme, manifestLoadConfig);
             Logger.LogDbgVerbose(saveManifestResponse.Message, saveManifestResponse.Context);
             if (!saveManifestResponse.Passed)
             {
@@ -220,9 +225,12 @@ namespace Schema.Core
                 numLoaded++;
                 progress?.Report((0.1f, $"Loading '{scheme.ToString(false)}' into Schema ({numLoaded} / {numSchemes})"));
                 Logger.LogDbgVerbose($"Loading scheme from manifest: {scheme}", context: manifestDataScheme);
+
+                var schemeLoadConfig = loadConfig.Clone() as SchemeLoadConfig;
+                schemeLoadConfig.overwriteExisting = false;
+                schemeLoadConfig.registerManifestEntry = false;
                 var loadRes = LoadDataScheme(ctx, scheme,
-                    overwriteExisting: false,
-                    registerManifestEntry: false);
+                    schemeLoadConfig);
                 if (loadRes.Failed)
                 {
                     success = false;
@@ -307,20 +315,41 @@ namespace Schema.Core
             return res.Pass(loadedSchema, $"Loaded scheme data from file");
         }
 
+        public class SchemeLoadConfig : ICloneable
+        {
+            /// If true, overwrites an existing scheme. If false, fails to overwrite an existing scheme if it exists
+            public bool overwriteExisting { get; set; }
+            
+            /// If true, registers a new manifest entry in the currently loaded manifest for the given scheme if loaded.
+            public bool registerManifestEntry { get; set; } = true;
+            public bool runValidation { get; set; } = true;
+            public bool pruneUnknownAttributeValues { get; set; } = true;
+            public bool runAutoConversion { get; set; } = true;
+            
+            public object Clone()
+            {
+                return new SchemeLoadConfig
+                {
+                    overwriteExisting = overwriteExisting,
+                    registerManifestEntry = registerManifestEntry,
+                    runValidation = runValidation,
+                    pruneUnknownAttributeValues = pruneUnknownAttributeValues,
+                    runAutoConversion = runAutoConversion
+                };
+            }
+        }
+
         /// <summary>
         /// Load a new scheme into memory.
         /// Note: This does not persist the new data scheme to disk
         /// </summary>
         /// <param name="ctx"></param>
         /// <param name="scheme">New scheme to load</param>
-        /// <param name="overwriteExisting">If true, overwrites an existing scheme. If false, fails to overwrite an existing scheme if it exists</param>
-        /// <param name="registerManifestEntry">If true, registers a new manifest entry in the currently loaded manifest for the given scheme if loaded.</param>
         /// <param name="importFilePath">File path from where this scheme was imported, if imported</param>
         /// <returns></returns>
         public static SchemaResult LoadDataScheme(SchemaContext ctx, 
-            DataScheme scheme, 
-            bool overwriteExisting, 
-            bool registerManifestEntry = true,
+            DataScheme scheme,
+            SchemeLoadConfig loadConfig,
             string importFilePath = null)
         {
             using var schemeScope = new SchemeContextScope(ref ctx, scheme);
@@ -332,102 +361,111 @@ namespace Schema.Core
                 return Fail(ctx, errorMessage: "Schema name is invalid: " + schemeName);
             }
             
-            if (ctx.Project.HasScheme(schemeName) && !overwriteExisting)
+            if (ctx.Project.HasScheme(schemeName) && !loadConfig.overwriteExisting)
             {
                 return Fail(ctx, errorMessage: "Schema already exists: " + schemeName);
             }
 
-            var schemeAttributes = scheme.GetAttributes().ToList();
             // TODO: This can be parallelized
             // process all incoming entry data and make sure it is in a valid formats 
-            foreach (var entry in scheme.AllEntries)
+            if (loadConfig.runValidation)
             {
-                using var entryScope = new EntryContextScope(ref ctx, entry);
-                var attributesToRemove = new List<string>();
-                // prune unknown attributes
-                using var entryEnumerator = entry.GetEnumerator();
-                while (entryEnumerator.MoveNext())
+                var schemeAttributes = scheme.GetAttributes().ToList();
+                foreach (var entry in scheme.AllEntries)
                 {
-                    var kvp = entryEnumerator.Current;
-                    var attrName = kvp.Key;
-                    bool isKnownAttribute = schemeAttributes.Select(attr => attr.AttributeName).Contains(attrName);
-                    if (isKnownAttribute)
+                    using var entryScope = new EntryContextScope(ref ctx, entry);
+                    if (loadConfig.pruneUnknownAttributeValues)
                     {
-                        continue;
-                    }
+                        var attributesToRemove = new List<string>();
+                        // prune unknown attributes
+                        using var entryEnumerator = entry.GetEnumerator();
+                        while (entryEnumerator.MoveNext())
+                        {
+                            var kvp = entryEnumerator.Current;
+                            var attrName = kvp.Key;
+                            bool isKnownAttribute = schemeAttributes.Select(attr => attr.AttributeName).Contains(attrName);
+                            if (isKnownAttribute)
+                            {
+                                continue;
+                            }
                     
-                    attributesToRemove.Add(attrName);
-                }
+                            attributesToRemove.Add(attrName);
+                        }
 
-                foreach (var attrName in attributesToRemove)
-                {
-                    using var _ = new AttributeContextScope(ref ctx, attrName);
-                    var removeRes = entry.RemoveData(ctx, attrName);
-                    if (removeRes.Failed)
-                    {
-                        return removeRes;
+                        foreach (var attrName in attributesToRemove)
+                        {
+                            using var _ = new AttributeContextScope(ref ctx, attrName);
+                            var removeRes = entry.RemoveData(ctx, attrName);
+                            if (removeRes.Failed)
+                            {
+                                return removeRes;
+                            }
+                        }
                     }
-                }
                 
-                // WARNING
-                // Number of hours spent on this code: 10
-                foreach (var attribute in schemeAttributes)
-                {
-                    using var attrScope =  new AttributeContextScope(ref ctx, attribute);
-                    attribute._scheme = scheme;
-                    
-                    var entryData = entry.GetData(attribute);
-                    if (entryData.Failed)
+                    // WARNING
+                    // Number of hours spent on this code: 10
+                    foreach (var attribute in schemeAttributes)
                     {
-                        // Don't have the data for this attribute, set to default value
-                        scheme.SetDataOnEntry(context: ctx, entry: entry, attributeName: attribute.AttributeName, value: attribute.CloneDefaultValue(), shouldDirtyScheme: true);
-                        continue;
-                    }
+                        using var attrScope =  new AttributeContextScope(ref ctx, attribute);
+                        attribute._scheme = scheme;
                     
-                    // Prompt users that there's an issue, maybe cause a failure in downstream publishing, but allow for editor fixes
-                    var fieldData = entryData.Result;
-                    var validateData = attribute.IsValidValue(ctx, fieldData);
-                    if (validateData.Failed) // Try to force the manifest to be loaded
-                    {
-                        //for manifest, handle partial load failures, if a manifest entry refers to a file that doesn't exist
-                        Logger.LogDbgWarning($"Entry {entry} failed attribute validate {attribute} in scheme: {scheme}");
-                        if (scheme.IsManifest && (attribute.DataType is FilePathDataType || attribute.DataType is FolderDataType))
+                        var entryData = entry.GetData(attribute);
+                        if (entryData.Failed)
                         {
-                            Logger.LogDbgWarning($"Error validating Manifest data for attribute: {attribute}, {fieldData}, error: {validateData.Message}");
+                            // Don't have the data for this attribute, set to default value
+                            scheme.SetDataOnEntry(context: ctx, entry: entry, attributeName: attribute.AttributeName, value: attribute.CloneDefaultValue(), shouldDirtyScheme: true);
                             continue;
                         }
+                    
+                        // Prompt users that there's an issue, maybe cause a failure in downstream publishing, but allow for editor fixes
+                        var fieldData = entryData.Result;
+                        var validateData = attribute.IsValidValue(ctx, fieldData);
+                        if (validateData.Failed) // Try to force the manifest to be loaded
+                        {
+                            //for manifest, handle partial load failures, if a manifest entry refers to a file that doesn't exist
+                            Logger.LogDbgWarning($"Entry {entry} failed attribute validate {attribute} in scheme: {scheme}");
+                            if (scheme.IsManifest && (attribute.DataType is FilePathDataType || attribute.DataType is FolderDataType))
+                            {
+                                Logger.LogDbgWarning($"Error validating Manifest data for attribute: {attribute}, {fieldData}, error: {validateData.Message}");
+                                continue;
+                            }
 
-                        if (attribute.DataType is PluginDataType)
-                        {
-                            Logger.LogDbgWarning($"Attempting to load a scheme with unknown type: {attribute.DataType.TypeName}");
-                            continue;
-                        }
-                            
-                        var conversion = attribute.ConvertValue(ctx, fieldData);
-                        if (conversion.Failed)
-                        {
-                            // TODO: What should the user flow be here? Auto-convert? Prompt for user feedback?
-                            // tried to convert the data, failed
+                            if (attribute.DataType is PluginDataType)
+                            {
+                                Logger.LogDbgWarning($"Attempting to load a scheme with unknown type: {attribute.DataType.TypeName}");
+                                continue;
+                            }
+
+                            if (loadConfig.runAutoConversion)
+                            {
+                                var conversion = attribute.ConvertValue(ctx, fieldData);
+                                if (conversion.Failed)
+                                {
+                                    // TODO: What should the user flow be here? Auto-convert? Prompt for user feedback?
+                                    // tried to convert the data, failed
                                 
-                            // Allow file path data types to load in, even if the file doesn't exist.
-                            // TODO: Runtime warn users when a filepath doesn't exist
-                            // var allowFailedConversion = attribute.DataType == DataType.FilePath ||
-                            //                             attribute.DataType is ReferenceDataType;
-                            //
-                            // if (!allowFailedConversion)
-                            // {
-                            // return Fail(context, errorMessage: $"{scheme}.{attribute}: {conversion.Message}");
-                            // }
+                                    // Allow file path data types to load in, even if the file doesn't exist.
+                                    // TODO: Runtime warn users when a filepath doesn't exist
+                                    // var allowFailedConversion = attribute.DataType == DataType.FilePath ||
+                                    //                             attribute.DataType is ReferenceDataType;
+                                    //
+                                    // if (!allowFailedConversion)
+                                    // {
+                                    // return Fail(context, errorMessage: $"{scheme}.{attribute}: {conversion.Message}");
+                                    // }
                             
-                            // Let's try continuing with the failure.
-                            Logger.LogError(conversion.Message, conversion.Context);
-                            continue;
-                        }
+                                    // Let's try continuing with the failure.
+                                    Logger.LogError(conversion.Message, conversion.Context);
+                                    continue;
+                                }
 
-                        var updateData = scheme.SetDataOnEntry(context: ctx, entry: entry, attributeName: attribute.AttributeName, value: conversion.Result, allowIdentifierUpdate: true, shouldDirtyScheme: false);
-                        if (updateData.Failed)
-                        {
-                            return Fail(ctx, updateData.Message);
+                                var updateData = scheme.SetDataOnEntry(context: ctx, entry: entry, attributeName: attribute.AttributeName, value: conversion.Result, allowIdentifierUpdate: true, shouldDirtyScheme: false);
+                                if (updateData.Failed)
+                                {
+                                    return Fail(ctx, updateData.Message);
+                                }
+                            }
                         }
                     }
                 }
@@ -440,7 +478,7 @@ namespace Schema.Core
                 IsTemplateManifestLoaded = false;
             }
 
-            if (registerManifestEntry)
+            if (loadConfig.registerManifestEntry)
             {
                 // add new manifest entry if not existing. Only do this for non-manifest schemes, else this could end up in an stack overflow
                 if (scheme.IsManifest || GetManifestEntryForScheme(ctx, schemeName).Try(out _)) 

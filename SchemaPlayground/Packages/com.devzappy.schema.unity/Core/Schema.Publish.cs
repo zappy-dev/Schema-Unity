@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Schema.Core.Data;
+using Schema.Core.IO;
 using Schema.Core.Logging;
 using Schema.Core.Schemes;
 using Schema.Core.Serialization;
@@ -25,9 +26,11 @@ namespace Schema.Core
         
         public class PublishConfig
         {
-            public PublishOperation PostPublish;
+            public PublishOperation PostPublish { get; set; }
 
-            public StorageFormatExt.ResolveExportPath ResolveExportPath;
+            public StorageFormatExt.ResolveExportPath ResolveExportPath { get; set; }
+            public Storage PublishStorage { get; set; }
+            public bool RunCodeGen { get; }
         }
         
         public static async Task<SchemaResult> PublishAllSchemes(SchemaContext ctx, 
@@ -122,19 +125,26 @@ namespace Schema.Core
                 // }
                 case ManifestScheme.PublishTarget.RESOURCES:
                 {
-                    var publishRes = await PublishToResources(schemeToPublish, ctx, cancellationToken);
+                    var publishRes = await PublishToResources(ctx, publishConfig, manifestEntry, schemeToPublish, cancellationToken);
                     isSuccess = publishRes.Passed;
-                } 
+                }
                     break;
             }
-
-            if (!GetStorage(ctx).Try(out var storage, out var storageError)) return storageError.Cast();
             
-            // Publish code
-            var exportRes = await storage.CSharpSchemeStorageFormat.Export(schemeToPublish, ctx, publishConfig.ResolveExportPath);
-            if (exportRes.Failed)
+            if (!isSuccess) return Fail(ctx, "Publishing scheme failed.");
+
+            if (publishConfig.RunCodeGen)
             {
-                return exportRes;
+                // TODO: Define a separate publishing storage for codegen?
+                // How should Web API publish code?
+                if (!GetStorage(ctx).Try(out var storage, out var storageError)) return storageError.Cast();
+                
+                // Publish code
+                var exportRes = await storage.CSharpSchemeStorageFormat.Export(schemeToPublish, ctx, publishConfig.ResolveExportPath);
+                if (exportRes.Failed)
+                {
+                    return exportRes;
+                }
             }
             
             publishConfig?.PostPublish?.Invoke(ctx, schemeToPublish);
@@ -146,14 +156,24 @@ namespace Schema.Core
         /// <summary>
         /// Publishes a given scheme to an associated Resources file
         /// </summary>
+        /// <param name="context"></param>
+        /// <param name="publishConfig"></param>
         /// <param name="originalSchemeToPublish"></param>
+        /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        private static async Task<SchemaResult> PublishToResources(DataScheme originalSchemeToPublish, SchemaContext context, CancellationToken cancellationToken)
+        private static async Task<SchemaResult> PublishToResources(SchemaContext context, PublishConfig publishConfig,
+            ManifestEntry manifestEntry,
+            DataScheme originalSchemeToPublish, CancellationToken cancellationToken)
         {
-            if (!GetStorage(context).Try(out var storage, out var storageError)) return storageError.Cast();
+            // if (!GetStorage(context).Try(out var storage, out var storageError)) return storageError.Cast();
 
+            var storage = publishConfig.PublishStorage;
+            
             var storageFormat = storage.DefaultSchemaPublishFormat;
-            string schemaPublishPath = $"{DEFAULT_RESOURCE_PUBLISH_PATH}/{originalSchemeToPublish.SchemeName}.{storageFormat.Extension}";
+            // string schemaPublishPath = $"{DEFAULT_RESOURCE_PUBLISH_PATH}/{storageFormat.ResolveFileName(originalSchemeToPublish.SchemeName)}";
+            string schemaPublishPath = $"{DEFAULT_RESOURCE_PUBLISH_PATH}/{manifestEntry.FilePath}";
+            schemaPublishPath = RemoteFileSystem.SanitizePath(schemaPublishPath);
+            // string schemaPublishPath = storageFormat.ResolvePublishPath(originalSchemeToPublish.SchemeName);
 
             // prepare a new data scheme to publish
             var publishScheme = new DataScheme(originalSchemeToPublish.SchemeName);

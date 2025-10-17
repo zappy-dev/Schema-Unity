@@ -32,6 +32,8 @@ namespace Schema.Unity.Editor
     {
         #region Static Fields and Constants
 
+        private static readonly SchemeLoadConfig EditorLoadConfig = new SchemeLoadConfig();
+        
         private static string _defaultUnityProjectPath;
         public static SchemaEditorWindow Instance { get; private set; }
 
@@ -389,7 +391,8 @@ namespace Schema.Unity.Editor
             }
 
             LatestManifestLoadResponse = await LoadManifest(context, 
-                templateManifest._, 
+                templateManifest._,
+                loadConfig: EditorLoadConfig,
                 manifestImportPath: _defaultManifestLoadPath, 
                 projectPath: _defaultUnityProjectPath,
                 cancellationToken: cancellationToken);

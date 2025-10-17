@@ -27,6 +27,7 @@ namespace Schema.Core.Serialization
         public async Task<SchemaResult<DataScheme>> DeserializeFromFile(SchemaContext context, string filePath,
             CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var readRes = await fileSystem.ReadAllText(context, filePath, cancellationToken);
             
             if (!readRes.Try(out string jsonData))

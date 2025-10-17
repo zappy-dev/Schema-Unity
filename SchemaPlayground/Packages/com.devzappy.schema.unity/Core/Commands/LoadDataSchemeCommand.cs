@@ -117,7 +117,9 @@ namespace Schema.Core.Commands
                     Logger.LogDbgVerbose($"Restoring previous scheme '{_previousScheme.SchemeName}'", this);
                     
                     // Use the synchronous method for now - this will be replaced when Schema interface is updated
-                    var restoreResult = Schema.LoadDataScheme(Context, _previousScheme, overwriteExisting: true);
+                    var loadConfig = new Schema.SchemeLoadConfig();
+                    loadConfig.overwriteExisting = true;
+                    var restoreResult = Schema.LoadDataScheme(Context, _previousScheme, loadConfig);
                     
                     if (restoreResult.Failed)
                     {
@@ -220,7 +222,9 @@ namespace Schema.Core.Commands
             {
                 scheme.SetDirty(Context, true);
                 // Use the existing LoadDataScheme method until the Schema interface is fully converted
-                var result = Schema.LoadDataScheme(Context, scheme, _overwriteExisting);
+                var loadConfig = new Schema.SchemeLoadConfig();
+                loadConfig.overwriteExisting = _overwriteExisting;
+                var result = Schema.LoadDataScheme(Context, scheme, loadConfig);
                 if (result.Failed)
                 {
                     Logger.LogError(result.Message, result.Context);

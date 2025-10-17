@@ -87,7 +87,7 @@ namespace Schema.Core
         public SchemaResult(RequestStatus status, string message, object context = null)
         {
             this.status = status;
-            this.message = string.IsNullOrEmpty(message) ? MESSAGE_NOT_SET : message;
+            this.message = string.IsNullOrEmpty(message) && status == RequestStatus.Failed ? MESSAGE_NOT_SET : message;
             this.context = context; // NOTE: Context may change
             
             if (SchemaResultSettings.Instance.LogFailure && status == RequestStatus.Failed)
@@ -122,7 +122,7 @@ namespace Schema.Core
         
         public override string ToString()
         {
-            return $"SchemaResponse[context={context}, status={status}, message={message}]";
+            return $"SchemaResponse[context={context}, status={status}, message='{message}']";
         }
 
         #region Static Factory Methods
@@ -193,7 +193,7 @@ namespace Schema.Core
         public SchemaResult(RequestStatus status, TResult result, string message, ICloneable context = null)
         {
             this.status = status;
-            this.message = (string.IsNullOrEmpty(message) ? SchemaResult.MESSAGE_NOT_SET : message);
+            this.message = (string.IsNullOrEmpty(message) && status == RequestStatus.Failed ? SchemaResult.MESSAGE_NOT_SET : message);
             this.result = result;
             this.context = context?.Clone();
 

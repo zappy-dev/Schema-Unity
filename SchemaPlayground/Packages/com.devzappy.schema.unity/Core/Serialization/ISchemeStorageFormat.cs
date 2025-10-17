@@ -12,6 +12,12 @@ namespace Schema.Core.Serialization
     {
         /// <summary>
         /// File extension associated with this format.
+        ///
+        /// Examples:
+        /// - g.cs
+        /// - csv
+        /// - json
+        /// - asset
         /// </summary>
         string Extension { get; }
 

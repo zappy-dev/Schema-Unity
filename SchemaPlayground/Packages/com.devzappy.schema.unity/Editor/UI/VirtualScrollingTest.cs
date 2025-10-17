@@ -60,7 +60,10 @@ namespace Schema.Unity.Editor
             // Save the scheme
             var targetFilePath = GetContentPath($"{testScheme.SchemeName}.json");
             
-            LoadDataScheme(ctx, testScheme, overwriteExisting: true, registerManifestEntry: true, importFilePath: targetFilePath);
+            var testSchemeLoadConfig =  new SchemeLoadConfig();
+            testSchemeLoadConfig.overwriteExisting = true;
+            testSchemeLoadConfig.registerManifestEntry = true;
+            LoadDataScheme(ctx, testScheme, loadConfig: testSchemeLoadConfig, importFilePath: targetFilePath);
             
             reporter.Report((0.9f, "Saving Test Scheme..."));
             // Should we save the manifest?

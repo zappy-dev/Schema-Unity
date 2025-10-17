@@ -110,7 +110,9 @@ namespace Schema.Unity.Editor
         {
             using var reporter = new EditorProgressReporter("Schema - Manifest Load");
             LogDbgVerbose("Loading Manifest", context);
-            LatestManifestLoadResponse = await LoadManifestFromPath(context, _defaultManifestLoadPath, _defaultUnityProjectPath, reporter, cancellationToken);
+            LatestManifestLoadResponse = await LoadManifestFromPath(context, _defaultManifestLoadPath, _defaultUnityProjectPath,
+                loadConfig: EditorLoadConfig,
+                reporter, cancellationToken);
             LatestResponse = LatestManifestLoadResponse.Cast();
 
             if (LatestManifestLoadResponse.Passed)
