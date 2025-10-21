@@ -11,6 +11,11 @@
 
 Schema-Unity provides Unity integrations for the Schema content management tool, enabling robust, flexible, and maintainable management of game design data within Unity projects.
 
+## Overview
+[![Schema Overview Video on YouTube](https://img.youtube.com/vi/B9hY2QzgPCE/0.jpg)](https://www.youtube.com/watch?v=B9hY2QzgPCE)
+
+Click to watch overview video
+
 ### Highlights
 - Table editor with fast, virtualized grid and publishing
   
