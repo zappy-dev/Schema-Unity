@@ -684,7 +684,7 @@ namespace Schema.Unity.Editor
         /// </summary>
         private void RenderSchemaExplorer(SchemaContext ctx)
         {
-            using (new EditorGUILayout.VerticalScope(GUILayout.Width(400)))
+            using (new EditorGUILayout.VerticalScope(GUILayout.Width(200)))
             {
                 if (GetNumAvailableSchemes(ctx).Try(out var numSchemes))
                 {

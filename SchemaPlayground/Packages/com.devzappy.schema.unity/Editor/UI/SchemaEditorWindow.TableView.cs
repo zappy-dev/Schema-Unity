@@ -330,9 +330,8 @@ namespace Schema.Unity.Editor
                     }
                 }
 
-                // TODO: Fix this double scrolling window
                 using (var tableScrollView = new EditorGUILayout.ScrollViewScope(tableViewHeaderHorizontalScrollPosition,
-                           alwaysShowHorizontal: true,
+                           alwaysShowHorizontal: false,
                            alwaysShowVertical: false))
                 {
                     tableViewHeaderHorizontalScrollPosition = tableScrollView.scrollPosition;
@@ -340,96 +339,90 @@ namespace Schema.Unity.Editor
                     // Freeze table header to top of the viewport
                     RenderTableHeader(renderCtx, attributeCount, scheme);
                     
-                    using (var tableBodyScrollView = new EditorGUILayout.ScrollViewScope(tableViewBodyVerticalScrollPosition,
-                               alwaysShowHorizontal: false,
-                               alwaysShowVertical: true))
+                    // Update scroll position from the scope
+                    if (tableScrollView.scrollPosition != tableViewBodyVerticalScrollPosition) 
                     {
-                        // Update scroll position from the scope
-                        if (tableBodyScrollView.scrollPosition != tableViewBodyVerticalScrollPosition) 
-                        {
-                            tableViewBodyVerticalScrollPosition = tableBodyScrollView.scrollPosition;
-                            ReleaseControlFocus();
-                        }
-
-                        _tableBodyMarker.Begin();
-
-                        // Calculate visible range for virtual scrolling
-                        visibleRange = _virtualTableView.CalculateVisibleRange(
-                            tableViewBodyVerticalScrollPosition,
-                            lastScrollViewRect,
-                            allEntries.Count,
-                            scheme.SchemeName,
-                            sortOrder,
-                            attributeFilters);
-
-                        // Debug logging to track visible range issues
-                        if (visibleRange.end > allEntries.Count)
-                        {
-                            visibleRange = (visibleRange.start, Math.Min(visibleRange.end, allEntries.Count));
-                        }
-                        
-                        // mapping entries to control IDs for focus/navigation management
-                        // For virtual scrolling, we only need control IDs for visible entries
-                        // Allocate based on actual visible range to prevent IndexOutOfRangeException
-                        visibleEntryCount = visibleRange.end - visibleRange.start;
-                        table.Initialize(attributeCount, visibleEntryCount);
-
-                        // Efficient approach: use single spacers for all invisible rows instead of individual spaces
-                        // This reduces GUI allocations and improves performance
-                        int renderedCount = 0;
-
-                        // Calculate row heights for all entries (needed for proper scrolling)
-                        // Use cache to avoid recalculating every frame
-                        if (_lastCachedSchemeName != scheme.SchemeName || !_rowHeightCache.ContainsKey(scheme.SchemeName) || scheme.IsDirty)
-                        {
-                            _rowHeightCache[scheme.SchemeName] = new Dictionary<int, float>();
-                            for (int i = 0; i < allEntries.Count; i++)
-                            {
-                                _rowHeightCache[scheme.SchemeName][i] = CalculateRowHeight(allEntries[i], scheme);
-                            }
-                            _lastCachedSchemeName = scheme.SchemeName;
-                        }
-                        
-                        var rowHeights = _rowHeightCache[scheme.SchemeName];
-
-                        // Top spacer for rows before visible range
-                        if (visibleRange.start > 0)
-                        {
-                            float topSpacerHeight = 0;
-                            for (int i = 0; i < visibleRange.start; i++)
-                            {
-                                topSpacerHeight += rowHeights[i];
-                            }
-                            GUILayout.Space(topSpacerHeight);
-                        }
-
-                        // Render visible rows
-                        for (int i = visibleRange.start; i < visibleRange.end; i++)
-                        {
-                            float rowHeight = rowHeights[i];
-                            var rowRect = GUILayoutUtility.GetRect(0, rowHeight);
-                            RenderTableRow(renderCtx, rowRect, allEntries.ElementAt(i), i, attributeCount, scheme, visibleEntryCount, visibleRange.start, rowHeight);
-                            renderedCount++;
-                        }
-
-                        // Bottom spacer for rows after visible range
-                        if (visibleRange.end < allEntries.Count)
-                        {
-                            float bottomSpacerHeight = 0;
-                            for (int i = visibleRange.end; i < allEntries.Count; i++)
-                            {
-                                bottomSpacerHeight += rowHeights[i];
-                            }
-                            GUILayout.Space(bottomSpacerHeight);
-                        }
-
-                        // Update the cell count in VirtualTableView for debug display
-                        int totalCellsDrawn = renderedCount * attributeCount; // Each row has attributeCount cells
-                        _virtualTableView.UpdateCellCount(totalCellsDrawn);
-
-                        // GUILayout.EndScrollView();
-                        _tableBodyMarker.End();
+                        tableViewBodyVerticalScrollPosition = tableScrollView.scrollPosition;
+                        ReleaseControlFocus();
                     }
+
+                    _tableBodyMarker.Begin();
+
+                    // Calculate visible range for virtual scrolling
+                    visibleRange = _virtualTableView.CalculateVisibleRange(
+                        tableViewBodyVerticalScrollPosition,
+                        lastScrollViewRect,
+                        allEntries.Count,
+                        scheme.SchemeName,
+                        sortOrder,
+                        attributeFilters);
+
+                    // Debug logging to track visible range issues
+                    if (visibleRange.end > allEntries.Count)
+                    {
+                        visibleRange = (visibleRange.start, Math.Min(visibleRange.end, allEntries.Count));
+                    }
+                    
+                    // mapping entries to control IDs for focus/navigation management
+                    // For virtual scrolling, we only need control IDs for visible entries
+                    // Allocate based on actual visible range to prevent IndexOutOfRangeException
+                    visibleEntryCount = visibleRange.end - visibleRange.start;
+                    table.Initialize(attributeCount, visibleEntryCount);
+
+                    // Efficient approach: use single spacers for all invisible rows instead of individual spaces
+                    // This reduces GUI allocations and improves performance
+                    int renderedCount = 0;
+
+                    // Calculate row heights for all entries (needed for proper scrolling)
+                    // Use cache to avoid recalculating every frame
+                    if (_lastCachedSchemeName != scheme.SchemeName || !_rowHeightCache.ContainsKey(scheme.SchemeName) || scheme.IsDirty)
+                    {
+                        _rowHeightCache[scheme.SchemeName] = new Dictionary<int, float>();
+                        for (int i = 0; i < allEntries.Count; i++)
+                        {
+                            _rowHeightCache[scheme.SchemeName][i] = CalculateRowHeight(allEntries[i], scheme);
+                        }
+                        _lastCachedSchemeName = scheme.SchemeName;
+                    }
+                    
+                    var rowHeights = _rowHeightCache[scheme.SchemeName];
+
+                    // Top spacer for rows before visible range
+                    if (visibleRange.start > 0)
+                    {
+                        float topSpacerHeight = 0;
+                        for (int i = 0; i < visibleRange.start; i++)
+                        {
+                            topSpacerHeight += rowHeights[i];
+                        }
+                        GUILayout.Space(topSpacerHeight);
+                    }
+
+                    // Render visible rows
+                    for (int i = visibleRange.start; i < visibleRange.end; i++)
+                    {
+                        float rowHeight = rowHeights[i];
+                        var rowRect = GUILayoutUtility.GetRect(0, rowHeight);
+                        RenderTableRow(renderCtx, rowRect, allEntries.ElementAt(i), i, attributeCount, scheme, visibleEntryCount, visibleRange.start, rowHeight);
+                        renderedCount++;
+                    }
+
+                    // Bottom spacer for rows after visible range
+                    if (visibleRange.end < allEntries.Count)
+                    {
+                        float bottomSpacerHeight = 0;
+                        for (int i = visibleRange.end; i < allEntries.Count; i++)
+                        {
+                            bottomSpacerHeight += rowHeights[i];
+                        }
+                        GUILayout.Space(bottomSpacerHeight);
+                    }
+
+                    // Update the cell count in VirtualTableView for debug display
+                    int totalCellsDrawn = renderedCount * attributeCount; // Each row has attributeCount cells
+                    _virtualTableView.UpdateCellCount(totalCellsDrawn);
+
+                    _tableBodyMarker.End();
                 }
 
                 if (Event.current.type == EventType.Repaint)

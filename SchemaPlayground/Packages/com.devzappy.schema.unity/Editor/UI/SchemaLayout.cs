@@ -54,12 +54,12 @@ namespace Schema.Unity.Editor
         }
 
 
-        public static bool DropdownButton(string text = "", float width = SETTINGS_WIDTH, GUIStyle style = null) =>
+        public static bool DropdownButton(string text, float width, GUIStyle style = null) =>
             DropdownButton(new GUIContent(text), width, style);
 
         public static GUILayoutOption[] SingleLayoutOption = new GUILayoutOption[1];
         
-        public static bool DropdownButton(GUIContent content, float width = SETTINGS_WIDTH, GUIStyle style = null)
+        public static bool DropdownButton(GUIContent content, float width, GUIStyle style = null)
         {
             
             SingleLayoutOption[0] = GUILayout.Width(width);
