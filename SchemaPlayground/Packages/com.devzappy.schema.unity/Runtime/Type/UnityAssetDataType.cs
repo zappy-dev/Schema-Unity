@@ -1,7 +1,9 @@
 ﻿using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Schemes;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
 using Logger = Schema.Core.Logging.Logger;
 
@@ -30,7 +32,10 @@ namespace Schema.Runtime.Type
             ObjectType = objectType;
         }
 
+#if UNITY_EDITOR
         [InitializeOnLoadMethod]
+#endif
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void Initialize()
         {
             Logger.LogVerbose("Initializing Unity Asset DataTypes");

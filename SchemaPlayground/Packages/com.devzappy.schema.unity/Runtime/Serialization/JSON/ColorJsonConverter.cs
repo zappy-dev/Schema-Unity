@@ -1,7 +1,9 @@
 ﻿using Newtonsoft.Json;
 using Schema.Core.Serialization;
 using Schema.Runtime.Type;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
 
 namespace Schema.Runtime.Serialization.JSON
@@ -33,7 +35,10 @@ namespace Schema.Runtime.Serialization.JSON
         public override bool CanRead => false;
         public override bool CanWrite => true;
 
+#if UNITY_EDITOR
         [InitializeOnLoadMethod]
+#endif
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         internal static void InitializeOnLoad()
         {
             JsonSettings.AddConverters(new ColorJsonConverter());
