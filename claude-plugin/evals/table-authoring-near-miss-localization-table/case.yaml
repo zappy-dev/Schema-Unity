@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: "table-authoring does not load for a localization string table"
+context:
+  scaffold_script: scaffold.sh

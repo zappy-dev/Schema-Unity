@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: "table-reading does not load for a Unity JSON serialization question"
+context:
+  scaffold_script: scaffold.sh

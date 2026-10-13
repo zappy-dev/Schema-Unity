@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: "table-authoring loads before the first edit when a feature needs a new tunable value"
+context:
+  scaffold_script: scaffold.sh
