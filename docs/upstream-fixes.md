@@ -101,3 +101,11 @@ This does not change the default that a Reference column gives to a *new* row: `
 **What changed.** The text is tried as it is first, which accepts what Unity accepts (a hex code with `#`, the names of colors), and then with a `#` in front, which keeps accepting a hex code written without one.
 
 **How you notice.** Converting a Text column that holds `red` to a Color column works.
+
+## 21: a nested operation no longer clears what the operation around it put in the context
+
+**What was wrong.** The four context scopes (scheme, attribute, data type, entry) set a value in the `SchemaContext` and, when they ended, set it to `null`. An operation that opened a scope inside another operation's scope therefore cleared the outer value. Adding a row to a table with `AddEntry` sets the scheme in the context, and the `GetAttributeByName` call inside it opened its own scope and cleared it, so a reference to a row of the same table, which is validated through the scheme in the context while the table is not loaded yet, always failed with `Reference scheme does not exist`, even for a row that was already there. A chain of links could not be added with validation.
+
+**What changed.** Each scope remembers the value it replaced and puts it back when it ends. A context that held nothing is left holding nothing.
+
+**How you notice.** `AddEntry` accepts a link to a row that is already in a table that is not loaded yet, and still rejects a link to a row that is not there. A `SchemaContext` that you pass in keeps what you put in it, instead of having its scheme, attribute, data type or entry cleared by the call.
