@@ -18,7 +18,7 @@ namespace Schema.Core.Data
             foreach (var attribute in attributes)
             {
                 // Determine a good default value to set for a new entry's Identifier
-                var defaultValue = attribute.CloneDefaultValue();
+                var defaultValue = attribute.CloneDefaultValueForEntry(context);
                 if (attribute.IsIdentifier)
                 {
                     if (!GetIdentifierAttribute().Try(out var idAttr, out var idErr))
@@ -93,7 +93,7 @@ namespace Schema.Core.Data
                         continue;
                     }
 
-                    newEntry.SetData(context, attribute.AttributeName, attribute.CloneDefaultValue());
+                    newEntry.SetData(context, attribute.AttributeName, attribute.CloneDefaultValueForEntry(context));
                 }
             }
             

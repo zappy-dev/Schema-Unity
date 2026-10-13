@@ -85,3 +85,11 @@ This does not change the default that a Reference column gives to a *new* row: `
 **What changed.** The column default is only reset when the type changes. The cells are still converted, and the column takes the new type object, so a changed setting such as `SupportsEmptyReferences` still applies.
 
 **How you notice.** The default shown in the column settings survives running the same conversion again.
+
+## 8: a new row gets a default that is valid for its column
+
+**What was wrong.** A Color column keeps its default as hex text (`#000000`), but its cells must hold a `Color`. Anything that filled a cell from the column default (the editor's new-row button, `AddEntry` completing a row that had no value for the column, adding a column to a table that already had rows) put the text in the cell, and the scheme then failed validation until it was saved and reloaded.
+
+**What changed.** When the column default is not a valid value of the column's type but converting it gives one, the converted value fills the cell. A default that is valid is used as it is, and one that cannot be converted keeps today's behavior. `CreateNewEmptyEntry`, the filling done by `AddEntry`, and `AddAttribute` do this.
+
+**How you notice.** A new row in a Color column holds a `Color`, and the scheme validates straight away. Not covered: `AddEntry` still rejects a hex text for a Color value, and the cells that `LoadDataScheme` fills for a column missing from a file still take the default as it is.

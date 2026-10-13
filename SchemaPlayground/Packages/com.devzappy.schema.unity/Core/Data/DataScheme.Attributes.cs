@@ -62,9 +62,11 @@ namespace Schema.Core.Data
             attributes.Add(newAttribute);
             SetDirty(context, true);
 
+            // Work out once whether the default needs converting to be a valid value, not once for every row
+            var convertedDefault = newAttribute.ConvertDefaultToValidValue(context);
             foreach (var entry in entries)
             {
-                entry.SetData(context, newAttributeName, newAttribute.CloneDefaultValue());
+                entry.SetData(context, newAttributeName, convertedDefault ?? newAttribute.CloneDefaultValue());
             }
             
             return SchemaResult.Pass($"Added attribute {newAttributeName}", context);
