@@ -1,0 +1,22 @@
+{
+ "case_filter": null,
+ "cases": {
+  "column-types-convert-blank-link-behaviour": 1,
+  "column-types-near-miss-postgres-foreign-key": 1,
+  "column-types-near-miss-serialized-field-type": 1,
+  "column-types-next-port-link-trigger": 1,
+  "column-types-port-tint-trigger": 1,
+  "table-authoring-missing-constant-trigger": 1,
+  "table-authoring-near-miss-localization-table": 1,
+  "table-authoring-near-miss-postgres-column": 1,
+  "table-authoring-published-copies-behaviour": 1,
+  "table-authoring-ship-fuel-trigger": 1,
+  "table-reading-empty-port-list-trigger": 1,
+  "table-reading-near-miss-json-save": 1,
+  "table-reading-near-miss-linq-update": 1,
+  "table-reading-unknown-ship-id-trigger": 1
+ },
+ "cost_usd": 3.9032427999999992,
+ "source": "2026-10-13T20-35-54-743Z",
+ "started_at": "2026-10-13T20:35:54.743Z"
+}
