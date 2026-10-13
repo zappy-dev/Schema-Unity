@@ -40,10 +40,21 @@ public class TestGeneratedReferenceAccessors
         zones.AddAttribute(Context, "Next", new ReferenceDataType("Zones", "ID", validateSchemeLoaded: false) { DefaultValue = "" }).AssertPassed();
         var items = ScratchSchemes.Table("Items", "Item_1");
         items.AddAttribute(Context, "Home", new ReferenceDataType("Zones", "ID", validateSchemeLoaded: false) { DefaultValue = "" }).AssertPassed();
+
+        // A table whose identifier is an integer, which the throwing getter reads with GetDataAsInt and the OrNull accessor reads as the raw cell
+        var levels = new DataScheme("Levels");
+        levels.AddAttribute(Context, "ID", DataType.Integer, isIdentifier: true).AssertPassed();
+        foreach (var id in new[] { 1, 2 })
+        {
+            levels.AddEntry(Context, new DataEntry { { "ID", id, Context } }).AssertPassed();
+        }
+        items.AddAttribute(Context, "Level", new ReferenceDataType("Levels", "ID", validateSchemeLoaded: false) { DefaultValue = "" }).AssertPassed();
+
         Schema.LoadDataScheme(Context, zones, overwriteExisting: true, registerManifestEntry: false).AssertPassed();
+        Schema.LoadDataScheme(Context, levels, overwriteExisting: true, registerManifestEntry: false).AssertPassed();
         Schema.LoadDataScheme(Context, items, overwriteExisting: true, registerManifestEntry: false).AssertPassed();
 
-        var sources = new[] { zones, items }.Select(Generate).ToList();
+        var sources = new[] { zones, levels, items }.Select(Generate).ToList();
         generated = Compile(sources);
         zonesEntry = generated.GetType("ZonesEntry")!;
         itemsEntry = generated.GetType("ItemsEntry")!;
@@ -187,6 +198,26 @@ public class TestGeneratedReferenceAccessors
         }
 
         Assert.That(ids, Is.EqualTo(new[] { "Zone_A", "Zone_B" }), "the chain ends at the blank link without throwing");
+    }
+
+    [Test]
+    public void AC7_AReferenceToAnIntegerIdentifier_ReadsTheSameWayThroughBothMembers()
+    {
+        var items = Loaded("Items");
+        var item = Wrap(itemsEntry, items, 0);
+
+        items.GetEntry(0).SetData(Context, "Level", 2);
+        var level = (EntryWrapper)Read(item, "LevelOrNull")!;
+        Assert.That(level, Is.Not.Null);
+        Assert.That(level._.GetDataDirect("ID"), Is.EqualTo(2));
+        Assert.That(((EntryWrapper)Read(item, "Level")!)._.GetDataDirect("ID"), Is.EqualTo(2), "both members agree on a good reference");
+
+        items.GetEntry(0).SetData(Context, "Level", "");
+        Assert.That(Read(item, "LevelOrNull"), Is.Null, "a blank reference to an integer identifier is null, not the entry with id 0");
+        Assert.Throws<InvalidOperationException>(() => Read(item, "Level"));
+
+        items.GetEntry(0).SetData(Context, "Level", 99);
+        Assert.That(Read(item, "LevelOrNull"), Is.Null, "a dangling one too");
     }
 
     [Test]
