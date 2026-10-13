@@ -62,44 +62,120 @@ namespace Schema.Core.Data
             attributes.Add(newAttribute);
             SetDirty(context, true);
 
+            // Work out once whether the default needs converting to be a valid value, not once for every row
+            var convertedDefault = newAttribute.ConvertDefaultToValidValue(context);
             foreach (var entry in entries)
             {
-                entry.SetData(context, newAttributeName, newAttribute.CloneDefaultValue());
+                entry.SetData(context, newAttributeName, convertedDefault ?? newAttribute.CloneDefaultValue());
             }
             
             return SchemaResult.Pass($"Added attribute {newAttributeName}", context);
         }
 
+        /// <summary>
+        /// Converts every cell of an attribute to a new data type, then changes the attribute's type.
+        /// </summary>
+        /// <remarks>
+        /// The conversion is all-or-nothing: every cell is converted first, and nothing is written unless all of them convert.
+        /// When any cell cannot be converted, the scheme is left exactly as it was (cells, attribute type, default value and
+        /// dirty state) and the failure names the scheme, the attribute, and every row and value that failed.
+        /// </remarks>
+        /// <param name="context">Operation context</param>
+        /// <param name="attributeName">Name of the attribute to convert</param>
+        /// <param name="newType">Data type to convert to</param>
         public SchemaResult ConvertAttributeType(SchemaContext context, string attributeName, DataType newType)
         {
             var attribute = attributes.Find(a => a.AttributeName == attributeName);
-
-            foreach (var entry in entries)
+            if (attribute == null)
             {
-                object convertedData;
-                if (!entry.HasData(attribute))
-                {
-                    convertedData = newType.CloneDefaultValue();
-                }
-                else
-                {
-                    var entryData = entry.GetData(attribute).Result;
+                return SchemaResult.Fail(context, $"Cannot convert attribute {attributeName} of scheme '{SchemeName}': the scheme has no such attribute");
+            }
 
-                    if (!DataType.ConvertValue(context, entryData, attribute.DataType, newType).Try(out convertedData, out var convertErr))
+            if (newType == null)
+            {
+                return SchemaResult.Fail(context, $"Cannot convert attribute {attributeName} of scheme '{SchemeName}': the new data type is null");
+            }
+
+            // 1. Convert every cell into a buffer. Nothing in the scheme is touched yet.
+            var convertedValues = new List<object>(entries.Count);
+            var failures = new List<string>();
+            var failedRows = 0;
+            for (var rowIndex = 0; rowIndex < entries.Count; rowIndex++)
+            {
+                var entry = entries[rowIndex];
+                // A row with no value for the column is a blank cell
+                var hasData = entry.HasData(attribute);
+                var entryData = hasData ? entry.GetData(attribute).Result : null;
+                var convertRes = hasData
+                    ? DataType.ConvertValue(context, entryData, attribute.DataType, newType)
+                    : newType.ConvertEmptyValue(context);
+                if (convertRes.Failed)
+                {
+                    failedRows++;
+                    if (failures.Count < MaxConversionFailuresReported)
                     {
-                        return SchemaResult.Fail(context, $"Cannot convert attribute {attributeName} to type {newType}, reason: {convertErr}");
+                        failures.Add($"{DescribeRow(rowIndex)} value '{entryData}': {convertRes.Message}");
                     }
+
+                    convertedValues.Add(null);
+                    continue;
                 }
-                        
-                entry.SetData(context, attributeName, convertedData);
+
+                convertedValues.Add(convertRes.Result);
+            }
+
+            if (failedRows > 0)
+            {
+                var more = failedRows > failures.Count ? $"; and {failedRows - failures.Count} more" : string.Empty;
+                return SchemaResult.Fail(context,
+                    $"Cannot convert attribute {attributeName} of scheme '{SchemeName}' to type {newType}, " +
+                    $"{failedRows} of {entries.Count} rows failed: {string.Join("; ", failures)}{more}");
+            }
+
+            // 2. Every cell converted, so write them all.
+            for (var rowIndex = 0; rowIndex < entries.Count; rowIndex++)
+            {
+                entries[rowIndex].SetData(context, attributeName, convertedValues[rowIndex]);
             }
             
+            // A column that keeps its type keeps the default value that was set for it (in the column settings, say).
+            // Any other column takes the default value of its new type.
+            var keepsItsType = attribute.DataType.Equals(newType);
             attribute.DataType = newType;
-            // TODO: Does the abstract that an attribute can defined a separate default value than a type help right now?
-            attribute.DefaultValue = newType.CloneDefaultValue();
+            if (!keepsItsType)
+            {
+                // TODO: Does the abstract that an attribute can defined a separate default value than a type help right now?
+                attribute.DefaultValue = newType.CloneDefaultValue();
+            }
             SetDirty(context, true);
             
             return SchemaResult.Pass($"Converted attribute {attributeName} to type {newType}", context);
+        }
+
+        /// <summary>The most rows that a failed conversion lists by name; the rest are counted.</summary>
+        private const int MaxConversionFailuresReported = 10;
+
+        /// <summary>
+        /// Names an entry for a message: its position counting from 1 and, when the scheme has an identifier attribute, its identifier.
+        /// </summary>
+        internal string DescribeRow(DataEntry entry) => DescribeRow(entries.IndexOf(entry));
+
+        /// <summary>
+        /// Names a row for a message: its position counting from 1 and, when the scheme has an identifier attribute, its identifier.
+        /// </summary>
+        private string DescribeRow(int rowIndex)
+        {
+            var position = $"row {rowIndex + 1}";
+            if (GetIdentifierAttribute().Try(out var idAttribute))
+            {
+                var id = entries[rowIndex].GetDataDirect(idAttribute);
+                if (id != null)
+                {
+                    return $"{position} ('{id}')";
+                }
+            }
+
+            return position;
         }
 
         public SchemaResult DeleteAttribute(SchemaContext context, AttributeDefinition attribute)

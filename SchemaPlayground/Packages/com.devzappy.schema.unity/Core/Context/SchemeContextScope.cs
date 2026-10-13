@@ -6,11 +6,14 @@ namespace Schema.Core
     public class SchemeContextScope : IContextScope
     {
         public SchemaContext Context { get; set; }
+        private readonly DataScheme previousScheme;
+
         public SchemeContextScope(ref SchemaContext context, DataScheme scheme)
         {
             Context = context;
             if (context != null)
             {
+                previousScheme = context.Scheme;
                 context.Scheme = scheme;
             }
         }
@@ -19,7 +22,7 @@ namespace Schema.Core
         {
             if (Context != null)
             {
-                Context.Scheme = null;
+                Context.Scheme = previousScheme;
             }
             Context = null;
         }

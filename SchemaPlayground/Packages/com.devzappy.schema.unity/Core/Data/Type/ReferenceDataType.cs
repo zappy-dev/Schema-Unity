@@ -180,6 +180,21 @@ namespace Schema.Core.Data
                 successMessage: "Value exists as an identifier", context);
         }
 
+        /// <summary>
+        /// A blank cell converted to a reference stays blank, when the reference allows empty values. It is never the first row of the
+        /// referenced scheme, which is only the default that a new row starts with.
+        /// </summary>
+        public override SchemaResult<object> ConvertEmptyValue(SchemaContext context)
+        {
+            using var _ = new DataTypeContextScope(ref context, this);
+            if (!SupportsEmptyReferences)
+            {
+                return Fail<object>("Empty references are not allowed.", context);
+            }
+
+            return Pass<object>(string.Empty, "Converted empty data to an empty reference", context);
+        }
+
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
             using var _ = new DataTypeContextScope(ref context, this);

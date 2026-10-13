@@ -5,12 +5,15 @@ namespace Schema.Core
     public struct AttributeContextScope : IContextScope
     {
         public SchemaContext Context { get; set; }
+        private string previousAttributeName;
         
         public AttributeContextScope(ref SchemaContext context, string attrName)
         {
             this.Context = context;
+            this.previousAttributeName = null;
             if (Context != null)
             {
+                previousAttributeName = Context.AttributeName;
                 Context.AttributeName = attrName;
             }
         }
@@ -23,7 +26,7 @@ namespace Schema.Core
         {
             if (Context != null)
             {
-                Context.AttributeName = null;
+                Context.AttributeName = previousAttributeName;
             }
             Context = null;
         }

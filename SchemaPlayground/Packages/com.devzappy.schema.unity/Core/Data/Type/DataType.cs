@@ -114,6 +114,34 @@ namespace Schema.Core.Data
         /// <returns>A <see cref="SchemaResult{object}"/> representing the conversion result.</returns>
         public abstract SchemaResult<object> ConvertValue(SchemaContext context, object value);
 
+        /// <summary>
+        /// Converts a blank cell (no value, null, an empty string or whitespace) to this data type, when a column of text is converted to it.
+        /// </summary>
+        /// <remarks>
+        /// The result is this type's default value, as long as that is a valid value of the type. A type whose default is held in another
+        /// form than its values (a color whose default is hex text) converts it first. A type for which a blank cell has no valid meaning
+        /// fails, so that the conversion can name the row instead of keeping a value that fails validation. Override this when a blank
+        /// cell should mean something else than the type's default, as <see cref="ReferenceDataType"/> does.
+        /// </remarks>
+        /// <param name="context"></param>
+        /// <returns>The value that a blank cell becomes, or a failure when there is none.</returns>
+        public virtual SchemaResult<object> ConvertEmptyValue(SchemaContext context)
+        {
+            var defaultValue = CloneDefaultValue();
+            if (IsValidValue(context, defaultValue).Passed)
+            {
+                return Pass<object>(defaultValue, "Converted empty data to default value", context);
+            }
+
+            var convertedDefault = ConvertValue(context, defaultValue);
+            if (convertedDefault.Passed && IsValidValue(context, convertedDefault.Result).Passed)
+            {
+                return Pass<object>(convertedDefault.Result, "Converted empty data to default value", context);
+            }
+
+            return Fail<object>($"An empty value is not valid for data type {TypeName}", context);
+        }
+
         #endregion
 
         /// <summary>
@@ -205,8 +233,7 @@ namespace Schema.Core.Data
 
                 if (string.IsNullOrWhiteSpace(data))
                 {
-                    return SchemaResult<object>.Pass(toType.CloneDefaultValue(),
-                        successMessage: "Converted empty data to default value", context);
+                    return toType.ConvertEmptyValue(context);
                 }
 
                 return toType.ConvertValue(context, data);
