@@ -92,6 +92,54 @@ namespace Schema.Unity.Editor.Tests
             Assert.That(new ColorDataType().IsValidValue(Context, conversion.Result).Passed, Is.True);
         }
 
+        // ---- findings 7 and 8 (see docs/upstream-fixes.md)
+
+        [Test]
+        [TestCase("red", 1f, 0f, 0f)]
+        [TestCase("  cyan  ", 0f, 1f, 1f)]
+        [TestCase("#00F", 0f, 0f, 1f)]
+        [TestCase("00ff00", 0f, 1f, 0f)]
+        public void B7_ANamedColorOrAShortHexConverts(string text, float r, float g, float b)
+        {
+            var items = ItemsWithTextTints(text);
+
+            var result = items.ConvertAttributeType(Context, "Tint", new ColorDataType());
+
+            Assert.That(result.Passed, Is.True, result.Message);
+            Assert.That(Tints(items)[0], Is.EqualTo(new Color(r, g, b, 1f)));
+        }
+
+        [Test]
+        public void B7_ANameThatIsNotAColor_StillFails()
+        {
+            var items = ItemsWithTextTints("notacolor");
+
+            Assert.That(items.ConvertAttributeType(Context, "Tint", new ColorDataType()).Failed, Is.True);
+        }
+
+        [Test]
+        public void B8_ANewRowInAColorColumn_HoldsAColor_AndTheSchemeValidates()
+        {
+            var items = ItemsWithTextTints("#FF0000");
+            items.ConvertAttributeType(Context, "Tint", new ColorDataType()).AssertPassedForTest();
+
+            var added = items.CreateNewEmptyEntry(Context);
+
+            Assert.That(added.Passed, Is.True, added.Message);
+            Assert.That(added.Result.GetDataDirect("Tint"), Is.InstanceOf<Color>(), "the column default is hex text, a new row must not hold it as is");
+            Assert.That(Schema.Core.Schema.IsValidScheme(Context, items).Passed, Is.True);
+        }
+
+        [Test]
+        public void B8_AColorColumnAddedToATableWithRows_FillsThemWithColors()
+        {
+            var items = ItemsWithTextTints("a", "b");
+
+            items.AddAttribute(Context, "Glow", new ColorDataType("#00FF00"));
+
+            Assert.That(items.AllEntries.Select(e => e.GetDataDirect("Glow")), Is.All.EqualTo(Color.green));
+        }
+
         // ---- AC4: alpha survives save and reload
 
         private static string Save(DataScheme scheme) =>
