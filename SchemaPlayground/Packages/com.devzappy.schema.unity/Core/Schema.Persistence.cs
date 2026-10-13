@@ -193,10 +193,17 @@ namespace Schema.Core
                     loadedSchemes.Add(loadedScheme);
                 }
                 
-                if (!DataScheme.TopologicalSortByReferences(context, loadedSchemes).Try(out var schemeLoadOrder, out var sortErr)) 
-                    return sortErr.CastError<ManifestLoadStatus>();
+                // Schemes that reference each other in a cycle cannot be placed in an order where every reference is loaded first.
+                // Load the others, and report the ones left out by name, so that the load does not claim to be complete.
+                var schemeLoadOrderList = DataScheme.SortByReferences(loadedSchemes, out var unsortableSchemes);
+                if (unsortableSchemes.Count > 0)
+                {
+                    success = false;
+                    var unsortableReport = DataScheme.DescribeUnsortable(schemeLoadOrderList, unsortableSchemes);
+                    Logger.LogError(unsortableReport);
+                    sb.AppendLine(unsortableReport);
+                }
 
-                var schemeLoadOrderList = schemeLoadOrder.ToList();
                 progress?.Report((0.1f, "Loading..."));
                 int numLoaded = 0;
                 int numSchemes = schemeLoadOrderList.Count;

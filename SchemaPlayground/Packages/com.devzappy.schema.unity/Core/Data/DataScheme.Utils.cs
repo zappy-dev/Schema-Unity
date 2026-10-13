@@ -124,13 +124,34 @@ namespace Schema.Core.Data
         /// <summary>
         /// Sort the given set of Data Schemes in topological order (first schemes should have no references on future schemes, later schemes can depend on earlier schemes but not schemes after them)
         /// </summary>
+        /// <remarks>
+        /// Fails, naming the schemes, when some of them cannot be placed: they reference each other in a cycle, or reference a scheme that
+        /// is not among those given. A scheme that references itself is not a cycle.
+        /// </remarks>
         /// <param name="schemes">Schemes to sort</param>
         /// <returns></returns>
         public static SchemaResult<IEnumerable<DataScheme>> TopologicalSortByReferences(SchemaContext context, IEnumerable<DataScheme> schemes)
         {
             var res = SchemaResult<IEnumerable<DataScheme>>.New(context);
+            var sorted = SortByReferences(schemes, out var unsortable);
+            if (unsortable.Count > 0)
+            {
+                return res.Fail(DescribeUnsortable(sorted, unsortable));
+            }
+
+            return res.Pass(sorted);
+        }
+
+        /// <summary>
+        /// Sorts schemes so that every scheme comes after the schemes it references, and returns the schemes that cannot be placed.
+        /// </summary>
+        /// <param name="schemes">Schemes to sort</param>
+        /// <param name="unsortable">Schemes that could not be placed, because of a cycle or because they reference a scheme that is not in <paramref name="schemes"/></param>
+        /// <returns>The schemes that were placed, referenced schemes first</returns>
+        internal static List<DataScheme> SortByReferences(IEnumerable<DataScheme> schemes, out List<DataScheme> unsortable)
+        {
             var schemesToProcess = schemes.ToList();
-            int totalSchemesToProcess = schemesToProcess.Count;
+            unsortable = new List<DataScheme>();
 
             // First pass, process schemes invalid schemes, schemes with no references
             var result = new List<DataScheme>();
@@ -179,9 +200,8 @@ namespace Schema.Core.Data
                     {
                         if (lastIterationSize == schemesToProcess.Count)
                         {
-                            var schemeReport = string.Join(",", schemesToProcess.Select(s => s.SchemeName));
-                            res.Fail($"Unable to topological sort the following schemes, check for cyclical dependencies: {schemeReport}");
                             // No schemes were moved, meaning there is a cyclical dependency
+                            unsortable.AddRange(schemesToProcess);
                             break;
                         }
                         lastIterationSize = schemesToProcess.Count;
@@ -189,7 +209,27 @@ namespace Schema.Core.Data
                 }
             }
 
-            return res.Pass(result);
+            return result;
+        }
+
+        /// <summary>
+        /// Names the schemes that <see cref="SortByReferences"/> could not place, and the schemes each of them is waiting for.
+        /// </summary>
+        internal static string DescribeUnsortable(IEnumerable<DataScheme> sorted, IEnumerable<DataScheme> unsortable)
+        {
+            var sortedNames = new HashSet<string>(sorted.Select(s => s.SchemeName));
+            var descriptions = unsortable.Select(scheme =>
+            {
+                var waitingFor = scheme.GetReferenceAttributes()
+                    .Select(refAttr => ((ReferenceDataType)refAttr.DataType).ReferenceSchemeName)
+                    .Where(name => name != scheme.SchemeName && !sortedNames.Contains(name))
+                    .Distinct()
+                    .ToList();
+                return waitingFor.Count > 0 ? $"{scheme.SchemeName} (references {string.Join(", ", waitingFor)})" : scheme.SchemeName;
+            });
+
+            return "Unable to topological sort the following schemes, check for cyclical dependencies " +
+                   "or for a reference to a scheme that is not loaded: " + string.Join(", ", descriptions);
         }
     }
 }

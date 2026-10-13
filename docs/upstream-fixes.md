@@ -31,3 +31,11 @@ This does not change the default that a Reference column gives to a *new* row: `
 **What changed.** `ColorJsonConverter` writes `#RRGGBBAA` when the alpha, rounded to the 8 bits the text can hold, is below 255. A fully opaque color is still written as `#RRGGBB`, so files that only hold opaque colors do not change.
 
 **How you notice.** A color column that holds alpha saves it. Reading a file back gives the same bytes, and saving it again writes the same text.
+
+## 11: tables that reference each other no longer vanish at load
+
+**What was wrong.** `DataScheme.TopologicalSortByReferences` detected a cycle between tables (`A` has a column that references `B` and `B` has one that references `A`), created a failure, threw it away, and returned a pass with the cyclic tables, and every table that depended on one, left out of the list. Loading a manifest then loaded the rest and reported `Loaded 8 schemes`. The tables simply were not there, in the editor or in the game.
+
+**What changed.** `TopologicalSortByReferences` now returns a failed result whose message names the tables it could not place, and the tables each of them is waiting for: `Unable to topological sort the following schemes, check for cyclical dependencies or for a reference to a scheme that is not loaded: Items (references Zones), Zones (references Items)`. A table that references itself is not a cycle and still sorts. `Schema.LoadManifest` loads the tables that can be placed, and reports the others in its message with the status `FAILED_TO_LOAD_ENTRIES`, not `FULLY_LOADED`; it no longer prints `Loaded N schemes` for a manifest that lost some. The editor's Publish All, which sorts the same way, now stops with that message instead of publishing a subset.
+
+**How you notice.** A project with a cycle between tables loads with a partial status that names the tables, instead of with some of them missing.
