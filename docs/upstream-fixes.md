@@ -47,3 +47,11 @@ This does not change the default that a Reference column gives to a *new* row: `
 **What changed.** `LoadManifest` collects every such cell while it loads the tables, and when there is any it returns the status `FAILED_TO_LOAD_ENTRIES` with a message that has one line per cell: `Scheme 'Items', row 2 ('Item_2'), attribute 'Home': value 'Zone_Typo' is not valid: ...`. The table is still loaded and the bad value is kept as it is, so that the table can be opened and fixed in the editor; the public `LoadDataScheme` keeps its signature and its result. `SchemaRuntime.Initialize` still returns a pass for a partial load, because the rest of the data can be used, but its message now begins `Schema Runtime loaded with errors:` and the same text is written with `Debug.LogError`. The CLI already printed the message for a status other than `FULLY_LOADED`.
 
 **How you notice.** Check the status of `LoadManifest`: `FAILED_TO_LOAD_ENTRIES` means something in the data needs attention, and the message says what.
+
+## 9: publishing fails when a row cannot be added
+
+**What was wrong.** The editor built the table to publish by adding each row to a copy of the table, and ignored the result of adding it. A row that failed validation was simply missing from the published file, and the publish reported success. The editor's Publish validates the table first, which hides this, but any publish that skips that step (a script, or a copy of the publish code that does not call `IsValidScheme`) loses the row without a message.
+
+**What changed.** Building the copy moved into Core as `DataScheme.CreatePublishedCopy(context)`, which the editor's `PublishToResources` now calls. It validates each value of the published columns and fails with the scheme, the row, the column and the value, instead of leaving the row out: `Cannot publish scheme 'Items': row 2 ('Item_2'), column 'Score': value 'not a number' is not valid: ...`. It does not change the table it copies. Code outside the package that has its own copy of the old publish loop keeps the old behavior until it calls `CreatePublishedCopy`.
+
+**How you notice.** A publish either writes every row of the table or fails and says which row and column are the problem.
