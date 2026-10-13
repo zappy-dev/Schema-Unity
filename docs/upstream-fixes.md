@@ -11,3 +11,15 @@ Every entry has the same three parts: what was wrong, what changed, and how you 
 **What changed.** `DataScheme.ConvertAttributeType` converts every cell into a buffer first and writes only if all of them converted. On failure the cells, the column type, the column default and the dirty state are exactly as they were. The failure message names the scheme, the column, and each row that failed, with its identifier (or its position, counting from 1, when the scheme has no identifier column) and the value, up to ten rows and then a count. Converting an unknown column, or converting to a `null` type, returns a failed result.
 
 **How you notice.** A conversion either happens completely or not at all. The message reads like `Cannot convert attribute Score of scheme 'Items' to type DataType: Integer, 2 of 5 rows failed: row 2 ('Item_2') value 'oops': ...`.
+
+## 1, 2: a blank cell keeps its meaning when its column changes type
+
+**What was wrong.** When a Text column was converted, a blank cell (empty, whitespace only, null, or no value at all) became the new type's default value without asking the type. For a Reference column the default is the first row of the referenced scheme, so a blank cell, such as the end of a chain of "next" links, silently became a link to the first row. For a Color column the default is the hex text `#000000`, so a blank cell became that string, which is not a `Color`: the scheme then failed validation, and publishing it dropped the row (issue 9).
+
+**What changed.** `DataType` has a new virtual method, `ConvertEmptyValue`, which decides what a blank cell becomes. Its default implementation uses the type's default value if that is a valid value of the type, converts it first if it is held in another form, and otherwise fails, so that the conversion can name the row. `ReferenceDataType` overrides it: a blank cell stays blank (an empty string) when `SupportsEmptyReferences` is true, and fails with "Empty references are not allowed." when it is false. `ColorDataType` overrides it to return the type's default as a `Color`, and its `ConvertValue` returns the same for null, empty and whitespace input instead of the string `#000000`. A cell with no value at all is treated as blank.
+
+**How you notice.** Converting a Text column that has blank cells to a Reference column leaves them blank. Converting it to a Color column gives black (or the color the type was created with), as a real `Color`, and the scheme validates. Converting blank cells to a type that does not allow them now fails and names the rows. That includes a file path or folder type created with `allowEmptyPath: false`, which used to keep an empty path that failed its own validation.
+
+`ColorDataType.ConvertValue` of a blank value used to return the string `"#000000"`; three tests that asserted that string now assert `Color.black`.
+
+This does not change the default that a Reference column gives to a *new* row: `new ReferenceDataType(scheme, attribute)` still defaults to the first row of a loaded scheme, and the column default is still set to it by a conversion.

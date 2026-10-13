@@ -55,7 +55,7 @@ namespace Schema.Unity.Editor.Tests
         {
             var conversion = _type.ConvertValue(Context, null);
             Assert.That(conversion.Passed, Is.True);
-            Assert.That(conversion.Result, Is.EqualTo("#000000"));
+            Assert.That(conversion.Result, Is.EqualTo(Color.black));
         }
 
         [Test]
@@ -63,7 +63,7 @@ namespace Schema.Unity.Editor.Tests
         {
             var conversion = _type.ConvertValue(Context, "");
             Assert.That(conversion.Passed, Is.True);
-            Assert.That(conversion.Result, Is.EqualTo("#000000"));
+            Assert.That(conversion.Result, Is.EqualTo(Color.black));
         }
 
         [Test]
@@ -71,7 +71,7 @@ namespace Schema.Unity.Editor.Tests
         {
             var conversion = _type.ConvertValue(Context, "   ");
             Assert.That(conversion.Passed, Is.True);
-            Assert.That(conversion.Result, Is.EqualTo("#000000"));
+            Assert.That(conversion.Result, Is.EqualTo(Color.black));
         }
 
         [Test]

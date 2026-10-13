@@ -101,14 +101,12 @@ namespace Schema.Core.Data
             for (var rowIndex = 0; rowIndex < entries.Count; rowIndex++)
             {
                 var entry = entries[rowIndex];
-                if (!entry.HasData(attribute))
-                {
-                    convertedValues.Add(newType.CloneDefaultValue());
-                    continue;
-                }
-
-                var entryData = entry.GetData(attribute).Result;
-                var convertRes = DataType.ConvertValue(context, entryData, attribute.DataType, newType);
+                // A row with no value for the column is a blank cell
+                var hasData = entry.HasData(attribute);
+                var entryData = hasData ? entry.GetData(attribute).Result : null;
+                var convertRes = hasData
+                    ? DataType.ConvertValue(context, entryData, attribute.DataType, newType)
+                    : newType.ConvertEmptyValue(context);
                 if (convertRes.Failed)
                 {
                     failedRows++;

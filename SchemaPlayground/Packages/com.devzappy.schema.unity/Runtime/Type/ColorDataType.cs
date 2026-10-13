@@ -51,23 +51,48 @@ namespace Schema.Runtime.Type
                 successMessage: "Value is a valid color", context);
         }
 
+        /// <summary>
+        /// A blank cell converted to a color is the type's default color, as a <see cref="Color"/>. The default is kept as hex text, but a
+        /// cell of a Color column has to hold a Color to be valid.
+        /// </summary>
+        public override SchemaResult<object> ConvertEmptyValue(SchemaContext context)
+        {
+            using var _ = new DataTypeContextScope(ref context, this);
+
+            if (DefaultValue is Color defaultColor)
+            {
+                return Pass<object>(result: defaultColor,
+                    successMessage: "Converted empty data to default color", context);
+            }
+
+            var defaultText = DefaultValue?.ToString()?.Trim();
+            if (!string.IsNullOrEmpty(defaultText))
+            {
+                if (!defaultText.StartsWith("#"))
+                {
+                    defaultText = "#" + defaultText;
+                }
+
+                if (ColorUtility.TryParseHtmlString(defaultText, out Color parsedDefault))
+                {
+                    return Pass<object>(result: parsedDefault,
+                        successMessage: "Converted empty data to default color", context);
+                }
+            }
+
+            return Fail<object>($"An empty value cannot become a color: the default value '{DefaultValue}' of the {TypeName} type is not a color.", context);
+        }
+
         public override SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
             using var _ = new DataTypeContextScope(ref context, this);
             
-            if (value == null)
+            if (value == null || string.IsNullOrWhiteSpace(value.ToString()))
             {
-                return Pass<object>(result: "#000000",
-                    successMessage: "Converted null to default color", context);
+                return ConvertEmptyValue(context);
             }
             
             string inputString = value.ToString();
-            
-            if (string.IsNullOrWhiteSpace(inputString))
-            {
-                return Pass<object>(result: "#000000",
-                    successMessage: "Converted empty string to default color", context);
-            }
             
             // Normalize the input by ensuring it starts with #
             string normalizedInput = inputString.Trim();
