@@ -1,0 +1,24 @@
+{
+ "cases": {
+  "column-types-convert-blank-link-behaviour": 0,
+  "column-types-near-miss-postgres-foreign-key": 1,
+  "column-types-near-miss-serialized-field-type": 1,
+  "column-types-next-port-link-trigger": 0,
+  "column-types-port-tint-trigger": 0,
+  "table-authoring-missing-constant-trigger": 0,
+  "table-authoring-near-miss-localization-table": 1,
+  "table-authoring-near-miss-postgres-column": 1,
+  "table-authoring-published-copies-behaviour": 0,
+  "table-authoring-ship-fuel-trigger": 0,
+  "table-reading-empty-port-list-trigger": 0,
+  "table-reading-near-miss-json-save": 1,
+  "table-reading-near-miss-linq-update": 1,
+  "table-reading-unknown-ship-id-trigger": 0
+ },
+ "cost_usd": 2.2254462000000004,
+ "note": "Baseline: the committed evals (commit 625583d) run against this plugin with a manifest and NO skills, --runs 1 --ablation none, on 2026-10-13. Not read by any tool; evals/coverage.json is the recorded run with skills.",
+ "runs_per_case": 1,
+ "skills_present": 0,
+ "source_commit": "625583d",
+ "started_at": "2026-10-13T14:42:52.017Z"
+}

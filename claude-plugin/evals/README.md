@@ -37,7 +37,7 @@ limited the run does not fail: sessions answer "You've hit your session limit" a
 Baseline: the committed evals (commit `625583d`) against this plugin with a manifest and **no skills**, one run
 each, 2026-10-13, $2.23. Result: 6 of 14 cases pass, and the six are the near-misses, which pass because
 nothing can load. Then the same evals with the skills, final run at 2 runs each, 14 of 14 cases, 28 of 28 runs,
-$3.90 (`coverage.json` records it).
+$3.90 (`coverage.json` records it; `baseline-no-skills.json` records the baseline). The baseline ran on the evals as first committed, without the localization overlay added later; that overlay changes only one near-miss, and a run with no skills cannot load a skill either way.
 
 | | no skills (1 run each) | with skills (2 runs each) |
 |---|---|---|
