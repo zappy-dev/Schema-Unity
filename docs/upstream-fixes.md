@@ -55,3 +55,11 @@ This does not change the default that a Reference column gives to a *new* row: `
 **What changed.** Building the copy moved into Core as `DataScheme.CreatePublishedCopy(context)`, which the editor's `PublishToResources` now calls. It validates each value of the published columns and fails with the scheme, the row, the column and the value, instead of leaving the row out: `Cannot publish scheme 'Items': row 2 ('Item_2'), column 'Score': value 'not a number' is not valid: ...`. It does not change the table it copies. Code outside the package that has its own copy of the old publish loop keeps the old behavior until it calls `CreatePublishedCopy`.
 
 **How you notice.** A publish either writes every row of the table or fails and says which row and column are the problem.
+
+## 12: reading a blank or dangling reference without an exception
+
+**What was wrong.** The generated property for a Reference column is `XScheme.GetEntry(...).Result`, and `Result` throws when the lookup fails. Reading the link of the last row of a chain threw, although the column allows blank references. There was no way to read a reference that did not throw.
+
+**What changed.** Nothing that exists. Next to it, each generated entry wrapper gets a property `<Column>OrNull` for every Reference column, and each generated scheme class gets `GetEntryOrNull(id)`; both return `null` for a blank id and for an id that no entry has. The new property is not generated when the table already has a column with that name. `docs/RuntimeGuide.md` says when to use which. The existing property still throws, so code that relies on that does not change. A test compiles generated wrappers (a table that references another and one that references itself) and reads blank, dangling and good references through both.
+
+**How you notice.** After you publish again, the generated `.g.cs` files have the new members. A project that already has its own member with one of those names (for instance a hand-written `HomeOrNull` in a partial class) gets a compile error until it removes its own.

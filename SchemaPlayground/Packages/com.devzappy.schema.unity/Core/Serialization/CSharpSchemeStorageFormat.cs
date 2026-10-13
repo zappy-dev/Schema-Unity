@@ -228,6 +228,19 @@ $@"
             return scheme.GetEntryById(entryId);
         }}
         
+        /// <summary>
+        /// Like GetEntry, but null instead of a failed result when the id is blank or no entry has it.
+        /// </summary>
+        public static {entryClassName} GetEntryOrNull(object entryId)
+        {{
+            if (entryId == null || (entryId is string text && text.Length == 0))
+            {{
+                return null;
+            }}
+            
+            return GetEntry(entryId).Try(out var entry) ? entry : null;
+        }}
+        
         public {schemeClassName}(DataScheme dataScheme) : base(dataScheme) {{}}
         
         protected override {entryClassName} EntryFactory({nameof(DataScheme)} dataScheme, {nameof(DataEntry)} dataEntry) {{
@@ -242,6 +255,10 @@ $@"
         /// </summary>
         public {entryClassName}({nameof(DataScheme)} dataScheme, {nameof(DataEntry)} entry) : base(dataScheme, entry) {{}}
 ");
+            // Property names of the published attributes, so that a generated accessor never takes the name of another attribute
+            var publishedPropertyNames = new System.Collections.Generic.HashSet<string>(
+                scheme.GetAttributes().Where(a => a.ShouldPublish)
+                    .Select(a => a.AttributeName.Replace(" ", string.Empty).ToPascalCase()));
             foreach (var attributeDefinition in scheme.GetAttributes()
                          .Where(a => a.ShouldPublish))
             {
@@ -297,6 +314,22 @@ $@"
                     sb.Append(
 $@"     
         public {csDataType} {attributePropertyName} => {getDataMethod};
+");
+                }
+
+                // A reference is read with a getter that throws when the reference is blank or points at no entry. Next to it, a
+                // reference gets one that returns null instead, for columns that allow blank references.
+                var nullablePropertyName = attributePropertyName + "OrNull";
+                if (attributeDefinition.DataType is ReferenceDataType referenceDataType &&
+                    !publishedPropertyNames.Contains(nullablePropertyName))
+                {
+                    var referencedSchemeClassName = SchemeClassIdentifier(referenceDataType.ReferenceSchemeName);
+                    sb.Append(
+$@"     
+        /// <summary>
+        /// Like {attributePropertyName}, but null instead of an exception when the reference is blank or points at no entry.
+        /// </summary>
+        public {csDataType} {nullablePropertyName} => {referencedSchemeClassName}.GetEntryOrNull({nameof(EntryWrapper.DataEntry)}.GetData(""{attributeName}""));
 ");
                 }
             }
