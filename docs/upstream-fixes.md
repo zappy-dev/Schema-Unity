@@ -93,3 +93,11 @@ This does not change the default that a Reference column gives to a *new* row: `
 **What changed.** When the column default is not a valid value of the column's type but converting it gives one, the converted value fills the cell. A default that is valid is used as it is, and one that cannot be converted keeps today's behavior. `CreateNewEmptyEntry`, the filling done by `AddEntry`, and `AddAttribute` do this.
 
 **How you notice.** A new row in a Color column holds a `Color`, and the scheme validates straight away. Not covered: `AddEntry` still rejects a hex text for a Color value, and the cells that `LoadDataScheme` fills for a column missing from a file still take the default as it is.
+
+## 7: a color name converts
+
+**What was wrong.** `ColorDataType.ConvertValue` put a `#` in front of any text that did not start with one, so `red`, which Unity's `ColorUtility` parses, was looked up as `#red` and refused.
+
+**What changed.** The text is tried as it is first, which accepts what Unity accepts (a hex code with `#`, the names of colors), and then with a `#` in front, which keeps accepting a hex code written without one.
+
+**How you notice.** Converting a Text column that holds `red` to a Color column works.

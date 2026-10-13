@@ -94,15 +94,11 @@ namespace Schema.Runtime.Type
             
             string inputString = value.ToString();
             
-            // Normalize the input by ensuring it starts with #
-            string normalizedInput = inputString.Trim();
-            if (!normalizedInput.StartsWith("#"))
-            {
-                normalizedInput = "#" + normalizedInput;
-            }
-            
-            // Use Unity's ColorUtility for validation and conversion
-            if (!ColorUtility.TryParseHtmlString(normalizedInput, out Color color))
+            // Unity's ColorUtility parses a hex code that starts with # and also the names of colors ("red"), so try the text as it is.
+            // A hex code without the # is accepted too.
+            string trimmedInput = inputString.Trim();
+            if (!ColorUtility.TryParseHtmlString(trimmedInput, out Color color) &&
+                (trimmedInput.StartsWith("#") || !ColorUtility.TryParseHtmlString("#" + trimmedInput, out color)))
             {
                 return Fail<object>($"Failed to convert '{value}' to {TypeName}. Invalid hex color format. Expected #RRGGBB or #RRGGBBAA", context: context);
             }
