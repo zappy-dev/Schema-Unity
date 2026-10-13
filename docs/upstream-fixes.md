@@ -15,8 +15,12 @@ Every entry has the same three parts: what was wrong, what changed, and how you 
 | 11 | Tables that reference each other no longer vanish at load | `8ee2026` |
 | 12 | A reference can be read without an exception | `61181b4` |
 | 13 | A bad value met at load makes the load partial | `291ac52` |
+| 17 | Converting a column to the type it already has keeps its default | `5ddfd42` |
+| 8 | A new row gets a default that is valid for its column | `004af3c` |
+| 7 | A color name converts | `09016e7` |
+| 21 | A nested operation no longer clears what the operation around it put in the context | `5baffb5` |
 
-The tests for all of these were written first and committed first, in `e5300df`, where they fail; each commit above turns the tests for its issues green. Issues 5, 7, 8, 10, 14, 15, 17, 18, 19, 20 and 21 of the same list are not covered by these commits.
+The tests for all of these were written first and committed first, where they fail: those for the first group in `e5300df`, those for 17, 8 and 7 in `a533dae`, and those for 21 in `f06b805`. Each commit above turns the tests for its issue green. Issues 5, 10, 14, 15, 18, 19 and 20 of the same list are not covered by these commits.
 
 ## 3, 4, 16: `ConvertAttributeType` is all-or-nothing, and says where it failed
 
