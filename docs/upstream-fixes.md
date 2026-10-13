@@ -1,12 +1,26 @@
 # Conversion, publish and load safety fixes
 
-These fixes came out of moving existing Text columns to Reference and Color columns in a project that already had data in them. Each one removes a case where Schema reported success, or only logged a line, while data was lost, changed meaning, or went missing. The numbers are the numbers of the findings in that project's report, kept here so the two lists can be matched; the last section maps each one to its commit.
+These fixes came out of moving existing Text columns to Reference and Color columns in a project that already had data in them. Each one removes a case where Schema reported success, or only logged a line, while data was lost, changed meaning, or went missing. The numbers are the numbers of the findings in that project's report, kept here so the two lists can be matched; the table below maps each one to its commit.
 
 Every entry has the same three parts: what was wrong, what changed, and how you notice the change.
 
+## Which commit fixes which issue
+
+| Issue | Fix | Commit |
+|---|---|---|
+| 1, 2 | A blank cell keeps its meaning when its column changes type | `1e788b7` |
+| 3, 4, 16 | `ConvertAttributeType` is all-or-nothing, names every failing row, unknown column fails | `88b9602` |
+| 6 | The alpha of a color survives a save | `b9443f2` |
+| 9 | Publishing fails when a row cannot be added | `a684888` |
+| 11 | Tables that reference each other no longer vanish at load | `8ee2026` |
+| 12 | A reference can be read without an exception | `61181b4` |
+| 13 | A bad value met at load makes the load partial | `291ac52` |
+
+The tests for all of these were written first and committed first, in `e5300df`, where they fail; each commit above turns the tests for its issues green. Issues 5, 7, 8, 10, 14, 15, 17, 18, 19, 20 and 21 of the same list are not covered by these commits.
+
 ## 3, 4, 16: `ConvertAttributeType` is all-or-nothing, and says where it failed
 
-**What was wrong.** Converting a column wrote each converted cell as it went. When a later cell could not convert, the call returned a failure but the cells before it stayed converted, the column kept its old type, and the scheme was not marked dirty, so a save later wrote the converted values into a column of the old type. The failure named the column and the data type but not the row or the value. Converting a column that does not exist threw a `NullReferenceException`.
+**What was wrong.** Converting a column wrote each converted cell as it went. When a later cell could not convert, the call returned a failure but the cells before it stayed converted while the column kept its old type, and the scheme was not marked dirty. The table was left half converted, with nothing to say so. The failure named the column and the data type but not the row or the value. Converting a column that does not exist threw a `NullReferenceException`.
 
 **What changed.** `DataScheme.ConvertAttributeType` converts every cell into a buffer first and writes only if all of them converted. On failure the cells, the column type, the column default and the dirty state are exactly as they were. The failure message names the scheme, the column, and each row that failed, with its identifier (or its position, counting from 1, when the scheme has no identifier column) and the value, up to ten rows and then a count. Converting an unknown column, or converting to a `null` type, returns a failed result.
 
