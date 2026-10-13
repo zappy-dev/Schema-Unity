@@ -212,14 +212,24 @@ namespace Schema.Core
                     numLoaded++;
                     progress?.Report((0.1f, $"Loading '{scheme.ToString(false)}' into Schema ({numLoaded} / {numSchemes})"));
                     Logger.LogDbgVerbose($"Loading scheme from manifest: {scheme}", context: manifestDataScheme);
+                    var invalidValues = new List<string>();
                     var loadRes = LoadDataScheme(context, scheme,
                         overwriteExisting: false,
-                        registerManifestEntry: false);
+                        registerManifestEntry: false,
+                        importFilePath: null,
+                        invalidValues: invalidValues);
                     if (loadRes.Failed)
                     {
                         success = false;
                         Logger.LogError(loadRes.Message, loadRes.Context);
                         sb.AppendLine(loadRes.Message);
+                    }
+
+                    // A value that is not valid does not keep the scheme from loading, but the manifest is not fully loaded with it.
+                    foreach (var invalidValue in invalidValues)
+                    {
+                        success = false;
+                        sb.AppendLine(invalidValue);
                     }
                     
                     Logger.LogDbgVerbose(loadRes.Message, loadRes.Context);
@@ -310,6 +320,22 @@ namespace Schema.Core
             bool overwriteExisting, 
             bool registerManifestEntry = true,
             string importFilePath = null)
+        {
+            return LoadDataScheme(context, scheme, overwriteExisting, registerManifestEntry, importFilePath, invalidValues: null);
+        }
+
+        /// <summary>
+        /// Loads a scheme like <see cref="LoadDataScheme(SchemaContext, DataScheme, bool, bool, string)"/>, and reports the values that are
+        /// not valid for their attribute and could not be converted. Such a value is kept as it is, so that the scheme can still be opened
+        /// and fixed in the editor; it does not make the load fail.
+        /// </summary>
+        /// <param name="invalidValues">Receives one message per invalid value, naming the scheme, the row, the attribute and the value. May be null.</param>
+        internal static SchemaResult LoadDataScheme(SchemaContext context, 
+            DataScheme scheme, 
+            bool overwriteExisting, 
+            bool registerManifestEntry,
+            string importFilePath,
+            List<string> invalidValues)
         {
             using var schemeScope = new SchemeContextScope(ref context, scheme);
             string schemeName = scheme.SchemeName;
@@ -409,6 +435,8 @@ namespace Schema.Core
                             
                             // Let's try continuing with the failure.
                             Logger.LogError(conversion.Message, conversion.Context);
+                            invalidValues?.Add($"Scheme '{schemeName}', {scheme.DescribeRow(entry)}, attribute '{attribute.AttributeName}': " +
+                                               $"value '{fieldData}' is not valid: {conversion.Message}");
                             continue;
                         }
 

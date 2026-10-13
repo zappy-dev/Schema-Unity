@@ -80,6 +80,15 @@ namespace Schema.Runtime
                 {
                     return  SchemaResult.Fail(context, manifestLoadRes.Message);
                 }
+
+                if (manifestLoadRes.Result != Core.Schema.ManifestLoadStatus.FULLY_LOADED)
+                {
+                    // Tables are missing, or hold values that are not valid. The rest can still be used, so this is not a failure,
+                    // but it must not look like a complete load: say what is wrong, in the log and in the result.
+                    var loadedWithErrors = $"Schema Runtime loaded with errors: {manifestLoadRes.Message}";
+                    Debug.LogError(loadedWithErrors);
+                    return SchemaResult.Pass(loadedWithErrors, context);
+                }
             }
             catch (Exception e)
             {

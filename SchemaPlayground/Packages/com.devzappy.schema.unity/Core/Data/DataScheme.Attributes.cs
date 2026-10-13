@@ -148,6 +148,11 @@ namespace Schema.Core.Data
         private const int MaxConversionFailuresReported = 10;
 
         /// <summary>
+        /// Names an entry for a message: its position counting from 1 and, when the scheme has an identifier attribute, its identifier.
+        /// </summary>
+        internal string DescribeRow(DataEntry entry) => DescribeRow(entries.IndexOf(entry));
+
+        /// <summary>
         /// Names a row for a message: its position counting from 1 and, when the scheme has an identifier attribute, its identifier.
         /// </summary>
         private string DescribeRow(int rowIndex)
