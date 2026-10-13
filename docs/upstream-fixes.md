@@ -23,3 +23,11 @@ Every entry has the same three parts: what was wrong, what changed, and how you 
 `ColorDataType.ConvertValue` of a blank value used to return the string `"#000000"`; three tests that asserted that string now assert `Color.black`.
 
 This does not change the default that a Reference column gives to a *new* row: `new ReferenceDataType(scheme, attribute)` still defaults to the first row of a loaded scheme, and the column default is still set to it by a conversion.
+
+## 6: the alpha of a color survives a save
+
+**What was wrong.** A color with an alpha channel was accepted when it was converted (`#FF000080`) and kept in memory, but the JSON converter wrote only the red, green and blue digits. Saving and reloading made it opaque, and a fully transparent white (`#FFFFFF00`) came back as opaque white, with no message.
+
+**What changed.** `ColorJsonConverter` writes `#RRGGBBAA` when the alpha, rounded to the 8 bits the text can hold, is below 255. A fully opaque color is still written as `#RRGGBB`, so files that only hold opaque colors do not change.
+
+**How you notice.** A color column that holds alpha saves it. Reading a file back gives the same bytes, and saving it again writes the same text.

@@ -18,7 +18,10 @@ namespace Schema.Runtime.Serialization.JSON
                 return;
             }
 
-            var hexColor = ColorDataType.ColorToHex(color.Value);
+            // Write the alpha channel when the color is not fully opaque, so it survives a save. Opaque colors keep the six digit form
+            // that existing files hold. The alpha is judged at the 8 bits that the hex text can hold, so 0.999 is opaque.
+            var isOpaque = Mathf.RoundToInt(color.Value.a * 255f) >= 255;
+            var hexColor = ColorDataType.ColorToHex(color.Value, includeAlpha: !isOpaque);
             writer.WriteValue(hexColor);
         }
 
