@@ -77,3 +77,11 @@ This does not change the default that a Reference column gives to a *new* row: `
 **What changed.** Nothing that exists. Next to it, each generated entry wrapper gets a property `<Column>OrNull` for every Reference column, and each generated scheme class gets `GetEntryOrNull(id)`; both return `null` for a blank id and for an id that no entry has. The new property is not generated when the table already has a column with that name. `docs/RuntimeGuide.md` says when to use which. The existing property still throws, so code that relies on that does not change. A test compiles generated wrappers (a table that references another and one that references itself) and reads blank, dangling and good references through both.
 
 **How you notice.** After you publish again, the generated `.g.cs` files have the new members. A project that already has its own member with one of those names (for instance a hand-written `HomeOrNull` in a partial class) gets a compile error until it removes its own.
+
+## 17: converting a column to the type it already has keeps its default
+
+**What was wrong.** `ConvertAttributeType` ended by setting the column's default value to the default of the new type, always. Running a conversion again on a column that already had the type, for instance the column menu's "Convert Type" entry, replaced a default that had been set in the column settings with the first row of the referenced scheme.
+
+**What changed.** The column default is only reset when the type changes. The cells are still converted, and the column takes the new type object, so a changed setting such as `SupportsEmptyReferences` still applies.
+
+**How you notice.** The default shown in the column settings survives running the same conversion again.

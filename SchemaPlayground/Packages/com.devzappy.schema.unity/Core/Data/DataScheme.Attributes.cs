@@ -136,9 +136,15 @@ namespace Schema.Core.Data
                 entries[rowIndex].SetData(context, attributeName, convertedValues[rowIndex]);
             }
             
+            // A column that keeps its type keeps the default value that was set for it (in the column settings, say).
+            // Any other column takes the default value of its new type.
+            var keepsItsType = attribute.DataType.Equals(newType);
             attribute.DataType = newType;
-            // TODO: Does the abstract that an attribute can defined a separate default value than a type help right now?
-            attribute.DefaultValue = newType.CloneDefaultValue();
+            if (!keepsItsType)
+            {
+                // TODO: Does the abstract that an attribute can defined a separate default value than a type help right now?
+                attribute.DefaultValue = newType.CloneDefaultValue();
+            }
             SetDirty(context, true);
             
             return SchemaResult.Pass($"Converted attribute {attributeName} to type {newType}", context);
