@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: "table-authoring leaves generated and published files alone and says how to regenerate them"
+context:
+  scaffold_script: scaffold.sh

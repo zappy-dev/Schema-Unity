@@ -1,0 +1,50 @@
+{
+  "SchemeName": "Manifest",
+  "Attributes": [
+    {
+      "AttributeName": "SchemeName",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "The name of the scheme",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "FilePath",
+      "DataType": {
+        "$type": "Schema.Core.Data.FilePathDataType, Schema.Core",
+        "AllowEmptyPath": true,
+        "UseRelativePaths": true,
+        "BasePath": null,
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Relative path to the staging file from this scheme",
+      "ColumnWidth": 300,
+      "DefaultValue": ""
+    }
+  ],
+  "Entries": [
+    {
+      "SchemeName": "Manifest",
+      "FilePath": "Content/Manifest.json"
+    },
+    {
+      "SchemeName": "Ships",
+      "FilePath": "Content/Ships.json"
+    },
+    {
+      "SchemeName": "Ports",
+      "FilePath": "Content/Ports.json"
+    },
+    {
+      "SchemeName": "Cargo",
+      "FilePath": "Content/Cargo.json"
+    }
+  ]
+}

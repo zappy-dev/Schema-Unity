@@ -1,0 +1,58 @@
+{
+  "SchemeName": "Cargo",
+  "Attributes": [
+    {
+      "AttributeName": "ID",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "Name",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "BasePrice",
+      "DataType": {
+        "$type": "Schema.Core.Data.IntegerDataType, Schema.Core",
+        "DefaultValue": 0
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Coins per unit",
+      "ColumnWidth": 150,
+      "DefaultValue": 0
+    }
+  ],
+  "Entries": [
+    {
+      "ID": "Cargo_Grain",
+      "Name": "Grain",
+      "BasePrice": 12
+    },
+    {
+      "ID": "Cargo_Timber",
+      "Name": "Timber",
+      "BasePrice": 20
+    },
+    {
+      "ID": "Cargo_Salt",
+      "Name": "Salt",
+      "BasePrice": 15
+    }
+  ]
+}
