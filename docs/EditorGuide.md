@@ -14,12 +14,62 @@
 
 ### Publishing
 - Choose a scheme and publish.
-- What happens:
+- What happens, unless the project says otherwise (see below):
   - A filtered copy of the scheme is written to `Assets/Plugins/Schema/Resources/<SchemeName>.json` (only attributes with `ShouldPublish`).
   - Strongly-typed C# wrappers are generated to the `CSharpExportPath` (default `Assets/Scripts/Schemes`).
+  - Then every publish step the project declares runs (see below).
 - After publishing, Unity assets are refreshed automatically.
 - A publish never leaves a row out. If a value is not valid for its column, the publish fails and the message names the scheme, row and column.
 - Publish All sorts the schemes so that referenced ones come first. If schemes reference each other in a cycle, it stops and names them.
+
+### Making Publish do what your project does
+A project does not have to publish the way Schema publishes. It can add a step of its own to a publish, and switch
+either built-in output off, so that Publish writes exactly what the project wants it to: a game can bake an authored
+table straight into a ScriptableObject of its own and never ship a Resources JSON.
+
+**A publish step.** Write a class that derives from `SchemaPublishStep` (or implements `ISchemaPublishStep`), in
+`Schema.Core.Publish`. Nothing registers it: every such type in the project is found and run, once per scheme being
+published, after the built-in outputs.
+
+```csharp
+using Schema.Core;
+using Schema.Core.Publish;
+
+public sealed class TuningBaker : SchemaPublishStep
+{
+    // Only this table. Leave it out to be called for every scheme.
+    protected override string SchemeName => "MachineGuns";
+
+    // Steps run from the lowest Order to the highest; the default is 0.
+    public override int Order => 0;
+
+    protected override SchemaResult PublishScheme(SchemaPublishRequest request)
+    {
+        // request.Scheme is the table as authored; request.Scheme.CreatePublishedCopy(request.Context)
+        // is the filtered copy publishing would have written.
+        // ... write TankTuning.asset ...
+        return SchemaResult.Pass("Baked TankTuning.asset");
+    }
+}
+```
+
+A publish runs in the editor, so a step that writes assets belongs in an `Editor` folder (or an editor-only
+assembly). `Schema.Core`, where the step types live, is auto-referenced, so an asmdef needs nothing added to it.
+
+A step needs a public parameterless constructor. A step that returns a failed result, or throws, fails the publish
+and is named in the message, so a bake that did not happen is never reported as published. A step that cannot be
+built (abstract, generic, or wanting constructor arguments) is skipped with a warning naming it, and the rest of the
+publish carries on.
+
+**The switches.** **Project Settings > Schema Publish** has one toggle per built-in output:
+- **Resources JSON** — write the published table to the scheme's publish target.
+- **Generated C#** — generate the strongly-typed wrappers.
+
+Both are on by default, so a project that does nothing keeps the behaviour it had. The same page lists the publish
+steps found in the project, and warns when Publish would do nothing at all (both outputs off and no steps). The
+setting is kept in the project's content folder as `Content/PublishSettings.json`, beside the Manifest, so it
+travels with the project and is committed with it rather than being a per-machine preference. A settings file that
+cannot be read fails the publish and names itself, rather than quietly writing files the project had switched off.
 
 ### Changing a column's type
 - The conversion is all-or-nothing. If any cell cannot convert, nothing changes and the message lists the rows (by identifier) and values that failed.
