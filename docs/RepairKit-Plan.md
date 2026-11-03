@@ -57,6 +57,25 @@ In SchemaPlayground only, an Editor script on a throwaway branch:
 **Done:** a ping reply printed in the Console and a correct, full-resolution PNG of the window on disk. If either
 fails, the plan changes before any package code is written.
 
+**Result (2026-11-03, Unity 6000.6.0f1, macOS, Retina display, pixelsPerPoint 2), run in `TestProjects/Unity6`:**
+
+- **0a passed (A0.1).** A batch Editor (`unity run . -- -executeMethod ...`; `unity run` is batch mode already and
+  rejects `-batchmode`) connected with `UnixDomainSocketEndPoint`, sent `{"op":"ping"}` serialised by Newtonsoft plus
+  `\n`, and read `{"ok": true, "data": {"status": "ok"}, "protocol": 2, ...}` from the tank game's daemon. No
+  System.Text.Json is needed.
+- **0b passed in part (A0.2: resolution and permission yes, framing no).** In a GUI Editor (the Unity binary run
+  directly, `-executeMethod`, 240 update ticks after `Show()`), `InternalEditorUtility.ReadScreenPixel` returned a
+  lit, full-resolution image with no Screen Recording prompt. Size is in physical pixels (`width * pixelsPerPoint`).
+  But with the window at `position` (100, 100) points, the image starts at the screen's top-left, menu bar included,
+  with the window 200 px in: the origin argument is not the window's top-left in either points or pixels. It also
+  captures whatever overlaps the window. **Phase 1 must:** prefer capturing the window's own view (the HostView
+  `GrabPixels` route, no screen coordinates, nothing overlapping), fall back to `ReadScreenPixel` with a calibrated
+  origin (macOS screen y is flipped; derive it from `Screen.currentResolution` or the main display height), and
+  prove the framing with a check that paints a known marker colour at the window's corners and finds it at the
+  image's corners. A locked screen may capture black; the dialog says so rather than sending a black image.
+- Stills: `a_points.png` (size in points: top-left quarter only) and `b_pixels.png` (size in pixels) were kept in
+  the lead's scratch space, not committed.
+
 ### Phase 1: the collector, report-only
 
 In the package, `Editor/Feedback/` under its own asmdef `Schema.Unity.Editor.Feedback` (Editor platform only):
