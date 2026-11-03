@@ -1,0 +1,137 @@
+using System;
+using UnityEngine;
+
+namespace Schema.Unity.Editor.Feedback
+{
+    /// <summary>
+    /// Makes a screenshot fit repairkit's 2 MB photo limit, and never refuses.
+    /// <list type="number">
+    /// <item>A PNG that fits goes out unchanged (<c>schema-editor.png</c>).</item>
+    /// <item>Otherwise the image is downscaled to 75% and encoded as JPEG (quality 85); if that is still over,
+    /// it is downscaled again (75% each step) and the quality steps down to 50, until it fits.</item>
+    /// <item>Below 160 px wide the loop stops at quality 40, which fits any image of that size.</item>
+    /// </list>
+    /// The result is <c>schema-editor.jpg</c> when it had to be re-encoded. Pure CPU work (a box filter over
+    /// <c>GetPixels32</c>), so it needs no GPU and runs in batch mode.
+    /// </summary>
+    internal static class PhotoFitter
+    {
+        public const int MaxBytes = 2 * 1024 * 1024;
+        public const string BaseName = "schema-editor";
+
+        private const float StepScale = 0.75f;
+        private const int FirstJpegQuality = 85;
+        private const int LowestJpegQuality = 50;
+        private const int FloorWidth = 160;
+
+        public static FeedbackPhoto Fit(Texture2D source, int maxBytes = MaxBytes)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+
+            var png = ImageConversion.EncodeToPNG(source);
+            if (png != null && png.Length > 0 && png.Length <= maxBytes)
+            {
+                return new FeedbackPhoto { Name = BaseName + ".png", Mime = "image/png", Bytes = png };
+            }
+
+            var pixels = source.GetPixels32();
+            var width = source.width;
+            var height = source.height;
+            var quality = FirstJpegQuality;
+            byte[] jpeg = null;
+
+            while (true)
+            {
+                var targetWidth = Math.Max(1, (int)Math.Round(width * StepScale));
+                var targetHeight = Math.Max(1, (int)Math.Round(height * StepScale));
+                if (targetWidth == width && targetHeight == height) break; // 1x1: cannot shrink further
+
+                pixels = BoxDownscale(pixels, width, height, targetWidth, targetHeight);
+                width = targetWidth;
+                height = targetHeight;
+
+                jpeg = EncodeJpeg(pixels, width, height, quality);
+                if (jpeg.Length <= maxBytes) break;
+
+                quality = Math.Max(LowestJpegQuality, quality - 5);
+                if (width <= FloorWidth)
+                {
+                    jpeg = EncodeJpeg(pixels, width, height, 40);
+                    break;
+                }
+            }
+
+            return new FeedbackPhoto { Name = BaseName + ".jpg", Mime = "image/jpeg", Bytes = jpeg };
+        }
+
+        /// <summary>
+        /// A capture that is all black: a locked screen, or a view that did not draw. Sampled on a coarse grid;
+        /// a real window has a grey background at the least.
+        /// </summary>
+        public static bool LooksBlack(Texture2D texture)
+        {
+            if (texture == null) return true;
+            var pixels = texture.GetPixels32();
+            if (pixels.Length == 0) return true;
+
+            var stride = Math.Max(1, pixels.Length / 4096);
+            for (var i = 0; i < pixels.Length; i += stride)
+            {
+                var p = pixels[i];
+                if (p.r > 8 || p.g > 8 || p.b > 8) return false;
+            }
+
+            return true;
+        }
+
+        private static byte[] EncodeJpeg(Color32[] pixels, int width, int height, int quality)
+        {
+            var texture = new Texture2D(width, height, TextureFormat.RGB24, false);
+            try
+            {
+                texture.SetPixels32(pixels);
+                texture.Apply(false);
+                return ImageConversion.EncodeToJPG(texture, quality);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
+        /// <summary>Area-averaging downscale: every target pixel is the mean of the source pixels it covers.</summary>
+        internal static Color32[] BoxDownscale(Color32[] source, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight)
+        {
+            var target = new Color32[targetWidth * targetHeight];
+            for (var ty = 0; ty < targetHeight; ty++)
+            {
+                var y0 = ty * sourceHeight / targetHeight;
+                var y1 = Math.Max(y0 + 1, (ty + 1) * sourceHeight / targetHeight);
+                for (var tx = 0; tx < targetWidth; tx++)
+                {
+                    var x0 = tx * sourceWidth / targetWidth;
+                    var x1 = Math.Max(x0 + 1, (tx + 1) * sourceWidth / targetWidth);
+
+                    long r = 0, g = 0, b = 0, a = 0;
+                    for (var y = y0; y < y1; y++)
+                    {
+                        var row = y * sourceWidth;
+                        for (var x = x0; x < x1; x++)
+                        {
+                            var p = source[row + x];
+                            r += p.r;
+                            g += p.g;
+                            b += p.b;
+                            a += p.a;
+                        }
+                    }
+
+                    var count = (x1 - x0) * (y1 - y0);
+                    target[ty * targetWidth + tx] = new Color32((byte)(r / count), (byte)(g / count), (byte)(b / count), (byte)(a / count));
+                }
+            }
+
+            return target;
+        }
+    }
+}

@@ -1,0 +1,23 @@
+{
+    "name": "Schema.Unity.Editor.Feedback.Tests",
+    "rootNamespace": "Schema.Unity.Editor.Feedback.Tests",
+    "references": [
+        "Schema.Unity.Editor.Feedback",
+        "Schema.Unity.Editor",
+        "Schema.Runtime",
+        "Schema.Core"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UNITY_2021_2_OR_NEWER"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

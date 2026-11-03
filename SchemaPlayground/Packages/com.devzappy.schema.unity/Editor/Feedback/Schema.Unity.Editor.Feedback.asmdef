@@ -1,0 +1,22 @@
+{
+    "name": "Schema.Unity.Editor.Feedback",
+    "rootNamespace": "Schema.Unity.Editor.Feedback",
+    "references": [
+        "Schema.Core",
+        "Schema.Runtime",
+        "Schema.Unity.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_2021_2_OR_NEWER"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

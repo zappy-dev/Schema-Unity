@@ -697,6 +697,9 @@ namespace Schema.Unity.Editor
                         Driver = "User_Request_Publish_All"
                     });
                 }
+
+                // Optional extras from other assemblies (the feedback collector); null unless one is compiled in.
+                DrawToolbarExtras?.Invoke(this);
             }
 
 #if SCHEMA_DEBUG
