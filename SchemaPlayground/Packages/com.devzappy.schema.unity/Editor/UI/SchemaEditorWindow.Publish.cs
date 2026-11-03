@@ -4,6 +4,7 @@ using System.Linq;
 using Schema.Core;
 using Schema.Core.Data;
 using Schema.Core.Ext;
+using Schema.Core.Publish;
 using Schema.Core.Schemes;
 using Schema.Runtime;
 using Schema.Runtime.Type;
@@ -44,40 +45,26 @@ namespace Schema.Unity.Editor
                 return validationErr;
             }
             
-            // publishing data
-            bool isSuccess = true;
-            switch (publishTarget)
+            // What a publish writes is the project's call: the built-in outputs its publish settings leave on, and
+            // then its own publish steps. A project that bakes the table into an asset of its own switches both
+            // built-in outputs off (Project Settings > Schema Publish) and publishes through a step.
+            if (!SchemaPublishSettingsStore.Load(context).Try(out var publishSettings, out var settingsError))
             {
-                case ManifestScheme.PublishTarget.SCRIPTABLE_OBJECT:
-                {
-                    // HACK: Assumes ID column is the asset guid for an underlying scriptable object to publish to
-                    if (!schemeToPublish.GetIdentifierAttribute().Try(out var idAttr))
-                    {
-                        return Fail(context, "No identifier attribute found for scheme to publish");
-                    }
-                    
-                    foreach (var entry in schemeToPublish.AllEntries)
-                    {
-                        var publishRes = PublishEntryToScriptableObject(context, schemeToPublish, entry, idAttr);
-                        isSuccess &= publishRes.Passed;
-                    }
-                    break;
-                }
-                case ManifestScheme.PublishTarget.RESOURCES:
-                {
-                    var publishRes = PublishToResources(schemeToPublish, context);
-                    isSuccess = publishRes.Passed;
-                } 
-                    break;
+                return settingsError.Cast();
             }
 
             if (!GetStorage(context).Try(out var storage, out var storageError)) return storageError.Cast();
-            
-            // Publish code
-            var exportRes = storage.CSharpSchemeStorageFormat.Export(schemeToPublish, context);
-            if (exportRes.Failed)
+
+            var publishRes = SchemaPublishPipeline.Run(
+                new SchemaPublishRequest(context, schemeToPublish),
+                publishSettings,
+                SchemaPublishStepRegistry.Steps,
+                publishResourcesJson: request => PublishSchemeData(request, publishTarget),
+                generateCSharp: request => storage.CSharpSchemeStorageFormat.Export(request.Scheme, request.Context));
+
+            if (publishRes.Failed)
             {
-                return exportRes;
+                return publishRes;
             }
             
             // Publish asset links
@@ -115,7 +102,38 @@ namespace Schema.Unity.Editor
             AssetDatabase.SaveAssetIfDirty(assetLinker);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            return Pass("Published assets");
+            return Pass(publishRes.Message, context);
+        }
+
+        /// <summary>
+        /// Writes the scheme's data to the target its Manifest entry names. The whole of this is skipped when the
+        /// project has switched the Resources JSON off: see <see cref="SchemaPublishSettings.PublishResourcesJson"/>.
+        /// </summary>
+        private SchemaResult PublishSchemeData(SchemaPublishRequest request, ManifestScheme.PublishTarget publishTarget)
+        {
+            var context = request.Context;
+            var schemeToPublish = request.Scheme;
+
+            switch (publishTarget)
+            {
+                case ManifestScheme.PublishTarget.SCRIPTABLE_OBJECT:
+                {
+                    // HACK: Assumes ID column is the asset guid for an underlying scriptable object to publish to
+                    if (!schemeToPublish.GetIdentifierAttribute().Try(out var idAttr))
+                    {
+                        return Fail(context, "No identifier attribute found for scheme to publish");
+                    }
+
+                    return BulkResult(schemeToPublish.AllEntries,
+                        entry => PublishEntryToScriptableObject(context, schemeToPublish, entry, idAttr),
+                        errorMessage: $"Failed to publish scheme '{request.SchemeName}' to its scriptable objects",
+                        context: context);
+                }
+                case ManifestScheme.PublishTarget.RESOURCES:
+                    return PublishToResources(schemeToPublish, context);
+                default:
+                    return Pass($"No data to write for publish target {publishTarget}", context);
+            }
         }
 
         /// <summary>
