@@ -113,6 +113,27 @@ namespace Schema.Unity.Editor.Feedback.Tests
             });
         }
 
+        /// <summary>
+        /// Batch-safe smoke check of the socket client against a real daemon: sends <c>ping</c> only (never <c>submit</c>) to the
+        /// socket in <c>SCHEMA_VERIFY_SOCKET</c> and exits 0 if it answers. Run with
+        /// <c>-batchmode -nographics -quit -executeMethod Schema.Unity.Editor.Feedback.Tests.WindowCaptureVerify.PingDaemon</c>.
+        /// </summary>
+        public static void PingDaemon()
+        {
+            var socket = Environment.GetEnvironmentVariable("SCHEMA_VERIFY_SOCKET");
+            try
+            {
+                var data = new RepairkitClient(socket, 5000).Ping();
+                Debug.Log("[capture-verify] ping ok: " + data);
+                EditorApplication.Exit(0);
+            }
+            catch (RepairkitException e)
+            {
+                Debug.LogError("[capture-verify] ping failed: " + e.Message);
+                EditorApplication.Exit(1);
+            }
+        }
+
         /// <summary>Captures one window to a PNG and says how big it came out against the window's size times the scale.</summary>
         private static bool CaptureTo(EditorWindow window, string fileName, string outDir, Action<string> say)
         {

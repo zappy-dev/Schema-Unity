@@ -98,6 +98,44 @@ In the package, `Editor/Feedback/` under its own asmdef `Schema.Unity.Editor.Fee
 **Done:** the end-to-end success in section 1, from the tank game's Editor, against the Schema-Unity daemon of phase 2
 (or, before it exists, the outbox).
 
+**Result (2026-11-03, branch `rk-collector`, Unity 6000.6.0f1, macOS, Retina, Metal, in `TestProjects/Unity6`):**
+
+- **Built.** `Editor/Feedback/` (asmdef `Schema.Unity.Editor.Feedback`, Editor only, `UNITY_2021_2_OR_NEWER`): a socket
+  client on Newtonsoft (`ping`, `submit`, `attach_photos`; fresh connection per op, socket timeouts, protocol check), the
+  context builder, a ring buffer of the last 50 Console lines that mention Schema (since the last domain reload; the
+  Console's older entries need internal APIs, so they are not read), a git `HEAD` reader for `file:` packages
+  (PackageInfo gives a commit only for git-URL dependencies), the outbox (`~/.schema-unity/feedback-outbox/<timestamp>-<id>/`,
+  the report id is stored once `submit` succeeds so a retry only attaches the image), the 2 MB photo fit, the window
+  capture, the dialog, a **Feedback** button in the Schema Editor toolbar, `Tools/Schema/Send Feedback...`, and the socket
+  setting (in the dialog and under Preferences > Schema Feedback, EditorPrefs only, so a host project gains no files).
+  The seam in existing files is small: `SchemaEditorWindow.DrawToolbarExtras` (one line in `OnGUI`, the rest in a new
+  partial file) and two `InternalsVisibleTo` lines; the older assembly does not reference the 2021.2+ one.
+- **Tests.** 43 new EditMode tests (`Tests/Editor/Feedback`, asmdef `Schema.Unity.Editor.Feedback.Tests`, same define
+  constraint), written before the code (the first run failed to compile naming the missing types). Whole suite: 168 run,
+  167 pass, 1 fails: the pre-existing `SchemaEditorWindowTests.Test_Click_Create_New_Scheme_Button`. A1.2:
+  `FeedbackContextTests`. A1.3: `FeedbackOutboxTests` against an in-test fake Unix-socket daemon on `/tmp/sk-<hex>.sock`.
+  A1.4: `PhotoFitterTests`. A1.5 and A1.6: `FeedbackSenderTests` (A1.5 also snapshots `Assets/` and `ProjectSettings/` before
+  and after). A1.1 needs the Schema-Unity daemon (phase 2) and is not run here; the client was smoke-tested with `ping` only
+  against the tank game's live daemon (`WindowCaptureVerify.PingDaemon`, protocol 2 reply, no report filed).
+- **Framing (A0.2), checked in a GUI Editor** with `WindowCaptureVerify.Run` (kept as a documented manual tool: it needs a
+  GPU and a window server, so it cannot be a batch test). The capture is `GUIView.GrabPixels` into a RenderTexture sized
+  points x `pixelsPerPoint`, by reflection on `EditorWindow.m_Parent`, not `ReadScreenPixel`. A marker window paints red,
+  green, blue and yellow in its four corners; the capture came out 1282 x 804 (641 x 402 pt x 2) with each colour in the
+  matching corner. The Schema Editor floating (2000 x 1400 for 1000 x 700 pt) and docked beside the Scene view (1904 x 1162
+  for 952 x 581 pt) are the window's content only, upright, crisp, with the **Feedback** button visible. Findings that
+  changed the design: (1) `GrabPixels` returns the view upside down and including the dock tab strip, so the rows are
+  flipped and the strip cropped; (2) it works with the screen locked, whereas `ReadScreenPixel` with the screen locked fails
+  an engine assertion (`image != nil`) and aborts the whole Editor, so there is no `ReadScreenPixel` fallback and no
+  origin to calibrate: if `GrabPixels` is missing or the picture is black the dialog says so and the report goes without
+  it; (3) a window that has been painted only once can come out half drawn, so the capture waits two Editor ticks after
+  asking for a repaint; (4) `EditorApplication.delayCall` never ran in a GUI Editor started with `-executeMethod` and the
+  screen locked while `update` did, so the button's deferral uses `update`. Verified on Metal only (the flip follows
+  `SystemInfo.graphicsUVStartsAtTop`); re-run `WindowCaptureVerify.Run` on Windows before trusting it there.
+- **Deferred.** A1.1 (end to end against a daemon) waits for phase 2. Windows and Unity 2021.2 to 2022 were not run. The
+  selected cell is the last cell that had focus (a table cell is only a control id, so it is resolved to column, row and
+  value); it is empty until a cell has been focused. No CHANGELOG exists in this repository and `package.json` is not
+  bumped; releasing is the user's call (section 7.1).
+
 ### Phase 2: a Schema-Unity daemon
 
 - `tools/repair_host.py`, copied from `examples/unity_host.py` and checked against the tank game's
