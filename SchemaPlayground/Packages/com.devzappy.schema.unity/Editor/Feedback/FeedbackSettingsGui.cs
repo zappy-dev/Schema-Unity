@@ -30,12 +30,12 @@ namespace Schema.Unity.Editor.Feedback
             }
 
             var edited = EditorGUILayout.DelayedTextField(
-                new GUIContent("Socket path", "The repairkit daemon's Unix socket, e.g. /Users/you/.schema-unity/repairkit/rk.sock. Stored in this machine's EditorPrefs; the project is not touched."),
+                new GUIContent("Socket path", "The repairkit daemon's Unix socket, e.g. ~/.schema-unity/repairkit/repairkit.sock (a leading ~ is expanded for you). Stored in this machine's EditorPrefs; the project is not touched."),
                 settings.SocketPath);
             if (!string.Equals(edited, settings.SocketPath, StringComparison.Ordinal))
             {
                 FeedbackSettings.SaveSocketPath(edited);
-                settings.SocketPath = (edited ?? string.Empty).Trim();
+                settings.SocketPath = FeedbackSettings.ExpandUserPath(edited);
                 pingResult = null;
             }
 
