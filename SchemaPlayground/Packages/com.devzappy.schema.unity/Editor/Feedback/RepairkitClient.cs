@@ -56,7 +56,9 @@ namespace Schema.Unity.Editor.Feedback
 
         public RepairkitClient(string socketPath, int timeoutMs = FeedbackSettings.DefaultTimeoutMs)
         {
-            this.socketPath = socketPath;
+            // A shell expands a leading ~; the socket API does not. Expanding here means every caller --
+            // the dialog's test, the sender, the outbox flush -- connects to, and reports, the real path.
+            this.socketPath = FeedbackSettings.ExpandUserPath(socketPath);
             this.timeoutMs = timeoutMs;
         }
 
