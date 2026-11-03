@@ -8,7 +8,8 @@ namespace Schema.Unity.Editor.Feedback.Tests
 {
     /// <summary>
     /// A1.5 (no socket path: explain, send nothing, write nothing) and A1.6 (the submit request carries
-    /// hold_for_review), plus the happy path against a fake daemon.
+    /// hold_for_review), plus the happy path against a fake daemon, including the maybe_auto_fix that asks
+    /// the daemon to start a repair.
     /// </summary>
     public class FeedbackSenderTests
     {
@@ -127,7 +128,8 @@ namespace Schema.Unity.Editor.Feedback.Tests
 
             Assert.That(result.Status, Is.EqualTo(SendStatus.Sent), result.Message);
             Assert.That(result.ReportId, Is.EqualTo("r-1"));
-            Assert.That(server.Requests().Select(r => (string)r["op"]), Is.EqualTo(new[] { "submit", "attach_photos" }));
+            Assert.That(server.Requests().Select(r => (string)r["op"]),
+                Is.EqualTo(new[] { "submit", "attach_photos", "maybe_auto_fix" }));
             var photo = server.Photos().Single();
             Assert.That(photo.ReportId, Is.EqualTo("r-1"));
             Assert.That(photo.Name, Is.EqualTo("schema-editor.png"));
@@ -158,6 +160,74 @@ namespace Schema.Unity.Editor.Feedback.Tests
             Assert.That(server.Requests(), Is.Empty);
             Assert.That(Directory.Exists(outbox), Is.False);
         }
+
+        // ---- maybe_auto_fix -----------------------------------------------------------------------------
+
+        [Test]
+        public void A_sent_report_asks_the_daemon_to_repair_it_after_submit_and_attach_photos()
+        {
+            server = new FakeRepairkitServer();
+
+            var result = SenderFor(server.SocketPath).Send(Draft());
+
+            Assert.That(result.Status, Is.EqualTo(SendStatus.Sent), result.Message);
+            var ops = server.Requests().Select(r => (string)r["op"]).ToList();
+            Assert.That(ops, Does.Contain("maybe_auto_fix"), "repairkit starts a repair only when it is asked to");
+            Assert.That(ops.IndexOf("maybe_auto_fix"), Is.GreaterThan(ops.IndexOf("submit")), "after the report is filed");
+            Assert.That(ops.IndexOf("maybe_auto_fix"), Is.GreaterThan(ops.IndexOf("attach_photos")), "and after its photo is in");
+            var ask = server.Requests("maybe_auto_fix").Single();
+            Assert.That((string)ask["id"], Is.EqualTo(result.ReportId), "the id the submit reply gave");
+        }
+
+        [Test]
+        public void A_report_without_a_screenshot_still_asks_the_daemon_to_repair_it()
+        {
+            server = new FakeRepairkitServer();
+
+            var result = SenderFor(server.SocketPath).Send(Draft(withPhoto: false));
+
+            Assert.That(result.Status, Is.EqualTo(SendStatus.Sent), result.Message);
+            Assert.That(server.Requests().Select(r => (string)r["op"]),
+                Is.EqualTo(new[] { "submit", "maybe_auto_fix" }));
+            Assert.That((string)server.Requests("maybe_auto_fix").Single()["id"], Is.EqualTo(result.ReportId));
+        }
+
+        [Test]
+        public void Flushing_the_outbox_asks_the_daemon_to_repair_what_it_delivers()
+        {
+            var socketPath = FakeRepairkitServer.NewSocketPath(); // nothing listens yet
+            Assert.That(SenderFor(socketPath).Send(Draft()).Status, Is.EqualTo(SendStatus.Queued));
+
+            server = new FakeRepairkitServer(socketPath); // the daemon comes back
+            var delivered = SenderFor(socketPath).FlushOutbox();
+
+            Assert.That(delivered, Is.EqualTo(1));
+            Assert.That(server.Requests().Select(r => (string)r["op"]),
+                Is.EqualTo(new[] { "submit", "attach_photos", "maybe_auto_fix" }));
+            Assert.That((string)server.Requests("maybe_auto_fix").Single()["id"], Is.EqualTo("r-1"),
+                "the id the flushed entry was filed under");
+        }
+
+        [Test]
+        public void A_refused_repair_request_leaves_the_report_sent_neither_requeued_nor_filed_twice()
+        {
+            // The daemon refuses the repair request; the sender logs a warning and leaves the report alone.
+            server = new FakeRepairkitServer { FailAutoFix = true };
+
+            var result = SenderFor(server.SocketPath).Send(Draft());
+
+            Assert.That(result.Status, Is.EqualTo(SendStatus.Sent), "the report is filed, so the dialog says Sent");
+            Assert.That(result.ReportId, Is.EqualTo("r-1"));
+            Assert.That(Directory.Exists(outbox) && Directory.GetDirectories(outbox).Length > 0, Is.False,
+                "nothing is queued: a retry would file the same report again");
+
+            SenderFor(server.SocketPath).FlushOutbox();
+
+            Assert.That(server.Requests("submit").Count, Is.EqualTo(1), "never submitted twice");
+            Assert.That(server.Photos().Count, Is.EqualTo(1), "and its screenshot is attached once");
+        }
+
+        // ---- the client ----------------------------------------------------------------------------------
 
         [Test]
         public void Ping_reaches_a_daemon_that_is_up_and_explains_one_that_is_down()

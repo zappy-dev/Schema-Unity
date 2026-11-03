@@ -11,7 +11,8 @@ namespace Schema.Unity.Editor.Feedback.Tests
     /// <summary>
     /// A stand-in for the repairkit daemon: a Unix socket server that speaks the wire the real one does
     /// (one JSON request line in, one JSON reply line out, a fresh connection per op) and records every
-    /// request it was sent. Socket paths must stay under 104 characters on macOS, so tests use
+    /// request it was sent (<c>ping</c>, <c>submit</c>, <c>attach_photos</c>, <c>maybe_auto_fix</c>).
+    /// Socket paths must stay under 104 characters on macOS, so tests use
     /// <see cref="NewSocketPath"/>, which is a short name directly under /tmp.
     /// </summary>
     internal sealed class FakeRepairkitServer : IDisposable
@@ -26,6 +27,9 @@ namespace Schema.Unity.Editor.Feedback.Tests
 
         /// <summary>Reply ok:false to this many attach_photos calls before accepting one.</summary>
         public int AttachFailuresRemaining;
+
+        /// <summary>Reply ok:false to every maybe_auto_fix call, like a daemon that cannot start a repair.</summary>
+        public bool FailAutoFix;
 
         public string SocketPath { get; }
 
@@ -135,6 +139,11 @@ namespace Schema.Unity.Editor.Feedback.Tests
                     break;
                 case "attach_photos":
                     reply = AttachPhotos(request);
+                    break;
+                case "maybe_auto_fix":
+                    reply = FailAutoFix
+                        ? new JObject { ["ok"] = false, ["error"] = "repair queue unavailable", ["protocol"] = 2 }
+                        : Ok(new JObject { ["id"] = request["id"], ["triggered"] = true });
                     break;
                 default:
                     reply = new JObject { ["ok"] = false, ["error"] = "unknown op", ["protocol"] = 2 };

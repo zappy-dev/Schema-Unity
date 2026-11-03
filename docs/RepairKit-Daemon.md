@@ -13,7 +13,7 @@ The plan it comes from is docs/RepairKit-Plan.md (phase 2).
 | launchd agent (written, not loaded) | `tools/launchd/com.devzappy.schema-unity.repairkit.plist` |
 | repairkit itself | v1.2.1, in its own venv `~/.schema-unity/repairkit/venv` |
 | Store, workspaces, log | `~/.schema-unity/repairkit/` (`repairkit.log`, `feedback-reports/`, `workspaces/`) |
-| Socket (paste into the Feedback dialog) | `~/.schema-unity/repairkit/repairkit.sock` |
+| Socket (the Feedback dialog fills this in itself) | `~/.schema-unity/repairkit/repairkit.sock` |
 
 ## Install, start, check
 

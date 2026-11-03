@@ -76,14 +76,62 @@ namespace Schema.Unity.Editor.Feedback.Tests
         }
 
         [Test]
-        public void A_black_capture_is_recognised_and_a_real_one_is_not()
+        public void A_black_capture_is_refused()
         {
             texture = FeedbackTestKit.SolidTexture(64, 64, new Color32(0, 0, 0, 255));
-            Assert.That(PhotoFitter.LooksBlack(texture), Is.True);
 
-            UnityEngine.Object.DestroyImmediate(texture);
-            texture = FeedbackTestKit.NoiseTexture(64, 64);
-            Assert.That(PhotoFitter.LooksBlack(texture), Is.False);
+            Assert.That(PhotoFitter.DescribeUnusable(texture), Is.EqualTo("The capture came out black"));
+        }
+
+        [Test]
+        public void A_picture_of_a_window_is_kept()
+        {
+            texture = FeedbackTestKit.WindowLikeTexture();
+
+            Assert.That(PhotoFitter.DescribeUnusable(texture), Is.Null, "a drawn Editor window must be sent");
+        }
+
+        [Test]
+        public void A_dark_themed_window_is_not_mistaken_for_a_black_capture()
+        {
+            texture = FeedbackTestKit.SolidTexture(64, 64, new Color32(56, 56, 56, 255)); // the dark theme's background
+
+            Assert.That(PhotoFitter.DescribeUnusable(texture), Is.Null);
+        }
+
+        [Test]
+        public void A_capture_that_is_nothing_but_noise_is_refused()
+        {
+            texture = FeedbackTestKit.NoiseTexture(200, 150);
+
+            Assert.That(PhotoFitter.DescribeUnusable(texture), Does.Contain("noise"));
+        }
+
+        /// <summary>
+        /// Report 78dd7292: the frame attached to 67d24d9a was black with a band of noise across the top, and the
+        /// old check refused only an all-black image, so it went out as if it were a screenshot.
+        /// </summary>
+        [Test]
+        public void The_black_frame_with_a_noise_band_that_was_sent_is_refused()
+        {
+            texture = FeedbackTestKit.BlackWithNoiseBandTexture(640, 400, noiseShare: 0.05f);
+
+            Assert.That(PhotoFitter.DescribeUnusable(texture), Is.Not.Null.And.Not.Empty);
+        }
+
+        [Test]
+        public void A_part_drawn_capture_that_is_neither_all_black_nor_all_noise_is_refused()
+        {
+            texture = FeedbackTestKit.BlackWithNoiseBandTexture(640, 400, noiseShare: 0.3f, seed: 11);
+
+            Assert.That(PhotoFitter.DescribeUnusable(texture), Is.Not.Null.And.Not.Empty,
+                "70% black and 30% noise is not a picture of a window either");
+        }
+
+        [Test]
+        public void An_empty_or_missing_capture_is_refused()
+        {
+            Assert.That(PhotoFitter.DescribeUnusable(null), Is.Not.Null.And.Not.Empty);
         }
     }
 }
