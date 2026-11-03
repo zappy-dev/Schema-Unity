@@ -211,7 +211,7 @@ def heavy_job_script() -> Optional[Path]:
         return Path(override) if Path(override).is_file() else None
     cached = sorted(
         Path.home().glob(".claude/plugins/cache/*/project-skills/*/scripts/heavy_job.py"),
-        key=lambda p: p.parent.parent.name,
+        key=lambda p: tuple(int(part) if part.isdigit() else 0 for part in p.parent.parent.name.split(".")),
     )
     for candidate in (*reversed(cached), Path.home() / "src/zappy-project-skills/scripts/heavy_job.py"):
         if candidate.is_file():
