@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "com.devzappy.schema.unity": "file:../../../SchemaPlayground/Packages/com.devzappy.schema.unity",
+    "com.devzappy.schema.unity-tests": "file:../../../SchemaPlayground/Packages/com.devzappy.schema.unity-tests",
+    "com.unity.editorcoroutines": "1.0.1",
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.test-framework": "1.8.0",
+    "com.unity.modules.imageconversion": "1.0.0",
+    "com.unity.modules.imgui": "1.0.0",
+    "com.unity.modules.jsonserialize": "1.0.0",
+    "com.unity.modules.uielements": "1.0.0"
+  },
+  "testables": [
+    "com.devzappy.schema.unity-tests"
+  ]
+}
