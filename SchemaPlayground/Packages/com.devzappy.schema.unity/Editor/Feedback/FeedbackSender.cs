@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
+using UnityEngine;
 
 namespace Schema.Unity.Editor.Feedback
 {
     /// <summary>
-    /// Delivers a draft: submit, then attach the image. An unreachable daemon, or any failure on the way, leaves
-    /// the report in the outbox with the id it already has (so a retry never files it twice), and the next
-    /// <see cref="Send"/> or <see cref="FlushOutbox"/> carries on. Nothing here reads EditorPrefs or the project:
+    /// Delivers a draft: submit, attach the image, then ask the daemon to repair it. An unreachable daemon, or any
+    /// failure on the way, leaves the report in the outbox with the id it already has (so a retry never files it
+    /// twice), and the next <see cref="Send"/> or <see cref="FlushOutbox"/> carries on. Nothing here reads EditorPrefs or the project:
     /// it works on the <see cref="FeedbackSettings"/> it is given, and with no socket path it does nothing at
     /// all, not even write to the outbox. Calls block up to the settings' timeout per op: call off the main thread.
     /// </summary>
@@ -151,7 +152,10 @@ namespace Schema.Unity.Editor.Feedback
             Failed,
         }
 
-        /// <summary>Runs the remaining steps of one report: submit if it has no id, then attach its image if it still has one.</summary>
+        /// <summary>
+        /// Runs the remaining steps of one report: submit if it has no id, attach its image if it still has one,
+        /// then ask the daemon to repair it.
+        /// </summary>
         private Outcome Attempt(OutboxEntry entry, out string error)
         {
             error = null;
@@ -177,12 +181,33 @@ namespace Schema.Unity.Editor.Feedback
                     }
                 }
 
+                // Last, and only once both steps are in: repairkit starts a repair only when it is asked to, so a
+                // report nobody asks about waits as pending however the daemon's repair.auto is set.
+                RequestRepair(client, entry.SubmittedId);
                 return Outcome.Done;
             }
             catch (RepairkitException e)
             {
                 error = e.Message;
                 return e.IsConnectionFailure ? Outcome.Unreachable : Outcome.Failed;
+            }
+        }
+
+        /// <summary>
+        /// Asks the daemon to start a repair for a report it has already taken. The report is filed either way, so
+        /// a failure here is logged and nothing more: queuing or retrying the entry would file the same report a
+        /// second time, and the person has already been told it was sent.
+        /// </summary>
+        private static void RequestRepair(RepairkitClient client, string reportId)
+        {
+            try
+            {
+                client.MaybeAutoFix(reportId);
+            }
+            catch (RepairkitException e)
+            {
+                Debug.LogWarning("Schema feedback: report " + reportId +
+                                 " was filed, but asking the daemon to repair it failed (" + e.Message + ").");
             }
         }
     }

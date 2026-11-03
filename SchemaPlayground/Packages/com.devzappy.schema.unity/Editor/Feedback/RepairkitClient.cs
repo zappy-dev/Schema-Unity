@@ -138,6 +138,14 @@ namespace Schema.Unity.Editor.Feedback
             Call("attach_photos", new JObject { ["id"] = reportId, ["photos"] = array });
         }
 
+        /// <summary>
+        /// Asks the daemon to start a repair for a report it already has, if its own settings allow one
+        /// (<c>repair.auto</c>). repairkit queues nothing by itself: a report stays pending until the collector
+        /// sends this, so it goes out once the report and its photos are in. repairkit's reference C# client calls
+        /// it <c>MaybeAutoFixAsync</c>. Returns the reply's <c>data</c> (<c>{"triggered": ...}</c>).
+        /// </summary>
+        public JToken MaybeAutoFix(string reportId) => Call("maybe_auto_fix", new JObject { ["id"] = reportId });
+
         private string Exchange(string op, byte[] payload)
         {
             Socket socket = null;
