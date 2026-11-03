@@ -170,6 +170,18 @@ class WholeGateTests(unittest.TestCase):
         self.assertFalse(v.started)
         self.assertIn("TestProjects/Unity6", v.reason)
 
+    def test_compile_errors_are_named_once_and_workspace_relative(self) -> None:
+        ws = Path("/w/plant-ws")
+        log = (
+            "/w/plant-ws/SchemaPlayground/Packages/x/Foo.cs(1,91): error CS0029: Cannot implicitly convert type 'string' to 'int'\n"
+            "/w/plant-ws/SchemaPlayground/Packages/x/Foo.cs(1,91): error CS0029: Cannot implicitly convert type 'string' to 'int'\n"
+            "Scripts have compiler errors.\n"
+        )
+        self.assertEqual(
+            gate.compile_errors(log, ws),
+            ["SchemaPlayground/Packages/x/Foo.cs(1,91): error CS0029: Cannot implicitly convert type 'string' to 'int'"],
+        )
+
     def test_exit_codes_say_pass_red_and_could_not_start(self) -> None:
         ok = gate.Verdict(passed=True, reason="ok")
         red = gate.Verdict(passed=False, reason="red")

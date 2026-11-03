@@ -219,8 +219,17 @@ def heavy_job_script() -> Optional[Path]:
     return None
 
 
-def _compile_errors(text: str) -> List[str]:
-    return [line.strip() for line in text.splitlines() if "error CS" in line][:10]
+def compile_errors(text: str, workspace: Path) -> List[str]:
+    """The ``error CS`` lines in a Unity log, each once, with the workspace prefix taken off, at most ten."""
+    prefix = str(workspace).rstrip("/") + "/"
+    found: List[str] = []
+    for line in text.splitlines():
+        if "error CS" not in line:
+            continue
+        line = line.strip().replace(prefix, "")
+        if line not in found:
+            found.append(line)
+    return found[:10]
 
 
 def unity_half(
@@ -263,7 +272,10 @@ def unity_half(
 
     v = read_nunit(xml, known)
     if not xml.exists():
-        errors = _compile_errors(output)
+        # The CLI says only "Scripts have compiler errors."; the error CS lines are in the project's Editor.log.
+        editor_log = project / "Logs" / "Editor.log"
+        log_text = editor_log.read_text(encoding="utf-8", errors="replace") if editor_log.is_file() else ""
+        errors = compile_errors(output + "\n" + log_text, workspace)
         if errors:
             v.reason = "compile errors: " + " | ".join(errors)
     v.reason += f" ({time.monotonic() - began:.0f} s)"
