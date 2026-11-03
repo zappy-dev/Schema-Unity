@@ -35,9 +35,10 @@ namespace Schema.Unity.Editor.Feedback
         private const string MessageControl = "SchemaFeedbackMessage";
 
         /// <summary>
-        /// A floating utility window, which is what a dialog should be. WindowCapture's picture of a utility window
-        /// (a bare HostView rather than a DockArea) is not framed correctly, so the manual verification tool turns this
-        /// off to take a picture of the dialog; the capture the feature relies on is of the Schema Editor, a DockArea tab.
+        /// A floating utility window, which is what a dialog should be. The manual verification tool turns this off so
+        /// the dialog is a dock tab, the same kind of host as the Schema Editor, to take a deterministic picture of it.
+        /// (A utility window captured after a single paint came out half drawn; it was not re-checked with repeated
+        /// repaints, so whether utility windows frame correctly is open. The feature only captures the Schema Editor.)
         /// </summary>
         internal static bool UseUtilityWindow = true;
 

@@ -134,7 +134,11 @@ In the package, `Editor/Feedback/` under its own asmdef `Schema.Unity.Editor.Fee
 - **Deferred.** A1.1 (end to end against a daemon) waits for phase 2. Windows and Unity 2021.2 to 2022 were not run. The
   selected cell is the last cell that had focus (a table cell is only a control id, so it is resolved to column, row and
   value); it is empty until a cell has been focused. No CHANGELOG exists in this repository and `package.json` is not
-  bumped; releasing is the user's call (section 7.1).
+  bumped; releasing is the user's call (section 7.1). Known edges, none losing a report: a crash between `submit`
+  returning and the outbox entry being written can file one report twice on the retry; the open scheme is serialised at
+  every button press (and held twice in the dialog's state) even when the toggle stays off, which a very large scheme will
+  feel; the Console tail matches "Schema" case-sensitively; whether a utility (non-dock-tab) window frames correctly under
+  `GrabPixels` was not settled (the feature captures only the Schema Editor, a dock tab).
 
 ### Phase 2: a Schema-Unity daemon
 
