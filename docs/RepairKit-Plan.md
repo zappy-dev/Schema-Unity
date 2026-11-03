@@ -1,7 +1,7 @@
 # Plan: RepairKit feedback for the Schema Editor
 
-Status: approved 2026-11-03 (defaults taken on every question, section 7); phase 0 in progress on branch
-`repairkit-feedback`.
+Status: approved 2026-11-03 (defaults taken on every question, section 7). Phases 0 and 1 done (branch
+`rk-collector`); phase 2 built and checked on branch `rk-daemon` (its Result below); none of it is on `main` yet.
 
 ## 1. Goal
 
@@ -152,6 +152,59 @@ In the package, `Editor/Feedback/` under its own asmdef `Schema.Unity.Editor.Fee
 - repairkit installed from a tag into the daemon's own venv, run under launchd, `doctor` green on unchanged code.
 
 **Done:** `health.self_check` passes; the phase 1 report shows in `list_reports`.
+
+**Result (2026-11-03, branch `rk-daemon`, repairkit v1.2.1, Unity 6000.6.0f1, macOS; running it: docs/RepairKit-Daemon.md):**
+
+- **Built.** `tools/repair_host.py` (every seam: paths, host profile, provider, settings, workspace, runtime,
+  evidence; origin left at repairkit's default, "every message is a person's"), `tools/repair_gate.py` and
+  `tools/repair_gate_known_failures.json`, `tools/repairkit.sh` (install, start, stop, restart, serve, and every CLI
+  op), `tools/launchd/com.devzappy.schema-unity.repairkit.plist` (written and `plutil`-clean, **not loaded**), 30 tests
+  in `tools/tests` (written first; the first run had 25 failing on assertions), and
+  `WindowCaptureVerify.SubmitToDaemon` for the end-to-end check. repairkit is installed from tag v1.2.1 (commit
+  023ce40) with daemoncore at its pinned 11597f1 into `~/.schema-unity/repairkit/venv` (Python 3.12 via uv,
+  `--no-sources` because the tag pins daemoncore by an ssh URL); `~/src/repairkit` was not touched. State, store,
+  workspaces and socket are under `~/.schema-unity/repairkit/` (socket `~/.schema-unity/repairkit/repairkit.sock`, 50
+  characters). The tank game's daemon was never connected to.
+- **How the host differs from the template.** The workspace subclasses repairkit's own `GitWorktreeWorkspace` (which
+  already has every fix the tank game's hand-written one carries) rather than copying the tank's: it bases repairs on
+  `main` instead of the primary checkout's HEAD, promotes only into a primary checkout that has `main` out with no
+  tracked edits, clones `TestProjects/Unity6/Library` into each workspace (APFS clone), deletes the doctor's throwaway
+  branch, and turns gate exit 3 into `started=False`. From the tank's host: dropping the daemon's PYTHONPATH after
+  import, `denied_commands`, `promotion_requires_review`, the wrapper runtime. Not taken: the tank's release on
+  promote (consumers pin by commit, phase 3), its claims hooks (repairkit >= 1.4), its demo evidence (phase 3).
+- **Criteria.**
+
+  | # | Evidence |
+  |---|---|
+  | A2.1 | Test daemon (`SCHEMA_REPAIR_BASE=rk-daemon`, see below): `tools/repairkit.sh doctor`, then `health.self_check` = `ok: true, started: true`, 40.5 s, all four checks green: `programs` (gate interpreter = the venv's python, outside the live checkout), `workspace` (`~/.schema-unity/repairkit/workspaces/repairkit-doctor`), `environment` (7 overrides, nothing names the live checkout), `validation` ("the gate passed on unchanged code"). `gates.ok: true`. Doctor workspace and branch gone afterwards. |
+  | A2.2 | In a throwaway detached worktree of `rk-daemon` (removed afterwards; nothing planted was committed): unchanged, `GATE PASS`, XML `total=168 failed=1`, verdict "167 of 168 passed; known failure(s) excluded: ...Test_Click_Create_New_Scheme_Button". With a planted `PlantedGateFailureTests.Planted_Failure_The_Gate_Must_Name`: `GATE RED`, exit 1, XML `total=169 failed=2`, verdict "1 of 169 test(s) failed: Schema.Unity.Editor.Feedback.Tests.PlantedGateFailureTests.Planted_Failure_The_Gate_Must_Name". The unity CLI exited **8 for both** runs, so the verdict could only have come from the XML. With a planted compile error: `GATE RED` naming `PlantedCompileError.cs(1,91): error CS0029` (no results file; the CLI exited 6). **The Core half of A2.2 is deferred**: no dotnet SDK here, so the gate skips it with a note; its TRX reading is unit-tested only. |
+  | A1.1 | Same test daemon. `unity run TestProjects/Unity6 -- -executeMethod ...WindowCaptureVerify.SubmitToDaemon` (batch, its own socket and outbox settings, not the EditorPrefs key): ping `{"status":"ok"}`, then `Sent, report 39815b35-6e47-4db8-bcbe-1e7b61c55203 (with the screenshot)`. `get-report`: `status: pending`, `source: schema-editor`, `photos: [1_schema-editor.jpg]`, context with `project_name: Unity6`, `unity_version`, `package_version`, `package_commit`, `hold_for_review: "phase 1: report only"`. Then `maybe-auto-fix` on it answered `triggered: true` and did nothing: status still `pending`, `running-agents-summary` count 0, queue 0/0/0. Run from `TestProjects/Unity6`, not yet from the tank game's Editor (the criterion's own wording); no Schema Editor scheme was open, so the selected-scheme fields are absent. |
+  | AUTO_REPAIR off | `repair.auto: False` in `_SETTINGS`; `AutoRepairOffTests` (a submitted report plus `maybe_auto_fix` starts no fix thread); the live `maybe-auto-fix` above. |
+- **Decisions taken (defaults, unattended).** (1) The startup self-check is **off** (`repair.self_check_on_start`):
+  the gate is a full Unity run and a daemon started at login must not start Unity unasked; `doctor` asks.
+  (2) The Unity half queues in project-skills' machine-wide `heavy_job.py` `unity` pool instead of the plan's
+  "`unity-editor` lease": that lease is the tank game's per-repository claim for driving a GUI Editor, and a batch
+  run on a workspace's own project copy needs neither it nor the tank's project lock; the pool is what keeps it from
+  running beside the tank game's Unity jobs. (3) The known pre-existing failure is excluded by name, with its reason,
+  in a JSON file the gate reads; an entry without a reason is refused, and a listed test that starts passing is
+  reported. (4) The gate runs from the workspace (`tools/repair_gate.py`), so a repair is judged by its own copy;
+  edits to the gate, its list, the host, the wrapper, the launchd plist, the test project's packages and settings, the
+  package's `package.json` and `.github/` are therefore held for review even when green. (5) `MAX_CONCURRENT` 1,
+  agent timeout 3600 s, model `claude-opus-5` (unused until phase 3). (6) The agent extra (`claude-agent-sdk`) is not
+  installed: nothing dispatches in phase 2.
+- **Known edges.** `main` (d6ec179) does not yet contain `TestProjects/Unity6` or `tools/`, so a daemon on the default
+  base reports `gates.ok: false` ("main has no tools/repair_gate.py") until phases 0-2 land on `main`; every check above
+  ran with `SCHEMA_REPAIR_BASE=rk-daemon`. The primary checkout is on `runtime-player-build`, so `promote` would refuse
+  (by design). repairkit v1.2.1 stores every photo as `<n>_<name>.jpg` whatever its format (the file is the PNG the
+  collector sent), so A1.1's `schema-editor.png` reads as `1_schema-editor.jpg`. The smoke report 39815b35 is still in
+  the store, `pending`; dismiss it with `tools/repairkit.sh update-report 39815b35-6e47-4db8-bcbe-1e7b61c55203 --status
+  dismissed` if wanted. `Library/` is seeded from the primary checkout's `TestProjects/Unity6/Library`, which does not
+  exist there yet, so the first gate in each workspace imports from scratch unless `SCHEMA_REPAIR_LIBRARY_SEED` is set
+  (the checks used the `rk-collector` worktree's). The Core (dotnet) half has never run against a real SDK.
+- **Morning items (only a person can do these).** Land `rk-collector`/`rk-daemon` on `main`, then put the primary
+  checkout `/Users/zappy/src/Schema-Unity` on `main` before enabling repairs (it has `runtime-player-build` out and
+  an untracked `docs/CLI-Plan.md` that is someone's); load the launchd agent (docs/RepairKit-Daemon.md); install the
+  .NET 8 SDK to turn on the Core half; paste the socket path into the Feedback dialog on each machine that should send.
 
 ### Phase 3: repairs on
 
