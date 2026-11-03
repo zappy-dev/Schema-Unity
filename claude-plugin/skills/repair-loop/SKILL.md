@@ -27,8 +27,9 @@ game's report to this one.
 
 ## 1. File a report
 
-- **From the Schema Editor**: press **Feedback**. A socket path that starts with `~` is not expanded by package
-  0.3.2, so paste the full path `/Users/<you>/.schema-unity/repairkit/repairkit.sock`.
+- **From the Schema Editor**: press **Feedback**. From package 0.3.3 the socket field fills itself when the daemon
+  sits at the standard path, and a leading `~` is expanded. On 0.3.2, paste the full path
+  `/Users/<you>/.schema-unity/repairkit/repairkit.sock`.
 - **From a session**: `python3 <this skill>/scripts/file_report.py "<what is wrong, what you expected>" --photo
   <png|jpg> --context '<json object>'`. It sends `submit`, then `attach_photos`, then `maybe_auto_fix`, prints the
   report id, and uses only the standard library. Do not use `tools/repairkit.sh submit --context`: repairkit 1.2.1's
@@ -42,7 +43,7 @@ too: a repair only changes Schema-Unity.
 
 `tools/repairkit.sh running-agents-summary` lists the running repair and the queue; one repair runs at a time.
 A report that stays `pending` was never asked for. repairkit starts a repair only when the client sends
-`maybe_auto_fix` after `submit`, and package 0.3.2's collector does not send it. Ask for it by hand:
+`maybe_auto_fix` after `submit`. The collector sends it from 0.3.3; 0.3.2 does not. Ask for it by hand:
 `tools/repairkit.sh maybe-auto-fix <id>`, or `tools/repairkit.sh enqueue-fix <id> --note "<extra context>"`, which
 puts the note into the agent's prompt.
 
