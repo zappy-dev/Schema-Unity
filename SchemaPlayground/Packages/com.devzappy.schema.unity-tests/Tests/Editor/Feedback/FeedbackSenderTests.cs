@@ -89,7 +89,7 @@ namespace Schema.Unity.Editor.Feedback.Tests
         // ---- A1.6 ---------------------------------------------------------------------------------------
 
         [Test]
-        public void The_submit_request_carries_hold_for_review_and_the_source()
+        public void The_submit_request_carries_the_source_and_no_hold_mark()
         {
             server = new FakeRepairkitServer();
 
@@ -97,13 +97,13 @@ namespace Schema.Unity.Editor.Feedback.Tests
 
             Assert.That(result.Status, Is.EqualTo(SendStatus.Sent), result.Message);
             var submit = server.Requests("submit").Single();
-            Assert.That((string)submit["context"]["hold_for_review"], Is.EqualTo("phase 1: report only"));
+            Assert.That(submit["context"]["hold_for_review"], Is.Null);
             Assert.That((string)submit["source"], Is.EqualTo("schema-editor"));
             Assert.That((string)submit["message"], Is.EqualTo("the Coax tooltip column is cut off"));
         }
 
         [Test]
-        public void A_context_that_forgot_the_hold_gets_it_anyway()
+        public void The_caller_s_context_is_sent_unchanged()
         {
             server = new FakeRepairkitServer();
             var draft = Draft();
@@ -112,7 +112,7 @@ namespace Schema.Unity.Editor.Feedback.Tests
             SenderFor(server.SocketPath).Send(draft);
 
             var submit = server.Requests("submit").Single();
-            Assert.That((string)submit["context"]["hold_for_review"], Is.EqualTo("phase 1: report only"));
+            Assert.That(JToken.DeepEquals(submit["context"], draft.Context), Is.True, submit["context"].ToString());
         }
 
         // ---- happy path ----------------------------------------------------------------------------------

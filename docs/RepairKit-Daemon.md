@@ -31,9 +31,10 @@ Unity unasked.
 
 ## What it does with a report
 
-Nothing, yet. Repairs are **off** (`repair.auto` false in `tools/repair_host.py`), and the collector marks every
-report `hold_for_review`. A report sits `pending` until someone enqueues it (`tools/repairkit.sh enqueue-fix ID`),
-which is phase 3. When repairs run: one git worktree per repair under `~/.schema-unity/repairkit/workspaces/`, cut
+Repairs it, automatically (`repair.auto` true in `tools/repair_host.py`, phase 3, like Mino): every submitted report
+starts a repair, one at a time, using the Claude Code CLI through `claude-agent-sdk` in the daemon's venv. A report
+filed before that, or one that failed, is started by hand with `tools/repairkit.sh enqueue-fix ID`. Each repair runs in
+one git worktree per repair under `~/.schema-unity/repairkit/workspaces/`, cut
 from **`main`** (whatever the primary checkout has out), with `TestProjects/Unity6/Library` cloned in from the
 primary checkout; the gate runs there; a passing repair is merged into the primary checkout only if that checkout is
 on `main` with no tracked edits. Nothing is pushed. A repair that edits the gate, the host or the test project's

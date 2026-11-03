@@ -181,9 +181,10 @@ _SETTINGS = {
     settings.BREAKER_THRESHOLD: 2,
     settings.MAX_CONCURRENT: 1,
     settings.AGENT_TIMEOUT_SECONDS: 3600,
-    # Off: a report never dispatches a repair on its own (Mino's name for this is feedback_auto_agent).
-    # Phase 3 turns repairs on per report, by enqueueing, not by flipping this.
-    settings.AUTO_REPAIR: False,
+    # On (phase 3, the user 2026-11-03: "for feedback that I am giving locally here, I want it to automatically
+    # start working, similar to mino"): every submitted report starts a repair, one at a time. A repair that passes
+    # the gate is merged into the primary checkout's main, locally; one that edits a path in requires_review waits.
+    settings.AUTO_REPAIR: True,
     # Off: the doctor's gate is a full Unity EditMode run (minutes, one more Unity process); a daemon started at
     # login must not start one unasked. `tools/repairkit.sh doctor` asks, and health.self_check shows the verdict.
     settings.SELF_CHECK_ON_START: False,

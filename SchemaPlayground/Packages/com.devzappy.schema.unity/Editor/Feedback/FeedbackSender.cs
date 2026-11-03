@@ -161,7 +161,6 @@ namespace Schema.Unity.Editor.Feedback
                 if (entry.SubmittedId == null)
                 {
                     var context = entry.Context != null ? (JObject)entry.Context.DeepClone() : new JObject();
-                    context["hold_for_review"] = FeedbackContext.HoldForReview;
                     entry.SubmittedId = client.Submit(entry.Message, entry.Source, context);
                     if (entry.Directory != null) outbox.Save(entry); // remember the id before the next step can fail
                 }

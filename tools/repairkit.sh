@@ -59,6 +59,7 @@ case "$cmd" in
     uv pip install --no-sources --python "$VENV/bin/python" \
       "daemoncore @ git+file://$DAEMONCORE_SRC@$DAEMONCORE_REV" \
       "repairkit @ git+file://$REPAIRKIT_SRC@$REPAIRKIT_TAG" \
+      claude-agent-sdk \
       pytest
     "$VENV/bin/python" -c 'import importlib.metadata as m; print("repairkit", m.version("repairkit"))'
     ;;

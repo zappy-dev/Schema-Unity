@@ -51,7 +51,7 @@ namespace Schema.Unity.Editor.Feedback.Tests
             Assert.That(Directory.GetFiles(entries[0].Directory, "schema-editor.*").Length, Is.EqualTo(1));
             Assert.That(entries[0].Message, Is.EqualTo("first"));
             Assert.That(entries[0].Source, Is.EqualTo("schema-editor"));
-            Assert.That((string)entries[0].Context["hold_for_review"], Is.EqualTo("phase 1: report only"));
+            Assert.That(entries[0].Context["hold_for_review"], Is.Null);
         }
 
         [Test]

@@ -24,12 +24,6 @@ namespace Schema.Unity.Editor.Feedback
 
     internal static class FeedbackContext
     {
-        /// <summary>
-        /// Phase 1 reports are not repaired. repairkit records this as the report's hold_reason and holds any
-        /// repair for review; it is added to every submit whatever the caller passed.
-        /// </summary>
-        public const string HoldForReview = "phase 1: report only";
-
         public const int MaxSchemeJsonChars = 400 * 1024;
 
         /// <summary>The <c>context</c> object of a <c>submit</c>: snake_case keys, empty values left out.</summary>
@@ -75,7 +69,6 @@ namespace Schema.Unity.Editor.Feedback
                 }
             }
 
-            context["hold_for_review"] = HoldForReview;
             return context;
         }
 

@@ -49,11 +49,11 @@ namespace Schema.Unity.Editor.Feedback.Tests
         }
 
         [Test]
-        public void Context_always_holds_the_repair_for_review_in_phase_one()
+        public void Context_carries_no_hold_mark_so_the_daemon_may_repair_it()
         {
             var ctx = FeedbackContext.Build(new FeedbackContextInputs());
 
-            Assert.That((string)ctx["hold_for_review"], Is.EqualTo("phase 1: report only"));
+            Assert.That(ctx["hold_for_review"], Is.Null);
         }
 
         [Test]

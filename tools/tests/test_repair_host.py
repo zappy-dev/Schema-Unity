@@ -5,7 +5,7 @@ What they hold the host to (docs/RepairKit-Plan.md, phase 2):
 
 * the state root and socket are Schema-Unity's own (``~/.schema-unity/repairkit``), under the 104-character
   socket limit, and never the tank game's;
-* AUTO_REPAIR is off: a submitted report does not start an agent, even when ``maybe_auto_fix`` is asked;
+* AUTO_REPAIR is on: a submitted report starts a repair through ``maybe_auto_fix`` (phase 3);
 * repairs base on the integration branch (``main``) whatever the primary checkout has out, and promote only
   into a primary checkout that is on that branch;
 * the doctor's throwaway workspace leaves no branch behind.
@@ -63,23 +63,21 @@ class StateRootTests(unittest.TestCase):
         self.assertEqual(paths.socket_path(), _STATE.resolve() / "repairkit.sock")
 
 
-class AutoRepairOffTests(unittest.TestCase):
-    def test_auto_repair_is_off(self) -> None:
-        self.assertIs(settings.get(settings.AUTO_REPAIR), False)
+class AutoRepairOnTests(unittest.TestCase):
+    def test_auto_repair_is_on(self) -> None:
+        self.assertIs(settings.get(settings.AUTO_REPAIR), True)
 
-    def test_a_submitted_report_starts_no_agent_even_when_maybe_auto_fix_is_asked(self) -> None:
+    def test_a_submitted_report_starts_a_repair(self) -> None:
         from repairkit import store
         started: list[str] = []
         original = agent_queue._start_fix_thread
         agent_queue._start_fix_thread = lambda report, **kw: started.append(report.id) or True
         try:
-            report = store.submit("the tooltip column renders cut off", source="schema-editor",
-                                  context={"hold_for_review": "phase 1: report only"})
+            report = store.submit("the tooltip column renders cut off", source="schema-editor", context={})
             agent_queue.maybe_auto_fix(report)
         finally:
             agent_queue._start_fix_thread = original
-        self.assertEqual(started, [])
-        self.assertEqual(store.get_report(report.id).status.value, "pending")
+        self.assertEqual(started, [report.id])
 
 
 class ProfileTests(unittest.TestCase):
