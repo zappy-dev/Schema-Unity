@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: "repair-loop does not load for a change to a table's data"
+context:
+  scaffold_script: scaffold.sh

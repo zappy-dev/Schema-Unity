@@ -1,6 +1,6 @@
 # schema-unity: Claude Code skills for projects that use Schema
 
-Three skills that teach an AI agent how to work with the [Schema](../README.md) data-table package in a Unity
+Four skills that teach an AI agent how to work with the [Schema](../README.md) data-table package in a Unity
 project: change a table and its generated C#, read tables from game code, and make a column a checked link or
 a real colour. They describe Schema package **0.3.x** and were checked at **0.3.1 plus commit `e9089e0`**.
 
@@ -9,6 +9,7 @@ a real colour. They describe Schema package **0.3.x** and were checked at **0.3.
 | `schema-unity:table-authoring` | a feature needs a new value, row or table in a Schema table; a generated constant or property is missing; someone wants to edit a `*Scheme.g.cs` or a published JSON; a table works in the editor and not in a build | runbook |
 | `schema-unity:table-reading` | game code reads a table; `InvalidOperationException`/"Entry not found"; an empty screen or `No Scheme ... loaded` in a build; a mistyped ID takes down a spawn; lookups allocate; a player build fails in `Schema.Runtime` | runbook |
 | `schema-unity:column-types` | a text column should be a link or a colour; asked whether Convert Type is safe; a link throws or reads blank; a new row starts linked to the first row | playbook, with a runbook and a preflight script |
+| `schema-unity:repair-loop` | Schema Editor or package feedback goes to the local Schema-Unity repairkit daemon; a report sits pending or a repair is held, failed or blocked; the fixes are to be released and re-pinned in a project | runbook, with a report-filing script |
 
 The skills link Schema's own docs ([Key Concepts](../docs/KeyConcepts.md), [Editor Guide](../docs/EditorGuide.md),
 [Runtime Guide](../docs/RuntimeGuide.md)) instead of copying them, and add what the docs do not say: what
@@ -27,7 +28,7 @@ claude plugin install schema-unity@schema --scope project
 
 Or in one step, on Claude Code 2.1.275 or later: `claude plugin install schema-unity --marketplace zappy-dev/Schema-Unity --scope project`
 (this declares the marketplace in your user settings instead). Start a new session, or run `/reload-plugins`;
-`claude plugin details schema-unity@schema` lists the three skills.
+`claude plugin details schema-unity@schema` lists the four skills.
 
 How these steps are known: with the marketplace given as a local clone of this repository
 (`claude plugin marketplace add <path to clone> --scope project`), the install, the settings it wrote, the
