@@ -192,6 +192,36 @@ namespace Schema.Core.Data
             return DataType.IsValidValue(context, value);
         }
 
+        /// <summary>
+        /// Converts the default value to a valid value of the data type, when the default itself is not valid. A type can keep its default in
+        /// another form than its values (a color whose default is hex text), and a cell must not hold the default in that form.
+        /// </summary>
+        /// <returns>The converted default, or null when the default is valid as it is or cannot be converted to a valid value.</returns>
+        internal object ConvertDefaultToValidValue(SchemaContext context)
+        {
+            if (DataType == null || DefaultValue == null)
+            {
+                return null;
+            }
+
+            var defaultValue = CloneDefaultValue();
+            if (DataType.IsValidValue(context, defaultValue).Passed)
+            {
+                return null;
+            }
+
+            var converted = DataType.ConvertValue(context, defaultValue);
+            return converted.Passed && DataType.IsValidValue(context, converted.Result).Passed ? converted.Result : null;
+        }
+
+        /// <summary>
+        /// The value that fills a cell of this attribute when there is none: the default value, converted when it is not valid as it is.
+        /// </summary>
+        internal object CloneDefaultValueForEntry(SchemaContext context)
+        {
+            return ConvertDefaultToValidValue(context) ?? CloneDefaultValue();
+        }
+
         public SchemaResult<object> ConvertValue(SchemaContext context, object value)
         {
             return DataType.ConvertValue(context, value);

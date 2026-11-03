@@ -15,7 +15,8 @@ A table-like definition with a unique `SchemeName`, a set of `Attributes` (colum
 A column definition with a `DataType`, optional identifier flag, and `ShouldPublish`. Common types include:
 - Text, Number, Boolean
 - FilePath, Folder
-- Color (Unity runtime plugin - hex color codes like #FF0000 or #FF0000AA)
+- Color (Unity runtime plugin - hex color codes like #FF0000 or #FF0000AA; the alpha channel is saved)
+- Reference (a link to a row of another scheme, or of the same scheme; it may be blank)
 - Custom types can be added in code
 
 ### Entry
@@ -23,6 +24,9 @@ A row of data in a scheme. At publish time, only attributes with `ShouldPublish`
 
 ### Publishing
 Publishing writes a sanitized version of a scheme to `Assets/Plugins/Schema/Resources/` and generates C# wrappers into `Assets/Scripts/Schemes/` (configurable via Manifest). The runtime loads from `Resources` using `SchemaRuntime.Initialize()`.
+
+### References between schemes
+A Reference column links to a row of another scheme (or of its own scheme). Schemes load and publish with the referenced ones first, so schemes must not reference each other in a cycle; a cycle is reported by name instead of loading. A blank link is allowed when the column's `SupportsEmptyReferences` is true.
 
 ### Storage and File Systems
 Schema abstracts IO via an `IFileSystem`. In-editor it uses a local filesystem; at runtime it reads from Unity `Resources` via `TextAssetResourcesFileSystem`.

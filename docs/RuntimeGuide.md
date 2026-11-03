@@ -70,6 +70,14 @@ if (res.Try(out var entities))
 }
 ```
 
+### Reading a reference column
+A column that references another scheme gets two members in its generated entry wrapper. For a column `Home` that references `Zones`:
+```csharp
+ZonesEntry home = item.Home;            // throws InvalidOperationException if the reference is blank or points at no entry
+ZonesEntry homeOrNull = item.HomeOrNull; // null in both of those cases
+```
+Use `Home` where a blank reference is a data error. Use `HomeOrNull` for a column that allows blank references (the end of a chain of "next" links, an optional link), and check for `null`. For an id you have in hand, the generated scheme class has the same pair: `ZonesScheme.GetEntry(id)` returns a result that fails for a missing id, and `ZonesScheme.GetEntryOrNull(id)` returns `null` for a missing or blank id.
+
 ### Updating content
 At runtime, content is read-only from Resources. Update data via the editor, republish, and rebuild the player.
 

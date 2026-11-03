@@ -130,37 +130,8 @@ namespace Schema.Unity.Editor
             var storageFormat = storage.DefaultSchemaPublishFormat;
             string schemaPublishPath = $"{SchemaRuntime.DEFAULT_RESOURCE_PUBLISH_PATH}/{originalSchemeToPublish.SchemeName}.{storageFormat.Extension}";
 
-            // prepare a new data scheme to publish
-            var publishScheme = new DataScheme(originalSchemeToPublish.SchemeName);
-
-            // first clone published attributes
-            var publishedAttributes = originalSchemeToPublish.GetAttributes(a => a.ShouldPublish).ToList();
-            foreach (var publishedAttr in publishedAttributes)
-            {
-                publishScheme.AddAttribute(context, publishedAttr.Clone() as AttributeDefinition);
-            }
-            
-            // second clone data entries, stripped for only published entries
-            if (!originalSchemeToPublish.GetEntries(context: context).Try(out var entries, out var error)) return error.Cast();
-            
-            foreach (var entry in entries)
-            {
-                var publishedEntry = new DataEntry();
-
-                var copyRes = BulkResult(
-                    entries: publishedAttributes,
-                    operation: (publishedAttr) =>
-                        publishedEntry.SetData(context, publishedAttr.AttributeName, entry.GetDataDirect(publishedAttr)),
-                    errorMessage: $"Failed to publish entry: {entry}",
-                    context: context);
-
-                if (copyRes.Failed)
-                {
-                    return copyRes;
-                }
-
-                publishScheme.AddEntry(context, publishedEntry);
-            }
+            // prepare a new data scheme to publish: the published columns and every row. A row that cannot be added fails the publish.
+            if (!originalSchemeToPublish.CreatePublishedCopy(context).Try(out var publishScheme, out var copyError)) return copyError.Cast();
             
             var publishRes = storageFormat.SerializeToFile(context, schemaPublishPath, publishScheme);
 
