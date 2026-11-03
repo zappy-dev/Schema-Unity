@@ -1,0 +1,15 @@
+{
+  "scopedRegistries": [
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [ "com.devzappy.schema.unity" ]
+    }
+  ],
+  "dependencies": {
+    "com.devzappy.schema.unity": "0.3.1",
+    "com.unity.localization": "1.4.5",
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.modules.ui": "1.0.0"
+  }
+}

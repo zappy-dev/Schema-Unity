@@ -71,6 +71,7 @@ public partial class ProfilesEntry : EntryWrapper
 - **Unity Editor Guide:** [docs/EditorGuide](docs/EditorGuide.md)
 - **Runtime Integration:** [docs/RuntimeGuide](docs/RuntimeGuide.md)
 - **FAQ & Troubleshooting:** [docs/FAQ](docs/FAQ.md)
+- **AI agent skills:** [Claude Code plugin](claude-plugin/README.md) for projects that use Schema ([why](docs/ClaudePlugin.md))
 
 ## Features
 

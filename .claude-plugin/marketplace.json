@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "schema",
+  "description": "Claude Code plugins for Schema, the data-table package for Unity.",
+  "owner": {
+    "name": "DevZappy",
+    "email": "me@devzappy.com"
+  },
+  "plugins": [
+    {
+      "name": "schema-unity",
+      "description": "Skills for AI agents working in a Unity project that uses the Schema package: changing tables and their generated C#, reading tables from game code, and Reference and Color columns.",
+      "source": "./claude-plugin",
+      "category": "development"
+    }
+  ]
+}

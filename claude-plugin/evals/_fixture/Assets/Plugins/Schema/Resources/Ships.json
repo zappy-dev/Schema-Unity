@@ -1,0 +1,73 @@
+{
+  "SchemeName": "Ships",
+  "Attributes": [
+    {
+      "AttributeName": "ID",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "Name",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "Speed",
+      "DataType": {
+        "$type": "Schema.Core.Data.FloatingPointDataType, Schema.Core",
+        "DefaultValue": 0.0
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Knots at full sail",
+      "ColumnWidth": 150,
+      "DefaultValue": 0.0
+    },
+    {
+      "AttributeName": "Capacity",
+      "DataType": {
+        "$type": "Schema.Core.Data.IntegerDataType, Schema.Core",
+        "DefaultValue": 0
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Cargo slots",
+      "ColumnWidth": 150,
+      "DefaultValue": 0
+    }
+  ],
+  "Entries": [
+    {
+      "ID": "Ship_Sloop",
+      "Name": "Sloop",
+      "Speed": 9.0,
+      "Capacity": 6
+    },
+    {
+      "ID": "Ship_Brig",
+      "Name": "Brig",
+      "Speed": 7.5,
+      "Capacity": 14
+    },
+    {
+      "ID": "Ship_Galleon",
+      "Name": "Galleon",
+      "Speed": 5.0,
+      "Capacity": 30
+    }
+  ]
+}

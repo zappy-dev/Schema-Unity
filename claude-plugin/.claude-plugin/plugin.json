@@ -1,0 +1,13 @@
+{
+  "name": "schema-unity",
+  "version": "0.3.0",
+  "description": "Skills for AI agents working in a Unity project that uses the Schema data-table package (com.devzappy.schema.unity). Written against package 0.3.x, verified at 0.3.1 plus commit e9089e0.",
+  "author": {
+    "name": "DevZappy",
+    "email": "me@devzappy.com"
+  },
+  "homepage": "https://github.com/zappy-dev/Schema-Unity/tree/main/claude-plugin",
+  "repository": "https://github.com/zappy-dev/Schema-Unity",
+  "license": "MIT",
+  "keywords": ["unity", "schema", "data-tables", "codegen"]
+}

@@ -1,0 +1,95 @@
+{
+  "SchemeName": "Ports",
+  "Attributes": [
+    {
+      "AttributeName": "ID",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": true,
+      "ShouldPublish": true,
+      "AttributeToolTip": "",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "Name",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "NextPort",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": ""
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "ID of the next port on the standard route; blank for the last port",
+      "ColumnWidth": 150,
+      "DefaultValue": ""
+    },
+    {
+      "AttributeName": "Tint",
+      "DataType": {
+        "$type": "Schema.Core.Data.TextDataType, Schema.Core",
+        "DefaultValue": "#FFFFFF"
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Label colour as #RRGGBB",
+      "ColumnWidth": 150,
+      "DefaultValue": "#FFFFFF"
+    },
+    {
+      "AttributeName": "Fee",
+      "DataType": {
+        "$type": "Schema.Core.Data.IntegerDataType, Schema.Core",
+        "DefaultValue": 0
+      },
+      "IsIdentifier": false,
+      "ShouldPublish": true,
+      "AttributeToolTip": "Docking fee in coins",
+      "ColumnWidth": 150,
+      "DefaultValue": 0
+    }
+  ],
+  "Entries": [
+    {
+      "ID": "Port_Harbor",
+      "Name": "Harbor Town",
+      "NextPort": "Port_Reef",
+      "Tint": "#3FA7D6",
+      "Fee": 5
+    },
+    {
+      "ID": "Port_Reef",
+      "Name": "Coral Reef",
+      "NextPort": "Port_Cape",
+      "Tint": "#59CD90",
+      "Fee": 8
+    },
+    {
+      "ID": "Port_Cape",
+      "Name": "Cape Storm",
+      "NextPort": "Port_Isle",
+      "Tint": "#EE6352",
+      "Fee": 11
+    },
+    {
+      "ID": "Port_Isle",
+      "Name": "Last Isle",
+      "NextPort": "",
+      "Tint": "#FAC05E",
+      "Fee": 12
+    }
+  ]
+}
