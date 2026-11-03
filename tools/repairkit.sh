@@ -69,6 +69,7 @@ case "$cmd" in
   start)
     if running; then echo "already running ($SOCKET)"; exit 0; fi
     mkdir -p "$STATE_ROOT"
+    cd "$STATE_ROOT"   # not a checkout: nothing the daemon spawns should start in one
     nohup env PYTHONPATH="$TOOLS_DIR" "$VENV/bin/repairkit" --host repair_host serve >>"$OUTLOG" 2>&1 </dev/null &
     echo $! >"$PIDFILE"
     for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
