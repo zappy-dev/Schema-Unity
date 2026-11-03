@@ -1,0 +1,10 @@
+{
+  "_doc": "EditMode tests that fail on unchanged code and must not make tools/repair_gate.py red. Each entry needs the test's NUnit fullname and the reason. Remove an entry once its test passes (the gate says so). Any failure not listed here makes the gate red.",
+  "known_failures": [
+    {
+      "test": "Schema.Unity.Editor.Tests.SchemaEditorWindowTests.Test_Click_Create_New_Scheme_Button",
+      "reason": "Pre-existing: fails before the feedback collector existed (docs/RepairKit-Plan.md phase 1 Result: 168 run, 167 pass). Message: \"No Scheme '<guid>' loaded. Expected: True But was: False\". Not caused by phase 1 or 2; listed so the gate judges repairs, not this test.",
+      "since": "2026-11-03"
+    }
+  ]
+}

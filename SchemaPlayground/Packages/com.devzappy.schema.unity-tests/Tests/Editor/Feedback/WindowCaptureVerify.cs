@@ -134,6 +134,65 @@ namespace Schema.Unity.Editor.Feedback.Tests
             }
         }
 
+        /// <summary>
+        /// End-to-end check of the collector against a real Schema-Unity daemon (plan A1.1, phase 2): <c>ping</c>, then one
+        /// report through the collector's own <see cref="FeedbackSender"/> with the live Editor's context and a small
+        /// generated PNG named like the real screenshot. The socket comes from <c>SCHEMA_VERIFY_SOCKET</c> and the outbox
+        /// is a folder under <c>SCHEMA_VERIFY_OUT</c>, so neither the shared EditorPrefs key nor the shared outbox is
+        /// touched. Writes <c>e2e.txt</c> (status and report id) there and exits 0 only if the report and its photo were
+        /// both accepted. Batch-safe:
+        /// <code>
+        /// SCHEMA_VERIFY_SOCKET=~/.schema-unity/repairkit/repairkit.sock SCHEMA_VERIFY_OUT=/some/dir \
+        ///   unity run TestProjects/Unity6 -- -executeMethod Schema.Unity.Editor.Feedback.Tests.WindowCaptureVerify.SubmitToDaemon
+        /// </code>
+        /// It files a real report (message starts "[phase 2 e2e smoke]"): point it only at a daemon with repairs held.
+        /// </summary>
+        public static void SubmitToDaemon()
+        {
+            var socket = Environment.GetEnvironmentVariable("SCHEMA_VERIFY_SOCKET");
+            var outDir = Environment.GetEnvironmentVariable("SCHEMA_VERIFY_OUT");
+            if (string.IsNullOrEmpty(outDir)) outDir = Path.Combine(Path.GetTempPath(), "schema-daemon-e2e");
+            Directory.CreateDirectory(outDir);
+            var lines = new StringBuilder();
+            void Say(string line) { lines.AppendLine(line); Debug.Log("[daemon-e2e] " + line); }
+
+            var exitCode = 1;
+            try
+            {
+                Say("ping: " + new RepairkitClient(socket, 5000).Ping().ToString(Newtonsoft.Json.Formatting.None));
+
+                var texture = new Texture2D(64, 40, TextureFormat.RGBA32, false);
+                var pixels = new Color32[64 * 40];
+                for (var i = 0; i < pixels.Length; i++) pixels[i] = (i % 64) < 32 ? new Color32(200, 40, 40, 255) : new Color32(40, 40, 200, 255);
+                texture.SetPixels32(pixels);
+                texture.Apply();
+                var photo = PhotoFitter.Fit(texture);
+                UnityEngine.Object.DestroyImmediate(texture);
+
+                var draft = new FeedbackDraft
+                {
+                    Message = "[phase 2 e2e smoke] Not a real bug: a test report from WindowCaptureVerify.SubmitToDaemon proving the " +
+                              "collector reaches the Schema-Unity daemon. Do not repair.",
+                    Context = FeedbackContext.Build(FeedbackContextCapture.Capture(null, false)),
+                    Photo = photo,
+                };
+                var settings = new FeedbackSettings { SocketPath = socket, OutboxRoot = Path.Combine(outDir, "outbox") };
+                var result = new FeedbackSender(settings).Send(draft);
+                Say("send: " + result.Status + ", report " + result.ReportId + ", photo " + photo.Name + " (" + photo.Bytes.Length +
+                    " bytes), error " + (result.Error ?? "none") + ": " + result.Message);
+                Say("report_id=" + result.ReportId);
+                exitCode = result.Status == SendStatus.Sent && !string.IsNullOrEmpty(result.ReportId) && result.Error == null ? 0 : 1;
+            }
+            catch (Exception e)
+            {
+                Say("failed: " + e.GetType().Name + ": " + e.Message);
+            }
+
+            Say(exitCode == 0 ? "RESULT: PASS" : "RESULT: FAIL");
+            File.WriteAllText(Path.Combine(outDir, "e2e.txt"), lines.ToString());
+            EditorApplication.Exit(exitCode);
+        }
+
         /// <summary>Captures one window to a PNG and says how big it came out against the window's size times the scale.</summary>
         private static bool CaptureTo(EditorWindow window, string fileName, string outDir, Action<string> say)
         {

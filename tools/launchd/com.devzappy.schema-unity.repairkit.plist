@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Schema-Unity's repairkit daemon as a per-user launchd agent. Written, not loaded: loading it is the user's step
+  (docs/RepairKit-Daemon.md). It runs tools/repairkit.sh serve from the PRIMARY checkout, so put that checkout on
+  main (with this file in it) first. launchd does not expand ~, so the paths are absolute for user zappy.
+
+    cp tools/launchd/com.devzappy.schema-unity.repairkit.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.devzappy.schema-unity.repairkit.plist
+    launchctl bootout gui/$(id -u)/com.devzappy.schema-unity.repairkit
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.devzappy.schema-unity.repairkit</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/zappy/src/Schema-Unity/tools/repairkit.sh</string>
+    <string>serve</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/zappy/.schema-unity/repairkit</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/zappy/.unity/bin:/Users/zappy/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>/Users/zappy</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/zappy/.schema-unity/repairkit/launchd.out</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/zappy/.schema-unity/repairkit/launchd.out</string>
+</dict>
+</plist>
