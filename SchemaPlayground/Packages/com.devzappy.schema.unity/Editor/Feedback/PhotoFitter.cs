@@ -64,24 +64,72 @@ namespace Schema.Unity.Editor.Feedback
             return new FeedbackPhoto { Name = BaseName + ".jpg", Mime = "image/jpeg", Bytes = jpeg };
         }
 
-        /// <summary>
-        /// A capture that is all black: a locked screen, or a view that did not draw. Sampled on a coarse grid;
-        /// a real window has a grey background at the least.
-        /// </summary>
-        public static bool LooksBlack(Texture2D texture)
-        {
-            if (texture == null) return true;
-            var pixels = texture.GetPixels32();
-            if (pixels.Length == 0) return true;
+        /// <summary>A pixel this dark in every channel counts as black; the dark Editor theme sits near 56.</summary>
+        private const int DarkLevel = 8;
 
-            var stride = Math.Max(1, pixels.Length / 4096);
+        /// <summary>At least this share of the picture being black means it is not a window.</summary>
+        internal const float BlackShare = 0.9f;
+
+        /// <summary>Neighbouring pixels further apart than this on any channel count as an edge.</summary>
+        private const int NeighbourJump = 40;
+
+        /// <summary>At least this share of neighbouring pairs being edges means noise, not a drawn window.</summary>
+        internal const float NoiseShare = 0.5f;
+
+        private const int SampleBudget = 8192;
+
+        /// <summary>
+        /// Why this capture is not worth sending, in words for the person, or null when it looks like a window.
+        /// Two ways a capture goes wrong, both seen in the wild:
+        /// <list type="bullet">
+        /// <item>Black, or all but black -- a locked screen, or a view that did not draw before it was grabbed.
+        /// Checked as a share, not as "every pixel": the report this came from was a black frame with a band of
+        /// garbage across the top, which an all-or-nothing check let through.</item>
+        /// <item>Noise -- graphics memory that was never written, which reads back as random colour. A drawn
+        /// window is mostly flat fill, so almost no two neighbouring pixels are far apart; noise is the opposite.</item>
+        /// </list>
+        /// Sampled on a coarse grid, so the cost does not grow with the window.
+        /// </summary>
+        public static string DescribeUnusable(Texture2D texture)
+        {
+            const string empty = "The capture came out empty";
+            if (texture == null || texture.width < 1 || texture.height < 1) return empty;
+
+            var pixels = texture.GetPixels32();
+            if (pixels.Length == 0) return empty;
+
+            var width = texture.width;
+            var stride = Math.Max(1, pixels.Length / SampleBudget);
+            // A stride that divides the width walks the same few columns down the whole picture, which for a
+            // power-of-two sized window would judge it on a sliver. One more pixel breaks the alignment.
+            if (stride > 1 && width % stride == 0) stride++;
+
+            int sampled = 0, black = 0, pairs = 0, edges = 0;
             for (var i = 0; i < pixels.Length; i += stride)
             {
                 var p = pixels[i];
-                if (p.r > 8 || p.g > 8 || p.b > 8) return false;
+                sampled++;
+                if (p.r <= DarkLevel && p.g <= DarkLevel && p.b <= DarkLevel) black++;
+
+                if (i % width == width - 1) continue; // the row's last pixel has no right-hand neighbour
+                var right = pixels[i + 1];
+                pairs++;
+                if (Math.Abs(p.r - right.r) > NeighbourJump || Math.Abs(p.g - right.g) > NeighbourJump ||
+                    Math.Abs(p.b - right.b) > NeighbourJump) edges++;
             }
 
-            return true;
+            if (sampled == 0) return empty;
+            if (black >= sampled * BlackShare)
+            {
+                return black == sampled ? "The capture came out black" : "The capture came out all but black";
+            }
+
+            if (pairs > 0 && edges >= pairs * NoiseShare) return "The capture came out as noise, not a picture of the window";
+
+            // Neither alone, but nothing else either: a part-drawn grab is black where it drew nothing and noise
+            // where the memory was never written, and a drawn window is overwhelmingly neither.
+            if (black + edges >= sampled * BlackShare) return "The capture came out black with noise across it";
+            return null;
         }
 
         private static byte[] EncodeJpeg(Color32[] pixels, int width, int height, int quality)
